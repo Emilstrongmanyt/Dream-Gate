@@ -243,7 +243,7 @@ namespace DreamGate.Battlegrounds.UI
             var action = mode == CardSlotDisplayMode.Hand
                 ? "Tap to play from hand."
                 : mode == CardSlotDisplayMode.Board
-                    ? "Tap to sell for 1 gold."
+                    ? "Drag to rearrange. Tap to sell for 1 gold."
                     : string.Empty;
 
             var body = BuildAbilityBody(card);

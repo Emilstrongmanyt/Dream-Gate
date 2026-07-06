@@ -183,6 +183,19 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
+        public bool TryReorderBoard(int fromIndex, int toIndex, out string message)
+        {
+            EnsureRecruitPhase();
+            var success = ShopSystem.TryReorderBoard(humanPlayer, fromIndex, toIndex, out message);
+            if (success && fromIndex != toIndex)
+            {
+                Post(message);
+                StateChanged?.Invoke();
+            }
+
+            return success;
+        }
+
         public bool TryPlayFromHand(int handIndex, out string message)
         {
             EnsureRecruitPhase();

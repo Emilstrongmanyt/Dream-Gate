@@ -120,6 +120,41 @@ namespace DreamGate.Battlegrounds.Economy
             return true;
         }
 
+        public static bool TryReorderBoard(PlayerState player, int fromIndex, int toIndex, out string message)
+        {
+            message = string.Empty;
+            if (fromIndex < 0 || fromIndex >= player.board.Count)
+            {
+                message = "Invalid board slot.";
+                return false;
+            }
+
+            if (toIndex < 0 || toIndex >= MatchConfig.BoardSize)
+            {
+                message = "Invalid target slot.";
+                return false;
+            }
+
+            if (fromIndex == toIndex)
+            {
+                return true;
+            }
+
+            var minion = player.board[fromIndex];
+            player.board.RemoveAt(fromIndex);
+
+            var insertIndex = toIndex;
+            if (insertIndex > fromIndex)
+            {
+                insertIndex--;
+            }
+
+            insertIndex = Mathf.Clamp(insertIndex, 0, player.board.Count);
+            player.board.Insert(insertIndex, minion);
+            message = "Board rearranged.";
+            return true;
+        }
+
         public static bool TryPlayFromHand(PlayerState player, int handIndex, out string message)
         {
             message = string.Empty;

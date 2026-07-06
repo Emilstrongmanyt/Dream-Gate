@@ -862,6 +862,44 @@ namespace DreamGate.Battlegrounds.UI
             AppendLog(message);
         }
 
+        internal bool CanDragBoardSlot(int index)
+        {
+            if (matchManager == null || matchManager.Phase != MatchPhase.Recruit)
+            {
+                return false;
+            }
+
+            var player = matchManager.GetHumanPlayer();
+            return player != null && index < player.board.Count;
+        }
+
+        internal int GetBoardDropSlotIndex(Vector2 screenPosition, Camera eventCamera)
+        {
+            for (var i = 0; i < boardSlots.Count; i++)
+            {
+                if (RectTransformUtility.RectangleContainsScreenPoint(boardSlots[i].RootRect, screenPosition, eventCamera))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        internal void TryBoardReorder(int fromIndex, int toIndex)
+        {
+            matchManager.TryReorderBoard(fromIndex, toIndex, out var message);
+            if (!string.IsNullOrEmpty(message))
+            {
+                AppendLog(message);
+            }
+        }
+
+        internal Transform GetBoardDragLayer()
+        {
+            return recruitPanel != null ? recruitPanel.transform : transform;
+        }
+
         private void OnHandClicked(int index)
         {
             matchManager.TryPlayFromHand(index, out var message);
@@ -1019,6 +1057,12 @@ namespace DreamGate.Battlegrounds.UI
                     () => onClick(index),
                     cardInspectOverlay,
                     includeCombatMotion);
+                if (mode == CardSlotDisplayMode.Board)
+                {
+                    var dragHandler = slot.RootRect.GetComponent<BoardCardDragHandler>();
+                    dragHandler.Configure(index, this);
+                }
+
                 slots.Add(slot);
             }
         }
@@ -1065,6 +1109,11 @@ namespace DreamGate.Battlegrounds.UI
             if (mode == CardSlotDisplayMode.Hand)
             {
                 rootGo.AddComponent<HandCardLift>();
+            }
+
+            if (mode == CardSlotDisplayMode.Board)
+            {
+                rootGo.AddComponent<BoardCardDragHandler>();
             }
 
             CombatMinionMotion combatMotion = null;
@@ -1224,6 +1273,20 @@ namespace DreamGate.Battlegrounds.UI
             return true;
         }
 
+        public void SuppressNextClick()
+        {
+            suppressClick = true;
+        }
+
+        public void CancelInspect()
+        {
+            pointerDown = false;
+            holdTimer = 0f;
+            hoverEligible = false;
+            hoverTimer = 0f;
+            HideInspect();
+        }
+
         public void OnPointerDown(PointerEventData eventData)
         {
             if (!CanInspect())
@@ -1327,15 +1390,6 @@ namespace DreamGate.Battlegrounds.UI
 
             inspectVisible = false;
             overlay.Hide();
-        }
-
-        private void CancelInspect()
-        {
-            pointerDown = false;
-            holdTimer = 0f;
-            hoverEligible = false;
-            hoverTimer = 0f;
-            HideInspect();
         }
 
         private static bool UseHoverInspect()
@@ -1591,6 +1645,156 @@ namespace DreamGate.Battlegrounds.UI
                 PortraitImage.color = new Color(0.2f, 0.35f, 0.65f, 0.55f);
                 PortraitImage.enabled = true;
             }
+        }
+    }
+
+    /// <summary>
+    /// Drag board minions between slots during the recruit phase.
+    /// </summary>
+    public class BoardCardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        private const float DragScale = 1.08f;
+        private const float DragAlpha = 0.72f;
+        private const float DragSuppressDistance = 12f;
+
+        private PracticeGameUI ui;
+        private CardInspectHandler inspectHandler;
+        private CardIdleMotion idleMotion;
+        private CanvasGroup canvasGroup;
+        private RectTransform rect;
+        private Transform dragLayer;
+        private Transform originalParent;
+        private Vector2 basePosition;
+        private Vector2 dragOffset;
+        private Vector3 baseScale;
+        private int originalSiblingIndex;
+        private int slotIndex;
+        private bool dragging;
+
+        public void Configure(int index, PracticeGameUI owner)
+        {
+            slotIndex = index;
+            ui = owner;
+            inspectHandler = GetComponent<CardInspectHandler>();
+            idleMotion = GetComponentInChildren<CardIdleMotion>();
+            rect = GetComponent<RectTransform>();
+            canvasGroup = GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+
+            dragLayer = owner.GetBoardDragLayer();
+            CacheBase();
+        }
+
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            if (ui == null || !ui.CanDragBoardSlot(slotIndex))
+            {
+                return;
+            }
+
+            dragging = true;
+            inspectHandler?.CancelInspect();
+            idleMotion?.SetActiveMotion(false);
+
+            originalParent = rect.parent;
+            originalSiblingIndex = rect.GetSiblingIndex();
+            basePosition = rect.anchoredPosition;
+            baseScale = rect.localScale;
+
+            rect.SetParent(dragLayer, true);
+            rect.SetAsLastSibling();
+            rect.localScale = baseScale * DragScale;
+            canvasGroup.alpha = DragAlpha;
+            canvasGroup.blocksRaycasts = false;
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    rect.parent as RectTransform,
+                    eventData.position,
+                    eventData.pressEventCamera,
+                    out var localPoint))
+            {
+                dragOffset = rect.anchoredPosition - localPoint;
+            }
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    rect.parent as RectTransform,
+                    eventData.position,
+                    eventData.pressEventCamera,
+                    out var localPoint))
+            {
+                rect.anchoredPosition = localPoint + dragOffset;
+            }
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            dragging = false;
+            var dragged = Vector2.Distance(eventData.pressPosition, eventData.position) >= DragSuppressDistance;
+            var dropIndex = ui.GetBoardDropSlotIndex(eventData.position, eventData.pressEventCamera);
+            if (dropIndex >= 0 && dropIndex != slotIndex)
+            {
+                ui.TryBoardReorder(slotIndex, dropIndex);
+                inspectHandler?.SuppressNextClick();
+            }
+            else if (dragged)
+            {
+                inspectHandler?.SuppressNextClick();
+            }
+
+            rect.SetParent(originalParent, false);
+            rect.SetSiblingIndex(originalSiblingIndex);
+            rect.anchoredPosition = basePosition;
+            rect.localScale = baseScale;
+            canvasGroup.alpha = 1f;
+            canvasGroup.blocksRaycasts = true;
+            idleMotion?.SetActiveMotion(true);
+        }
+
+        private void OnDisable()
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            dragging = false;
+            if (originalParent != null)
+            {
+                rect.SetParent(originalParent, false);
+                rect.SetSiblingIndex(originalSiblingIndex);
+            }
+
+            rect.anchoredPosition = basePosition;
+            rect.localScale = baseScale;
+            canvasGroup.alpha = 1f;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        private void CacheBase()
+        {
+            if (rect == null)
+            {
+                rect = GetComponent<RectTransform>();
+            }
+
+            basePosition = rect.anchoredPosition;
+            baseScale = rect.localScale;
         }
     }
 
