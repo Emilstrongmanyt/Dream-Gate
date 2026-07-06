@@ -57,15 +57,17 @@ namespace DreamGate.Battlegrounds.UI
 
         private static readonly float[] SpeedOptions = { 0.5f, 1f, 2f, 3f };
         private static readonly Vector2 CardSlotSize = new(132, 168);
-        private static readonly Vector2 ShopRowCenter = new(0, 250);
-        private static readonly Vector2 BoardRowCenter = new(0, -210);
-        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -535);
-        private static readonly Vector2 HandRowCenter = new(0, -660);
-        private static readonly Vector2 OpponentHeroCenter = new(0, 535);
-        private static readonly Vector2 OpponentBoardCenter = new(0, 210);
-        private static readonly Vector2 PlayerBoardCenter = new(0, -210);
-        private static readonly Vector2 PlayerHeroCenter = new(0, -535);
-        private static readonly Vector2 HeroOvalSize = new(172, 188);
+        private static readonly Vector2 ShopRowCenter = new(0, 40);
+        private static readonly Vector2 BoardRowCenter = new(0, -240);
+        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, 280);
+        private static readonly Vector2 HandRowCenter = new(0, -640);
+        private static readonly Vector2 OpponentHeroCenter = new(0, 420);
+        private static readonly Vector2 OpponentBoardCenter = new(0, 180);
+        private static readonly Vector2 PlayerBoardCenter = new(0, -240);
+        private static readonly Vector2 PlayerHeroCenter = new(0, -460);
+        private static readonly Vector2 HeroOvalSize = new(156, 172);
+        private const int CompactLogMaxLines = 3;
+        private const int CompactLogMaxChars = 900;
         private static readonly Color HudPanelColor = new(0.04f, 0.06f, 0.12f, 0.72f);
         private static readonly Color LogPanelColor = new(0.04f, 0.06f, 0.12f, 0.65f);
         private static readonly Color CombatPanelColor = new(0.03f, 0.05f, 0.1f, 0.55f);
@@ -259,25 +261,25 @@ namespace DreamGate.Battlegrounds.UI
             recruitRect.offsetMin = Vector2.zero;
             recruitRect.offsetMax = Vector2.zero;
 
-            CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, 148, CardSlotDisplayMode.Shop, OnShopClicked);
-            CreateSlotRow(recruitPanel.transform, boardSlots, "Board", BoardRowCenter, 6, 138, CardSlotDisplayMode.Board, OnBoardClicked);
             recruitPlayerHero = CreateHeroOvalPortrait(
                 recruitPanel.transform,
                 "RecruitPlayerHero",
                 RecruitPlayerHeroCenter,
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
+            CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, 148, CardSlotDisplayMode.Shop, OnShopClicked);
+            CreateSlotRow(recruitPanel.transform, boardSlots, "Board", BoardRowCenter, 6, 138, CardSlotDisplayMode.Board, OnBoardClicked);
             CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, 138, CardSlotDisplayMode.Hand, OnHandClicked);
 
-            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-380, 250), OnRefreshShopClicked);
-            upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 120), OnUpgradeClicked);
-            endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, 30), OnEndTurnClicked);
+            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-380, 40), OnRefreshShopClicked);
+            upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 40), OnUpgradeClicked);
+            endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, -50), OnEndTurnClicked);
             if (matchManager.Mode == MatchMode.Rated)
             {
                 endTurnButton.gameObject.SetActive(false);
             }
 
-            speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, -60), OnSpeedClicked);
-            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(380, -150), () => SceneNavigator.LoadMainMenu());
+            speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, -140), OnSpeedClicked);
+            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(380, -230), () => SceneNavigator.LoadMainMenu());
 
             BuildCombatPanel(root);
 
@@ -724,29 +726,34 @@ namespace DreamGate.Battlegrounds.UI
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
             hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0, -20);
-            hudRect.sizeDelta = new Vector2(980, 210);
+            hudRect.anchoredPosition = new Vector2(0, -12);
+            hudRect.sizeDelta = new Vector2(980, 248);
 
-            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, -30), 26, TextAlignmentOptions.Center);
-            hudText.rectTransform.sizeDelta = new Vector2(940, 110);
+            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, -24), 24, TextAlignmentOptions.Center);
+            hudText.rectTransform.sizeDelta = new Vector2(940, 84);
 
-            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -125), 17, TextAlignmentOptions.Center);
-            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 50);
+            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -104), 16, TextAlignmentOptions.Center);
+            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 38);
             leaderboardText.color = new Color(0.85f, 0.9f, 1f);
 
-            var logPanel = CreatePanel(root, "LogPanel", LogPanelColor);
-            var logRect = logPanel.GetComponent<RectTransform>();
-            logRect.anchorMin = new Vector2(0.5f, 0f);
-            logRect.anchorMax = new Vector2(0.5f, 0f);
-            logRect.pivot = new Vector2(0.5f, 0f);
-            logRect.anchoredPosition = new Vector2(0, 20);
-            logRect.sizeDelta = new Vector2(980, 170);
+            var compactLogPanel = new GameObject("CompactLog", typeof(RectTransform), typeof(Image));
+            compactLogPanel.transform.SetParent(hudPanel.transform, false);
+            var compactLogRect = compactLogPanel.GetComponent<RectTransform>();
+            compactLogRect.anchorMin = new Vector2(0.5f, 0f);
+            compactLogRect.anchorMax = new Vector2(0.5f, 0f);
+            compactLogRect.pivot = new Vector2(0.5f, 0f);
+            compactLogRect.anchoredPosition = new Vector2(0, 10);
+            compactLogRect.sizeDelta = new Vector2(920, 72);
+            compactLogPanel.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.08f, 0.58f);
 
-            logText = CreateText(logPanel.transform, "Log", new Vector2(0, 10), 16, TextAlignmentOptions.TopLeft);
+            logText = CreateText(compactLogPanel.transform, "Log", Vector2.zero, 13, TextAlignmentOptions.TopLeft);
             logText.rectTransform.anchorMin = Vector2.zero;
             logText.rectTransform.anchorMax = Vector2.one;
-            logText.rectTransform.offsetMin = new Vector2(20, 10);
-            logText.rectTransform.offsetMax = new Vector2(-20, -10);
+            logText.rectTransform.offsetMin = new Vector2(12, 6);
+            logText.rectTransform.offsetMax = new Vector2(-12, -6);
+            logText.color = new Color(0.82f, 0.88f, 0.96f);
+            logText.overflowMode = TextOverflowModes.Ellipsis;
+            logText.maxVisibleLines = CompactLogMaxLines;
         }
 
         private void Refresh()
@@ -964,12 +971,38 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             logBuilder.Insert(0, message + "\n");
-            if (logBuilder.Length > 2500)
+            if (logBuilder.Length > CompactLogMaxChars)
             {
-                logBuilder.Length = 2500;
+                logBuilder.Length = CompactLogMaxChars;
             }
 
-            logText.text = logBuilder.ToString();
+            logText.text = TrimLogForDisplay(logBuilder.ToString(), CompactLogMaxLines);
+        }
+
+        private static string TrimLogForDisplay(string raw, int maxLines)
+        {
+            if (string.IsNullOrEmpty(raw))
+            {
+                return string.Empty;
+            }
+
+            var lines = raw.Split('\n');
+            var kept = new List<string>(maxLines);
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                kept.Add(line.Trim());
+                if (kept.Count >= maxLines)
+                {
+                    break;
+                }
+            }
+
+            return string.Join("\n", kept);
         }
 
         private void CreateSlotRow(
