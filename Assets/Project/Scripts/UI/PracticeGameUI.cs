@@ -20,7 +20,6 @@ namespace DreamGate.Battlegrounds.UI
         private MatchManager matchManager;
         private readonly List<CardSlotView> shopSlots = new();
         private readonly List<CardSlotView> boardSlots = new();
-        private readonly List<CardSlotView> opponentBoardSlots = new();
         private readonly List<CardSlotView> handSlots = new();
         private readonly List<CardSlotView> playerCombatSlots = new();
         private readonly List<CardSlotView> opponentCombatSlots = new();
