@@ -89,8 +89,16 @@ namespace DreamGate.Battlegrounds.Heroes
             return null;
         }
 
+        public const string ShopkeeperHeroId = "shopkeeper";
+        public const string ShopkeeperHeroName = "Tavern Keeper";
+
         private static string GetPortraitAssetName(string heroId)
         {
+            if (heroId == ShopkeeperHeroId)
+            {
+                return "Magician";
+            }
+
             if (!heroId.StartsWith("hero_") || !int.TryParse(heroId.Substring(5), out var heroIndex))
             {
                 return null;

@@ -20,6 +20,7 @@ namespace DreamGate.Battlegrounds.UI
         private MatchManager matchManager;
         private readonly List<CardSlotView> shopSlots = new();
         private readonly List<CardSlotView> boardSlots = new();
+        private readonly List<CardSlotView> opponentBoardSlots = new();
         private readonly List<CardSlotView> handSlots = new();
         private readonly List<CardSlotView> playerCombatSlots = new();
         private readonly List<CardSlotView> opponentCombatSlots = new();
@@ -36,6 +37,7 @@ namespace DreamGate.Battlegrounds.UI
         private GameObject combatPanel;
         private GameObject resultsPanel;
         private GameObject hudPanel;
+        private HeroPortraitSlot recruitShopkeeperHero;
         private HeroPortraitSlot recruitPlayerHero;
         private HeroPortraitSlot combatPlayerHero;
         private HeroPortraitSlot combatOpponentHero;
@@ -57,14 +59,16 @@ namespace DreamGate.Battlegrounds.UI
 
         private static readonly float[] SpeedOptions = { 0.5f, 1f, 2f, 3f };
         private static readonly Vector2 CardSlotSize = new(132, 168);
-        private static readonly Vector2 ShopRowCenter = new(0, 40);
-        private static readonly Vector2 BoardRowCenter = new(0, -240);
-        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, 280);
-        private static readonly Vector2 HandRowCenter = new(0, -640);
-        private static readonly Vector2 OpponentHeroCenter = new(0, 420);
-        private static readonly Vector2 OpponentBoardCenter = new(0, 180);
-        private static readonly Vector2 PlayerBoardCenter = new(0, -240);
-        private static readonly Vector2 PlayerHeroCenter = new(0, -460);
+        private static readonly Vector2 RecruitShopkeeperHeroCenter = new(0, 360);
+        private static readonly Vector2 ShopRowCenter = new(0, 210);
+        private static readonly Vector2 RecruitEnemyBoardCenter = new(0, 55);
+        private static readonly Vector2 RecruitPlayerBoardCenter = new(0, -95);
+        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -285);
+        private static readonly Vector2 HandRowCenter = new(0, -520);
+        private static readonly Vector2 OpponentHeroCenter = new(0, 360);
+        private static readonly Vector2 OpponentBoardCenter = new(0, 55);
+        private static readonly Vector2 PlayerBoardCenter = new(0, -95);
+        private static readonly Vector2 PlayerHeroCenter = new(0, -285);
         private static readonly Vector2 HeroOvalSize = new(156, 172);
         private const int CompactLogMaxLines = 3;
         private const int CompactLogMaxChars = 900;
@@ -261,25 +265,40 @@ namespace DreamGate.Battlegrounds.UI
             recruitRect.offsetMin = Vector2.zero;
             recruitRect.offsetMax = Vector2.zero;
 
+            recruitShopkeeperHero = CreateHeroOvalPortrait(
+                recruitPanel.transform,
+                "RecruitShopkeeperHero",
+                RecruitShopkeeperHeroCenter,
+                new Color(0.55f, 0.35f, 0.2f, 0.55f));
             recruitPlayerHero = CreateHeroOvalPortrait(
                 recruitPanel.transform,
                 "RecruitPlayerHero",
                 RecruitPlayerHeroCenter,
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
+
             CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, 148, CardSlotDisplayMode.Shop, OnShopClicked);
-            CreateSlotRow(recruitPanel.transform, boardSlots, "Board", BoardRowCenter, 6, 138, CardSlotDisplayMode.Board, OnBoardClicked);
+            CreateSlotRow(
+                recruitPanel.transform,
+                opponentBoardSlots,
+                "Rival Army",
+                RecruitEnemyBoardCenter,
+                6,
+                138,
+                CardSlotDisplayMode.Combat,
+                _ => { });
+            CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 6, 138, CardSlotDisplayMode.Board, OnBoardClicked);
             CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, 138, CardSlotDisplayMode.Hand, OnHandClicked);
 
-            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-380, 40), OnRefreshShopClicked);
-            upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 40), OnUpgradeClicked);
-            endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, -50), OnEndTurnClicked);
+            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-380, 210), OnRefreshShopClicked);
+            upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 210), OnUpgradeClicked);
+            endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, 120), OnEndTurnClicked);
             if (matchManager.Mode == MatchMode.Rated)
             {
                 endTurnButton.gameObject.SetActive(false);
             }
 
-            speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, -140), OnSpeedClicked);
-            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(380, -230), () => SceneNavigator.LoadMainMenu());
+            speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, 30), OnSpeedClicked);
+            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(380, -60), () => SceneNavigator.LoadMainMenu());
 
             BuildCombatPanel(root);
 
@@ -299,14 +318,14 @@ namespace DreamGate.Battlegrounds.UI
                 combatPanel.transform,
                 "OpponentHero",
                 OpponentHeroCenter,
-                new Color(0.55f, 0.2f, 0.2f, 0.55f));
+                new Color(0.55f, 0.35f, 0.2f, 0.55f));
             opponentHeroRect = combatOpponentHero.Root;
             opponentHeroText = combatOpponentHero.NameText;
 
             CreateSlotRow(
                 combatPanel.transform,
                 opponentCombatSlots,
-                "Enemy",
+                "Rival Army",
                 OpponentBoardCenter,
                 6,
                 138,
@@ -775,13 +794,14 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             leaderboardText.text = matchManager.GetLeaderboardSummary();
-            recruitPlayerHero?.SetHero(player.heroName, player.heroId, player.heroHealth);
+            RefreshRecruitHeroes(player);
 
             var inCombatPlayback = combatPanel != null && combatPanel.activeSelf;
             if (!inCombatPlayback)
             {
                 RefreshShop(player);
                 RefreshBoard(player);
+                RefreshOpponentBoard(matchManager.GetRecruitOpponentPreview());
                 RefreshHand(player);
             }
 
@@ -846,6 +866,29 @@ namespace DreamGate.Battlegrounds.UI
                 var minion = player.board[i];
                 var card = CardRegistry.Get(minion.cardId);
                 boardSlots[i].SetMinionCard(card, minion, CardSlotDisplayMode.Board, matchManager.Phase == MatchPhase.Recruit);
+            }
+        }
+
+        private void RefreshRecruitHeroes(PlayerState player)
+        {
+            recruitShopkeeperHero?.SetShopkeeper();
+            recruitPlayerHero?.SetHero(player.heroName, player.heroId, player.heroHealth);
+        }
+
+        private void RefreshOpponentBoard(PlayerState opponent)
+        {
+            for (var i = 0; i < opponentBoardSlots.Count; i++)
+            {
+                opponentBoardSlots[i].Button.interactable = false;
+                if (opponent == null || i >= opponent.board.Count)
+                {
+                    opponentBoardSlots[i].SetEmpty("—", false);
+                    continue;
+                }
+
+                var minion = opponent.board[i];
+                var card = CardRegistry.Get(minion.cardId);
+                opponentBoardSlots[i].SetCombatMinion(card, minion);
             }
         }
 
@@ -1582,10 +1625,16 @@ namespace DreamGate.Battlegrounds.UI
             this.hpText = hpText;
         }
 
+        public void SetShopkeeper()
+        {
+            SetHero(HeroRegistry.ShopkeeperHeroName, HeroRegistry.ShopkeeperHeroId, -1);
+            hpText.text = "Shop";
+        }
+
         public void SetHero(string heroName, string heroId, int heroHealth)
         {
             NameText.text = heroName;
-            hpText.text = $"{heroHealth} HP";
+            hpText.text = heroHealth < 0 ? "Shop" : $"{heroHealth} HP";
 
             var portrait = HeroRegistry.LoadPortrait(heroId);
             if (portrait != null)

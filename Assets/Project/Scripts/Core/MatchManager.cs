@@ -125,6 +125,15 @@ namespace DreamGate.Battlegrounds.Core
 
         public PlayerState GetHumanPlayer() => humanPlayer;
 
+        public PlayerState GetRecruitOpponentPreview()
+        {
+            return players
+                .Where(p => !p.isHuman && !p.isEliminated && p.heroHealth > 0)
+                .OrderByDescending(p => p.heroHealth)
+                .ThenBy(p => p.playerId)
+                .FirstOrDefault();
+        }
+
         public int GetAlivePlayerCount()
         {
             return players.Count(p => !p.isEliminated && p.heroHealth > 0);
