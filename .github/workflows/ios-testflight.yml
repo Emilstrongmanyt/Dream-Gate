@@ -235,24 +235,19 @@ jobs:
           contents_path = os.path.join(icon_set, "Contents.json")
           with open(contents_path, encoding="utf-8") as f:
               data = json.load(f)
-          images = data.setdefault("images", [])
-          has_1024 = any(img.get("size") == "1024x1024" for img in images)
-          if not has_1024:
-              images.append({
-                  "filename": "Icon-1024.png",
-                  "idiom": "universal",
-                  "platform": "ios",
-                  "size": "1024x1024",
-              })
-          for img in images:
-              if img.get("size") == "1024x1024":
-                  img["filename"] = "Icon-1024.png"
-                  img["idiom"] = "universal"
-                  img["platform"] = "ios"
+          images = [img for img in data.get("images", []) if img.get("size") != "1024x1024"]
+          images.append({
+              "filename": "Icon-1024.png",
+              "idiom": "ios-marketing",
+              "scale": "1x",
+              "size": "1024x1024",
+          })
+          data["images"] = images
           with open(contents_path, "w", encoding="utf-8") as f:
-              json.dump(data, f, indent=2)
+              json.dump(data, f, indent="\t")
               f.write("\n")
           print(f"Updated {contents_path}")
+          print(open(contents_path, encoding="utf-8").read())
           PY
           cd "$XCODE_DIR"
           xcodebuild -allowProvisioningUpdates \
