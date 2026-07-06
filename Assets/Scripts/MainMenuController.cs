@@ -9,6 +9,7 @@ public class MainMenuController : MonoBehaviour
     private void Start()
     {
         EnsureRatedButton();
+        EnsureBackButton();
     }
 
     public void StartPracticeGame()
@@ -20,6 +21,11 @@ public class MainMenuController : MonoBehaviour
     public void StartRatedLobby()
     {
         SceneNavigator.LoadRatedLobby();
+    }
+
+    public void BackToHome()
+    {
+        SceneNavigator.LoadHome();
     }
 
     private void EnsureRatedButton()
@@ -58,6 +64,35 @@ public class MainMenuController : MonoBehaviour
         ratedButton = ratedGo.GetComponent<Button>();
         ratedButton.onClick.RemoveAllListeners();
         ratedButton.onClick.AddListener(StartRatedLobby);
+    }
+
+    private void EnsureBackButton()
+    {
+        var practiceButton = FindPracticeButton();
+        if (practiceButton == null)
+        {
+            return;
+        }
+
+        var backGo = Instantiate(practiceButton.gameObject, practiceButton.transform.parent);
+        backGo.name = "BackButton";
+        var rect = backGo.GetComponent<RectTransform>();
+        var practiceRect = practiceButton.GetComponent<RectTransform>();
+        rect.anchoredPosition = practiceRect.anchoredPosition + new Vector2(-320f, 0f);
+
+        var image = backGo.GetComponent<Image>();
+        image.color = new Color(0.15f, 0.2f, 0.35f, 0.95f);
+
+        var label = backGo.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+        if (label != null)
+        {
+            label.text = "Back";
+            label.fontSize = 28;
+        }
+
+        var backButton = backGo.GetComponent<Button>();
+        backButton.onClick.RemoveAllListeners();
+        backButton.onClick.AddListener(BackToHome);
     }
 
     private static Button FindPracticeButton()

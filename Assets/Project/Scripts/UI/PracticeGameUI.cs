@@ -272,7 +272,7 @@ namespace DreamGate.Battlegrounds.UI
             upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 120), OnUpgradeClicked);
             endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, 30), OnEndTurnClicked);
             speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, -60), OnSpeedClicked);
-            menuButton = CreateActionButton(recruitPanel.transform, "Main Menu", new Vector2(380, -150), () => SceneNavigator.LoadMainMenu());
+            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(380, -150), () => SceneNavigator.LoadMainMenu());
 
             BuildCombatPanel(root);
 
