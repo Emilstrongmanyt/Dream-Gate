@@ -130,6 +130,34 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$PROFILE_UUID".mobileprovision
 
+      - name: Remove unused Unity Purchasing from Xcode project
+        run: |
+          PBXPROJ=$(find build/iOS -name project.pbxproj | head -1)
+          if [ -z "$PBXPROJ" ]; then
+            echo "project.pbxproj not found"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import pathlib, re
+          pbx = pathlib.Path(__import__("subprocess").check_output(
+              "find build/iOS -name project.pbxproj | head -1", shell=True, text=True
+          ).strip())
+          text = pbx.read_text(encoding="utf-8")
+          patterns = [
+              r"^\t\t.*StoreKit\.framework.*\n",
+              r"^\t\t.*UnityPurchasing.*\n",
+              r"^\t\t.*StoreKitManager\.swift.*\n",
+              r"^\t\t.*StoreKitCallback\.swift.*\n",
+              r"^\t\t.*UnityStoreKitPlugin\.swift.*\n",
+              r"^\t\t.*com\.unity\.purchasing.*\n",
+          ]
+          original_len = len(text)
+          for pattern in patterns:
+              text = re.sub(pattern, "", text, flags=re.MULTILINE)
+          pbx.write_text(text, encoding="utf-8")
+          print(f"Patched {pbx} ({original_len} -> {len(text)} bytes)")
+          PY
+
       - name: Build signed IPA
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
