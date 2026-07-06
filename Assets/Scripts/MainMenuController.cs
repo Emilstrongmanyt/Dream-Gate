@@ -187,7 +187,7 @@ public class MainMenuController : MonoBehaviour
             return practiceObject.GetComponent<Button>();
         }
 
-        var buttons = FindObjectsByType<Button>(FindObjectsSortMode.None);
+        var buttons = FindObjectsByType<Button>();
         foreach (var button in buttons)
         {
             if (button.gameObject.name is "RatedButton" or "BackButton")
