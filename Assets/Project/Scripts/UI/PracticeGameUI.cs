@@ -57,16 +57,20 @@ namespace DreamGate.Battlegrounds.UI
         private int speedIndex;
 
         private static readonly float[] SpeedOptions = { 0.5f, 1f, 2f, 3f };
-        private static readonly Vector2 CardSlotSize = new(132, 168);
+        private const float CardScaleFactor = 1.2f;
+        private static readonly Vector2 CardSlotSize = new(132f * CardScaleFactor, 168f * CardScaleFactor);
+        private const float ShopSlotSpacing = 148f * CardScaleFactor;
+        private const float BoardSlotSpacing = 138f * CardScaleFactor;
+        private const float RowLabelOffsetY = 95f * CardScaleFactor;
         private static readonly Vector2 RecruitShopkeeperHeroCenter = new(0, 360);
-        private static readonly Vector2 ShopRowCenter = new(0, 210);
-        private static readonly Vector2 RecruitPlayerBoardCenter = new(0, 15);
-        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -275);
-        private static readonly Vector2 HandRowCenter = new(0, -520);
+        private static readonly Vector2 ShopRowCenter = new(0, 55);
+        private static readonly Vector2 RecruitPlayerBoardCenter = new(0, -200);
+        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -480);
+        private static readonly Vector2 HandRowCenter = new(0, -760);
         private static readonly Vector2 OpponentHeroCenter = new(0, 360);
         private static readonly Vector2 OpponentBoardCenter = new(0, 55);
-        private static readonly Vector2 PlayerBoardCenter = new(0, -95);
-        private static readonly Vector2 PlayerHeroCenter = new(0, -285);
+        private static readonly Vector2 PlayerBoardCenter = new(0, -200);
+        private static readonly Vector2 PlayerHeroCenter = new(0, -480);
         private static readonly Vector2 HeroOvalSize = new(156, 172);
         private const int CompactLogMaxLines = 3;
         private const int CompactLogMaxChars = 900;
@@ -274,20 +278,20 @@ namespace DreamGate.Battlegrounds.UI
                 RecruitPlayerHeroCenter,
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
 
-            CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, 148, CardSlotDisplayMode.Shop, OnShopClicked);
-            CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 6, 138, CardSlotDisplayMode.Board, OnBoardClicked);
-            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, 138, CardSlotDisplayMode.Hand, OnHandClicked);
+            CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, ShopSlotSpacing, CardSlotDisplayMode.Shop, OnShopClicked);
+            CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 6, BoardSlotSpacing, CardSlotDisplayMode.Board, OnBoardClicked);
+            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, BoardSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
 
-            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-380, 210), OnRefreshShopClicked);
-            upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 210), OnUpgradeClicked);
-            endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, 120), OnEndTurnClicked);
+            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-420, 55), OnRefreshShopClicked);
+            upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(420, 55), OnUpgradeClicked);
+            endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(420, -50), OnEndTurnClicked);
             if (matchManager.Mode == MatchMode.Rated)
             {
                 endTurnButton.gameObject.SetActive(false);
             }
 
-            speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, 30), OnSpeedClicked);
-            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(380, -60), () => SceneNavigator.LoadMainMenu());
+            speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(420, -155), OnSpeedClicked);
+            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(420, -260), () => SceneNavigator.LoadMainMenu());
 
             BuildCombatPanel(root);
 
@@ -317,7 +321,7 @@ namespace DreamGate.Battlegrounds.UI
                 "Rival Army",
                 OpponentBoardCenter,
                 6,
-                138,
+                BoardSlotSpacing,
                 CardSlotDisplayMode.Combat,
                 _ => { },
                 includeCombatMotion: true);
@@ -328,7 +332,7 @@ namespace DreamGate.Battlegrounds.UI
                 "Your Army",
                 PlayerBoardCenter,
                 6,
-                138,
+                BoardSlotSpacing,
                 CardSlotDisplayMode.Combat,
                 _ => { },
                 includeCombatMotion: true);
@@ -1034,7 +1038,7 @@ namespace DreamGate.Battlegrounds.UI
             var totalWidth = (count - 1) * spacing;
             var startX = center.x - totalWidth * 0.5f;
 
-            CreateSectionLabel(parent, label, new Vector2(-470, center.y + 95));
+            CreateSectionLabel(parent, label, new Vector2(-470, center.y + RowLabelOffsetY));
 
             for (var i = 0; i < count; i++)
             {
@@ -1628,7 +1632,7 @@ namespace DreamGate.Battlegrounds.UI
     /// </summary>
     public class HandCardLift : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
-        private static readonly Vector2 LiftOffset = new(0f, 42f);
+        private static readonly Vector2 LiftOffset = new(0f, 42f * 1.2f);
         private const float LiftScale = 1.28f;
         private const float HoverDelay = 0.24f;
 
