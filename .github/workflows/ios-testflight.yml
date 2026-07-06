@@ -142,27 +142,28 @@ jobs:
           fi
           echo "Using Xcode project at $XCODE_DIR"
           EXPORT_PLIST=$RUNNER_TEMP/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Clear dict" "$EXPORT_PLIST" 2>/dev/null || true
           cat > "$EXPORT_PLIST" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>teamID</key>
-            <string>${APPLE_TEAM_ID}</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${{ env.BUNDLE_ID }}</key>
-              <string>${PROFILE_NAME}</string>
-            </dict>
-            <key>uploadSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>app-store-connect</string>
+  <key>teamID</key>
+  <string>${APPLE_TEAM_ID}</string>
+  <key>signingStyle</key>
+  <string>manual</string>
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>${{ env.BUNDLE_ID }}</key>
+    <string>${PROFILE_NAME}</string>
+  </dict>
+  <key>uploadSymbols</key>
+  <true/>
+</dict>
+</plist>
+EOF
           cd "$XCODE_DIR"
           xcodebuild -allowProvisioningUpdates \
             -scheme Unity-iPhone \
@@ -172,6 +173,10 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            UnityFramework_CODE_SIGN_STYLE=Automatic \
+            UnityFramework_PROVISIONING_PROFILE_SPECIFIER= \
+            GameAssembly_CODE_SIGN_STYLE=Automatic \
+            GameAssembly_PROVISIONING_PROFILE_SPECIFIER= \
             archive
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/DreamGate.xcarchive \
