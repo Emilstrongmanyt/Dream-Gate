@@ -46,6 +46,7 @@ namespace DreamGate.Battlegrounds.UI
         private CombatResult activeCombatResult;
         private CardInspectOverlay cardInspectOverlay;
         private Button upgradeButton;
+        private Button refreshShopButton;
         private Button endTurnButton;
         private Button menuButton;
         private Button speedButton;
@@ -267,6 +268,7 @@ namespace DreamGate.Battlegrounds.UI
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
             CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, 138, CardSlotDisplayMode.Hand, OnHandClicked);
 
+            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-380, 250), OnRefreshShopClicked);
             upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 120), OnUpgradeClicked);
             endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, 30), OnEndTurnClicked);
             speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, -60), OnSpeedClicked);
@@ -777,6 +779,8 @@ namespace DreamGate.Battlegrounds.UI
 
         private void SetRecruitControls(bool enabled)
         {
+            var player = matchManager.GetHumanPlayer();
+            refreshShopButton.interactable = enabled && player.gold >= MatchConfig.ShopRefreshCost;
             upgradeButton.interactable = enabled;
             endTurnButton.interactable = enabled;
         }
@@ -867,6 +871,12 @@ namespace DreamGate.Battlegrounds.UI
         private void OnUpgradeClicked()
         {
             matchManager.TryUpgradeTavern(out var message);
+            AppendLog(message);
+        }
+
+        private void OnRefreshShopClicked()
+        {
+            matchManager.TryRefreshShop(out var message);
             AppendLog(message);
         }
 

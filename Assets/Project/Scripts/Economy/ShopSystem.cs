@@ -83,6 +83,21 @@ namespace DreamGate.Battlegrounds.Economy
             return true;
         }
 
+        public static bool TryRefreshShop(PlayerState player, out string message)
+        {
+            message = string.Empty;
+            if (player.gold < MatchConfig.ShopRefreshCost)
+            {
+                message = "Not enough gold to refresh.";
+                return false;
+            }
+
+            player.gold -= MatchConfig.ShopRefreshCost;
+            RefreshShop(player);
+            message = $"Shop refreshed (-{MatchConfig.ShopRefreshCost} gold).";
+            return true;
+        }
+
         public static bool TryUpgradeTavern(PlayerState player, out string message)
         {
             message = string.Empty;

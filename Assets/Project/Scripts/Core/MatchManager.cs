@@ -33,6 +33,7 @@ namespace DreamGate.Battlegrounds.Core
         public const int MinionCost = 3;
         public const int SellValue = 1;
         public const int TavernUpgradeCost = 4;
+        public const int ShopRefreshCost = 1;
         public const int TripleGoldReward = 3;
 
         public const int BaseRecruitSeconds = 20;
@@ -198,6 +199,19 @@ namespace DreamGate.Battlegrounds.Core
         {
             EnsureRecruitPhase();
             var success = ShopSystem.TryUpgradeTavern(humanPlayer, out message);
+            if (success)
+            {
+                Post(message);
+                StateChanged?.Invoke();
+            }
+
+            return success;
+        }
+
+        public bool TryRefreshShop(out string message)
+        {
+            EnsureRecruitPhase();
+            var success = ShopSystem.TryRefreshShop(humanPlayer, out message);
             if (success)
             {
                 Post(message);
