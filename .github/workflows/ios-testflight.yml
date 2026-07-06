@@ -5,6 +5,16 @@ name: iOS TestFlight
 
 on:
   workflow_dispatch:
+    inputs:
+      sign_only:
+        description: Skip Unity build and reuse build-iOS artifact from a prior run
+        required: false
+        default: false
+        type: boolean
+      artifact_run_id:
+        description: Run ID to download build-iOS artifact from (sign_only only)
+        required: false
+        default: '28775941910'
   push:
     branches:
       - main
@@ -23,6 +33,7 @@ env:
 jobs:
   build-unity-ios:
     name: Build Unity iOS project
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.sign_only }}
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -77,12 +88,22 @@ jobs:
     name: Sign IPA and upload TestFlight
     runs-on: macos-latest
     needs: build-unity-ios
+    if: ${{ always() && (needs.build-unity-ios.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.sign_only)) }}
     steps:
       - name: Download Xcode project
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.sign_only }}
         uses: actions/download-artifact@v4
         with:
           name: build-iOS
           path: build/iOS
+
+      - name: Download Xcode project from prior run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_only }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.artifact_run_id }}" -n build-iOS -D build/iOS --repo "${{ github.repository }}"
+          find build/iOS -maxdepth 4 -type d | head -20
 
       - name: Import signing certificate
         env:
