@@ -1,0 +1,130 @@
+using System.Collections.Generic;
+using DreamGate.Battlegrounds.Cards;
+using DreamGate.Battlegrounds.Core;
+using DreamGate.Battlegrounds.Players;
+using UnityEngine;
+
+namespace DreamGate.Battlegrounds.Economy
+{
+    public static class ShopSystem
+    {
+        public static void RefreshShop(PlayerState player, int? seed = null)
+        {
+            player.shopCardIds.Clear();
+
+            var random = seed.HasValue ? new System.Random(seed.Value) : new System.Random();
+            for (var i = 0; i < MatchConfig.ShopSlotCount; i++)
+            {
+                var card = TavernTierOdds.RollCard(player.tavernTier, random);
+                player.shopCardIds.Add(card != null ? card.cardId : string.Empty);
+            }
+        }
+
+        public static bool TryBuy(PlayerState player, int shopIndex, out string message)
+        {
+            message = string.Empty;
+            if (shopIndex < 0 || shopIndex >= player.shopCardIds.Count)
+            {
+                message = "Invalid shop slot.";
+                return false;
+            }
+
+            if (player.gold < MatchConfig.MinionCost)
+            {
+                message = "Not enough gold.";
+                return false;
+            }
+
+            if (player.HandFull)
+            {
+                message = "Hand is full.";
+                return false;
+            }
+
+            var cardId = player.shopCardIds[shopIndex];
+            var definition = CardRegistry.Get(cardId);
+            if (definition == null)
+            {
+                message = "Card not found.";
+                return false;
+            }
+
+            player.gold -= MatchConfig.MinionCost;
+            player.shopCardIds[shopIndex] = string.Empty;
+
+            var minion = MinionInstance.FromDefinition(definition);
+            player.hand.Add(minion);
+
+            var triple = TripleSystem.TryCombine(player, cardId);
+            if (triple.triggered)
+            {
+                message = $"Triple! Golden {definition.displayName} created (+{triple.goldRewarded} gold).";
+            }
+            else
+            {
+                message = $"Purchased {definition.displayName}.";
+            }
+
+            return true;
+        }
+
+        public static bool TrySell(PlayerState player, int boardIndex, out string message)
+        {
+            message = string.Empty;
+            if (boardIndex < 0 || boardIndex >= player.board.Count)
+            {
+                message = "Invalid board slot.";
+                return false;
+            }
+
+            player.board.RemoveAt(boardIndex);
+            player.gold += MatchConfig.SellValue;
+            message = $"Sold minion (+{MatchConfig.SellValue} gold).";
+            return true;
+        }
+
+        public static bool TryUpgradeTavern(PlayerState player, out string message)
+        {
+            message = string.Empty;
+            if (player.tavernTier >= MatchConfig.MaxTavernTier)
+            {
+                message = "Tavern is already max tier.";
+                return false;
+            }
+
+            if (player.gold < MatchConfig.TavernUpgradeCost)
+            {
+                message = "Not enough gold to upgrade.";
+                return false;
+            }
+
+            player.gold -= MatchConfig.TavernUpgradeCost;
+            player.tavernTier++;
+            RefreshShop(player);
+            message = $"Tavern upgraded to tier {player.tavernTier}.";
+            return true;
+        }
+
+        public static bool TryPlayFromHand(PlayerState player, int handIndex, out string message)
+        {
+            message = string.Empty;
+            if (handIndex < 0 || handIndex >= player.hand.Count)
+            {
+                message = "Invalid hand slot.";
+                return false;
+            }
+
+            if (player.BoardFull)
+            {
+                message = "Board is full.";
+                return false;
+            }
+
+            var minion = player.hand[handIndex];
+            player.hand.RemoveAt(handIndex);
+            player.board.Add(minion);
+            message = "Minion played to board.";
+            return true;
+        }
+    }
+}
