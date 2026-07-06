@@ -26,7 +26,7 @@ on:
       - 'Assets/**'
       - 'Packages/**'
       - 'ProjectSettings/**'
-      - '.github/workflows/ios-testflight.yml'
+      - '.github/**'
 
 env:
   UNITY_VERSION: 6000.5.2f1
@@ -94,6 +94,22 @@ jobs:
     needs: build-unity-ios
     if: ${{ always() && (needs.build-unity-ios.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.sign_only)) }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "Xcode 26 not found. Installed Xcode apps:"
+            ls /Applications | grep Xcode || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcodebuild -showsdks | grep iphoneos
+
       - name: Download Xcode project
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.sign_only }}
         uses: actions/download-artifact@v4
@@ -206,6 +222,38 @@ jobs:
           open(path, "w", encoding="utf-8").write(patched)
           print(f"Patched Unity-iPhone signing in {path}")
           PY
+          ICON_SET="$XCODE_DIR/Unity-iPhone/Images.xcassets/AppIcon.appiconset"
+          if [ ! -d "$ICON_SET" ]; then
+            echo "App icon set not found at $ICON_SET"
+            find "$XCODE_DIR" -name AppIcon.appiconset -maxdepth 6
+            exit 1
+          fi
+          cp .github/ios/AppIcon-1024.png "$ICON_SET/Icon-1024.png"
+          python3 - <<'PY'
+          import json, os
+          icon_set = os.path.join(os.environ["XCODE_DIR"], "Unity-iPhone/Images.xcassets/AppIcon.appiconset")
+          contents_path = os.path.join(icon_set, "Contents.json")
+          with open(contents_path, encoding="utf-8") as f:
+              data = json.load(f)
+          images = data.setdefault("images", [])
+          has_1024 = any(img.get("size") == "1024x1024" for img in images)
+          if not has_1024:
+              images.append({
+                  "filename": "Icon-1024.png",
+                  "idiom": "universal",
+                  "platform": "ios",
+                  "size": "1024x1024",
+              })
+          for img in images:
+              if img.get("size") == "1024x1024":
+                  img["filename"] = "Icon-1024.png"
+                  img["idiom"] = "universal"
+                  img["platform"] = "ios"
+          with open(contents_path, "w", encoding="utf-8") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          print(f"Updated {contents_path}")
+          PY
           cd "$XCODE_DIR"
           xcodebuild -allowProvisioningUpdates \
             -scheme Unity-iPhone \
@@ -236,7 +284,9 @@ jobs:
           APPLE_CONNECT_KEY: ${{ secrets.APPLE_CONNECT_KEY }}
           APPLE_CONNECT_KEY_ID: ${{ secrets.APPLE_CONNECT_KEY_ID }}
           APPLE_CONNECT_ISSUER_ID: ${{ secrets.APPLE_CONNECT_ISSUER_ID }}
+          DEVELOPER_DIR: ${{ env.DEVELOPER_DIR }}
         run: |
+          xcodebuild -version
           KEY_PATH=$RUNNER_TEMP/AuthKey.p8
           printf '%s' "$APPLE_CONNECT_KEY" | base64 --decode > "$KEY_PATH"
           API_KEY_JSON=$RUNNER_TEMP/api_key.json
