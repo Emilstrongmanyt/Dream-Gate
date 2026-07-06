@@ -59,7 +59,7 @@ namespace DreamGate.Battlegrounds.UI
         private static readonly float[] SpeedOptions = { 0.5f, 1f, 2f, 3f };
         private const float CardScaleFactor = 1.2f;
         private static readonly Vector2 CardSlotSize = new(132f * CardScaleFactor, 168f * CardScaleFactor);
-        private const float ShopSlotSpacing = 148f * CardScaleFactor;
+        private const float ShopSlotSpacing = 128f * CardScaleFactor;
         private const float BoardSlotSpacing = 128f * CardScaleFactor;
         private const float HandSlotSpacing = 138f * CardScaleFactor;
         private const float RowLabelOffsetY = 95f * CardScaleFactor;
