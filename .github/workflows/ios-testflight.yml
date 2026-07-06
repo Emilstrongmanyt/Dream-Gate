@@ -3,20 +3,15 @@
 #
 # Required GitHub secrets:
 #   UNITY_EMAIL          — Unity account email
-#   UNITY_PASSWORD       — Unity account password
-#   UNITY_LICENSE        — Unity .ulf license file contents (base64)
-#   APPLE_CONNECT_KEY    — App Store Connect API key JSON (base64)
+#   UNITY_PASSWORD       — Unity account password (alphanumeric recommended)
+#   UNITY_LICENSE        — Unity .ulf license file (base64) for Personal license
+#   APPLE_CONNECT_KEY    — App Store Connect API .p8 key file (base64)
 #   APPLE_CONNECT_KEY_ID — Key ID from App Store Connect
 #   APPLE_CONNECT_ISSUER_ID — Issuer ID from App Store Connect
-#   APPLE_TEAM_ID        — Apple Developer Team ID (e.g. ABCDE12345)
+#   APPLE_TEAM_ID        — Apple Developer Team ID
 #   IOS_P12_BASE64       — Distribution certificate .p12 (base64)
 #   IOS_P12_PASSWORD     — Password for the .p12 file
 #   IOS_MOBILEPROVISION_BASE64 — App Store provisioning profile (base64)
-#
-# One-time App Store Connect setup:
-#   1. Create app with bundle ID com.solodreams.dreamgate
-#   2. Generate an App Store Connect API key (Admin or App Manager role)
-#   3. Create iOS Distribution cert + App Store provisioning profile for that bundle ID
 
 name: iOS TestFlight
 
@@ -35,7 +30,6 @@ env:
   UNITY_VERSION: 6000.5.2f1
   PROJECT_PATH: .
   BUILD_NAME: DreamGate
-  BUILD_TARGET: iOS
   BUNDLE_ID: com.solodreams.dreamgate
 
 jobs:
@@ -58,15 +52,9 @@ jobs:
             Library-iOS-
             Library-
 
-      - name: Activate Unity license
-        uses: game-ci/unity-activate@v2
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-
       - name: Build iOS Xcode project
         uses: game-ci/unity-builder@v4
+        id: unityBuild
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
@@ -76,9 +64,8 @@ jobs:
           targetPlatform: iOS
           projectPath: ${{ env.PROJECT_PATH }}
           buildName: ${{ env.BUILD_NAME }}
-          versioning: Semantic
-          androidVersionCode: 1
-          iosVersionCode: 1
+          versioning: None
+          cacheUnityInstallationOnMac: true
           customParameters: -bundleVersion 1.0 -buildNumber 1
 
       - name: Import signing certificate
@@ -104,7 +91,24 @@ jobs:
           cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
 
       - name: Build signed IPA
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          EXPORT_PLIST=$RUNNER_TEMP/ExportOptions.plist
+          cat > "$EXPORT_PLIST" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
           cd build/iOS/iOS
           xcodebuild -allowProvisioningUpdates \
             -scheme Unity-iPhone \
@@ -114,41 +118,20 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/DreamGate.xcarchive \
             -exportPath $RUNNER_TEMP/export \
-            -exportOptionsPlist <(cat <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>teamID</key>
-            <string>${{ secrets.APPLE_TEAM_ID }}</string>
-            <key>uploadSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-          )
+            -exportOptionsPlist "$EXPORT_PLIST"
 
       - name: Upload to TestFlight
         env:
-          APP_STORE_CONNECT_KEY: ${{ secrets.APPLE_CONNECT_KEY }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APPLE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APPLE_CONNECT_ISSUER_ID }}
+          APPLE_CONNECT_KEY: ${{ secrets.APPLE_CONNECT_KEY }}
+          APPLE_CONNECT_KEY_ID: ${{ secrets.APPLE_CONNECT_KEY_ID }}
+          APPLE_CONNECT_ISSUER_ID: ${{ secrets.APPLE_CONNECT_ISSUER_ID }}
         run: |
           KEY_PATH=$RUNNER_TEMP/AuthKey.p8
-          echo -n "$APP_STORE_CONNECT_KEY" | base64 --decode -o "$KEY_PATH"
+          echo -n "$APPLE_CONNECT_KEY" | base64 --decode -o "$KEY_PATH"
           gem install fastlane
           fastlane pilot upload \
             --api_key_path "$KEY_PATH" \
-            --api_key_key_id "$APP_STORE_CONNECT_KEY_ID" \
-            --api_key_issuer_id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --api_key_key_id "$APPLE_CONNECT_KEY_ID" \
+            --api_key_issuer_id "$APPLE_CONNECT_ISSUER_ID" \
             --ipa "$RUNNER_TEMP/export/${{ env.BUILD_NAME }}.ipa" \
             --skip_waiting_for_build_processing true
-
-      - name: Return Unity license
-        if: always()
-        uses: game-ci/unity-return-license@v2
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
