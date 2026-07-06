@@ -4,7 +4,7 @@
 # Required GitHub secrets:
 #   UNITY_EMAIL          — Unity account email
 #   UNITY_PASSWORD       — Unity account password (alphanumeric recommended)
-#   UNITY_LICENSE        — Unity .ulf license file (base64) for Personal license
+#   UNITY_LICENSE        — Full contents of Unity_lic.ulf (Personal license)
 #   APPLE_CONNECT_KEY    — App Store Connect API .p8 key file (base64)
 #   APPLE_CONNECT_KEY_ID — Key ID from App Store Connect
 #   APPLE_CONNECT_ISSUER_ID — Issuer ID from App Store Connect
@@ -52,13 +52,17 @@ jobs:
             Library-iOS-
             Library-
 
+      - name: Install Unity Personal license
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          sudo mkdir -p "/Library/Application Support/Unity"
+          printf '%s' "$UNITY_LICENSE" | sudo tee "/Library/Application Support/Unity/Unity_lic.ulf" > /dev/null
+          sudo chmod -R 777 "/Library/Application Support/Unity"
+
       - name: Build iOS Xcode project
         uses: game-ci/unity-builder@v4
         id: unityBuild
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: iOS
@@ -66,6 +70,7 @@ jobs:
           buildName: ${{ env.BUILD_NAME }}
           versioning: None
           cacheUnityInstallationOnMac: true
+          skipActivation: true
           customParameters: -bundleVersion 1.0 -buildNumber 1
 
       - name: Import signing certificate
