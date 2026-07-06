@@ -60,9 +60,8 @@ namespace DreamGate.Battlegrounds.UI
         private static readonly Vector2 CardSlotSize = new(132, 168);
         private static readonly Vector2 RecruitShopkeeperHeroCenter = new(0, 360);
         private static readonly Vector2 ShopRowCenter = new(0, 210);
-        private static readonly Vector2 RecruitEnemyBoardCenter = new(0, 55);
-        private static readonly Vector2 RecruitPlayerBoardCenter = new(0, -95);
-        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -285);
+        private static readonly Vector2 RecruitPlayerBoardCenter = new(0, 15);
+        private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -275);
         private static readonly Vector2 HandRowCenter = new(0, -520);
         private static readonly Vector2 OpponentHeroCenter = new(0, 360);
         private static readonly Vector2 OpponentBoardCenter = new(0, 55);
@@ -276,15 +275,6 @@ namespace DreamGate.Battlegrounds.UI
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
 
             CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, 148, CardSlotDisplayMode.Shop, OnShopClicked);
-            CreateSlotRow(
-                recruitPanel.transform,
-                opponentBoardSlots,
-                "Rival Army",
-                RecruitEnemyBoardCenter,
-                6,
-                138,
-                CardSlotDisplayMode.Combat,
-                _ => { });
             CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 6, 138, CardSlotDisplayMode.Board, OnBoardClicked);
             CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, 138, CardSlotDisplayMode.Hand, OnHandClicked);
 
@@ -800,7 +790,6 @@ namespace DreamGate.Battlegrounds.UI
             {
                 RefreshShop(player);
                 RefreshBoard(player);
-                RefreshOpponentBoard(matchManager.GetRecruitOpponentPreview());
                 RefreshHand(player);
             }
 
@@ -872,23 +861,6 @@ namespace DreamGate.Battlegrounds.UI
         {
             recruitShopkeeperHero?.SetShopkeeper();
             recruitPlayerHero?.SetHero(player.heroName, player.heroId, player.heroHealth);
-        }
-
-        private void RefreshOpponentBoard(PlayerState opponent)
-        {
-            for (var i = 0; i < opponentBoardSlots.Count; i++)
-            {
-                opponentBoardSlots[i].Button.interactable = false;
-                if (opponent == null || i >= opponent.board.Count)
-                {
-                    opponentBoardSlots[i].SetEmpty("—", false);
-                    continue;
-                }
-
-                var minion = opponent.board[i];
-                var card = CardRegistry.Get(minion.cardId);
-                opponentBoardSlots[i].SetCombatMinion(card, minion);
-            }
         }
 
         private void RefreshHand(PlayerState player)
