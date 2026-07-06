@@ -18,7 +18,7 @@ on:
       artifact_run_id:
         description: Run ID to download build-iOS artifact from (sign_only only)
         required: false
-        default: '28775941910'
+        default: '28780309888'
   push:
     branches:
       - main
@@ -144,6 +144,7 @@ jobs:
             exit 1
           fi
           echo "Using Xcode project at $XCODE_DIR"
+          export XCODE_DIR
           EXPORT_PLIST=$RUNNER_TEMP/ExportOptions.plist
           python3 - <<'PY'
           import os, plistlib
@@ -160,6 +161,51 @@ jobs:
           print(f"Wrote {path}")
           PY
           security find-identity -v -p codesigning
+          PBXPROJ="$XCODE_DIR/Unity-iPhone.xcodeproj/project.pbxproj"
+          python3 - <<'PY'
+          import os, re, sys
+          path = os.path.join(os.environ["XCODE_DIR"], "Unity-iPhone.xcodeproj/project.pbxproj")
+          text = open(path, encoding="utf-8").read()
+          team = os.environ["APPLE_TEAM_ID"]
+          uuid = os.environ["PROFILE_UUID"]
+          name = os.environ["PROFILE_NAME"]
+          identity = "iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN"
+
+          def patch_config(match):
+              block = match.group(0)
+              if "PRODUCT_BUNDLE_IDENTIFIER = com.solodreams.dreamgate;" not in block:
+                  return block
+              block = block.replace('DEVELOPMENT_TEAM = "";', f'DEVELOPMENT_TEAM = {team};')
+              block = block.replace('CODE_SIGN_IDENTITY = "iPhone Developer";', f'CODE_SIGN_IDENTITY = "{identity}";')
+              block = block.replace(
+                  '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";',
+                  f'"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "{identity}";',
+              )
+              block = block.replace('PROVISIONING_PROFILE_APP = "";', f'PROVISIONING_PROFILE_APP = {uuid};')
+              block = block.replace(
+                  'PROVISIONING_PROFILE_SPECIFIER = "$(PROVISIONING_PROFILE_SPECIFIER_APP)";',
+                  f'PROVISIONING_PROFILE_SPECIFIER = "{name}";',
+              )
+              if "CODE_SIGN_STYLE" not in block:
+                  block = block.replace(
+                      "\t\t\tbuildSettings = {\n",
+                      "\t\t\tbuildSettings = {\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n",
+                      1,
+                  )
+              return block
+
+          patched = re.sub(
+              r"\t\t[A-F0-9]+ /\* [^*]+ \*/ = \{.*?\n\t\t\};",
+              patch_config,
+              text,
+              flags=re.DOTALL,
+          )
+          if patched == text:
+              print("No Unity-iPhone signing blocks were patched", file=sys.stderr)
+              sys.exit(1)
+          open(path, "w", encoding="utf-8").write(patched)
+          print(f"Patched Unity-iPhone signing in {path}")
+          PY
           cd "$XCODE_DIR"
           xcodebuild -allowProvisioningUpdates \
             -scheme Unity-iPhone \
@@ -171,7 +217,9 @@ jobs:
             Unity-iPhone_CODE_SIGN_IDENTITY="iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN" \
             Unity-iPhone_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             Unity-iPhone_PROVISIONING_PROFILE="$PROFILE_UUID" \
+            Unity-iPhone_PROVISIONING_PROFILE_APP="$PROFILE_UUID" \
             Unity-iPhone_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            Unity-iPhone_PROVISIONING_PROFILE_SPECIFIER_APP="$PROFILE_NAME" \
             UnityFramework_CODE_SIGN_STYLE=Automatic \
             UnityFramework_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             GameAssembly_CODE_SIGN_STYLE=Automatic \
