@@ -96,6 +96,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Select Xcode 26
         run: |
@@ -228,26 +230,30 @@ jobs:
             find "$XCODE_DIR" -name AppIcon.appiconset -maxdepth 6
             exit 1
           fi
-          cp .github/ios/AppIcon-1024.png "$ICON_SET/Icon-1024.png"
+          ICON_SRC=".github/ios/AppIcon-1024.png"
+          file "$ICON_SRC"
+          ls -la "$ICON_SRC"
+          sips -g pixelWidth -g pixelHeight "$ICON_SRC"
+          cp "$ICON_SRC" "$ICON_SET/Icon-1024.png"
           python3 - <<'PY'
           import json, os
           icon_set = os.path.join(os.environ["XCODE_DIR"], "Unity-iPhone/Images.xcassets/AppIcon.appiconset")
           contents_path = os.path.join(icon_set, "Contents.json")
-          with open(contents_path, encoding="utf-8") as f:
-              data = json.load(f)
-          images = [img for img in data.get("images", []) if img.get("size") != "1024x1024"]
-          images.append({
-              "filename": "Icon-1024.png",
-              "idiom": "ios-marketing",
-              "scale": "1x",
-              "size": "1024x1024",
-          })
-          data["images"] = images
+          data = {
+              "images": [
+                  {
+                      "filename": "Icon-1024.png",
+                      "idiom": "universal",
+                      "platform": "ios",
+                      "size": "1024x1024",
+                  }
+              ],
+              "info": {"author": "xcode", "version": 1},
+          }
           with open(contents_path, "w", encoding="utf-8") as f:
               json.dump(data, f, indent="\t")
               f.write("\n")
-          print(f"Updated {contents_path}")
-          print(open(contents_path, encoding="utf-8").read())
+          print(f"Wrote single-size app icon catalog to {contents_path}")
           PY
           cd "$XCODE_DIR"
           xcodebuild -allowProvisioningUpdates \
