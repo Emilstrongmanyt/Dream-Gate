@@ -8,6 +8,7 @@ namespace DreamGate.Battlegrounds.Services
         public const int DefaultMmr = 1500;
 
         public string playerId;
+        public string email;
         public string displayName = "Dreamer";
         public int mmr = DefaultMmr;
         public int ratedGamesPlayed;

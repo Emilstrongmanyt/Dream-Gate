@@ -1,4 +1,5 @@
 using DreamGate.Battlegrounds.Core;
+using DreamGate.Battlegrounds.Services;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,6 +9,11 @@ public class MainMenuController : MonoBehaviour
 
     private void Start()
     {
+        if (!DreamGateServices.IsInitialized)
+        {
+            DreamGateServices.Initialize();
+        }
+
         EnsureRatedButton();
         EnsureBackButton();
     }
@@ -20,6 +26,12 @@ public class MainMenuController : MonoBehaviour
 
     public void StartRatedLobby()
     {
+        if (!DreamGateServices.IsLoggedIn)
+        {
+            SceneNavigator.LoadHome();
+            return;
+        }
+
         SceneNavigator.LoadRatedLobby();
     }
 

@@ -4,24 +4,66 @@ using UnityEngine;
 namespace DreamGate.Battlegrounds.Services
 {
     /// <summary>
-    /// Local-first player services. UGS auth and cloud save can be layered on when linked in the dashboard.
+    /// Player services with local account auth. Cloud sync can be layered on later.
     /// </summary>
     public static class DreamGateServices
     {
         public static bool IsInitialized { get; private set; }
-        public static bool IsCloudLinked { get; private set; }
+        public static bool IsLoggedIn => AuthService.IsLoggedIn;
         public static PlayerProfile Profile { get; private set; }
 
         public static void Initialize()
         {
-            Profile = ProfileStore.Load();
+            AuthService.RestoreSession();
+            if (AuthService.IsLoggedIn)
+            {
+                ProfileStore.MigrateLegacyProfileIfNeeded(AuthService.SessionPlayerId);
+                Profile = ProfileStore.Load(AuthService.SessionPlayerId);
+                if (AuthService.CurrentAccount != null)
+                {
+                    Profile.displayName = AuthService.CurrentAccount.displayName;
+                    Profile.email = AuthService.CurrentAccount.email;
+                }
+            }
+            else
+            {
+                Profile = null;
+            }
+
             IsInitialized = true;
-            IsCloudLinked = false;
+        }
+
+        public static bool TryRegister(string displayName, string email, string password, string confirmPassword, out string message)
+        {
+            if (!AuthService.TryRegister(displayName, email, password, confirmPassword, out message))
+            {
+                return false;
+            }
+
+            Profile = ProfileStore.Load(AuthService.SessionPlayerId);
+            return true;
+        }
+
+        public static bool TryLogin(string email, string password, out string message)
+        {
+            if (!AuthService.TryLogin(email, password, out message))
+            {
+                return false;
+            }
+
+            Profile = ProfileStore.Load(AuthService.SessionPlayerId);
+            return true;
+        }
+
+        public static void Logout()
+        {
+            AuthService.Logout();
+            Profile = null;
         }
 
         public static void ApplyRatedResult(MatchResult result)
         {
-            if (!IsInitialized || result == null || result.matchMode != MatchMode.Rated)
+            if (!IsInitialized || !IsLoggedIn || Profile == null || result == null || result.matchMode != MatchMode.Rated)
             {
                 return;
             }
@@ -46,9 +88,27 @@ namespace DreamGate.Battlegrounds.Services
                 return "Services not ready";
             }
 
-            return IsCloudLinked
-                ? $"Cloud linked | MMR {Profile.mmr}"
-                : $"Local profile | MMR {Profile.mmr}";
+            if (!IsLoggedIn || Profile == null)
+            {
+                return "Not signed in";
+            }
+
+            return $"Signed in as {Profile.displayName} | MMR {Profile.mmr}";
+        }
+
+        public static string GetHomeStatusLine()
+        {
+            if (!IsInitialized)
+            {
+                DreamGateServices.Initialize();
+            }
+
+            if (!IsLoggedIn || Profile == null)
+            {
+                return "Log in or create an account to track your rated MMR.";
+            }
+
+            return $"Welcome, {Profile.displayName}  •  MMR {Profile.mmr}  •  Games {Profile.ratedGamesPlayed}";
         }
     }
 }

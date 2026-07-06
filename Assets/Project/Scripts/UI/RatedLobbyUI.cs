@@ -42,9 +42,10 @@ namespace DreamGate.Battlegrounds.UI
 
         public void RefreshProfile()
         {
-            if (!DreamGateServices.IsInitialized)
+            if (!DreamGateServices.IsInitialized || !DreamGateServices.IsLoggedIn || DreamGateServices.Profile == null)
             {
-                profileText.text = "Loading profile...";
+                profileText.text = "Sign in from the home screen to track rated MMR.";
+                statusText.text = "Not signed in";
                 return;
             }
 

@@ -752,7 +752,7 @@ namespace DreamGate.Battlegrounds.UI
                 $"{modeLabel} | Turn {matchManager.Turn} | {player.heroName} | Phase: {matchManager.Phase}\n" +
                 $"Gold: {player.gold} | Tavern Tier: {player.tavernTier}/{MatchConfig.MaxTavernTier} | HP: {player.heroHealth}";
 
-            if (matchManager.Mode == MatchMode.Rated && DreamGateServices.IsInitialized)
+            if (matchManager.Mode == MatchMode.Rated && DreamGateServices.IsInitialized && DreamGateServices.IsLoggedIn && DreamGateServices.Profile != null)
             {
                 hudText.text += $"\nMMR: {DreamGateServices.Profile.mmr}";
             }

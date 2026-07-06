@@ -1,5 +1,6 @@
 using System;
 using DreamGate.Battlegrounds.Core;
+using DreamGate.Battlegrounds.Services;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -41,6 +42,66 @@ namespace DreamGate.Battlegrounds.UI
         public static Button CreateBackButton(Transform parent, Action onBack, float y = -760f)
         {
             return CreateActionButton(parent, "Back", new Vector2(0, y), () => onBack?.Invoke());
+        }
+
+        public static TextMeshProUGUI CreateStatusText(Transform parent, float y)
+        {
+            var label = CreateText(parent, "StatusText", string.Empty, y, 20, TextAlignmentOptions.Center);
+            label.rectTransform.sizeDelta = new Vector2(860, 80);
+            label.color = new Color(0.85f, 0.9f, 1f, 1f);
+            return label;
+        }
+
+        public static TMP_InputField CreateInputField(Transform parent, string name, string placeholder, float y, bool isPassword = false)
+        {
+            var row = new GameObject(name, typeof(RectTransform), typeof(Image));
+            row.transform.SetParent(parent, false);
+            var rowRect = row.GetComponent<RectTransform>();
+            rowRect.anchoredPosition = new Vector2(0, y);
+            rowRect.sizeDelta = new Vector2(860, 72);
+            row.GetComponent<Image>().color = new Color(0.1f, 0.12f, 0.2f, 1f);
+
+            var textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
+            textArea.transform.SetParent(row.transform, false);
+            var textAreaRect = textArea.GetComponent<RectTransform>();
+            textAreaRect.anchorMin = Vector2.zero;
+            textAreaRect.anchorMax = Vector2.one;
+            textAreaRect.offsetMin = new Vector2(16, 8);
+            textAreaRect.offsetMax = new Vector2(-16, -8);
+
+            var placeholderGo = new GameObject("Placeholder", typeof(RectTransform), typeof(TextMeshProUGUI));
+            placeholderGo.transform.SetParent(textArea.transform, false);
+            var placeholderRect = placeholderGo.GetComponent<RectTransform>();
+            placeholderRect.anchorMin = Vector2.zero;
+            placeholderRect.anchorMax = Vector2.one;
+            placeholderRect.offsetMin = Vector2.zero;
+            placeholderRect.offsetMax = Vector2.zero;
+            var placeholderText = placeholderGo.GetComponent<TextMeshProUGUI>();
+            placeholderText.text = placeholder;
+            placeholderText.fontSize = 22;
+            placeholderText.color = new Color(1f, 1f, 1f, 0.45f);
+            placeholderText.alignment = TextAlignmentOptions.Left;
+
+            var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(textArea.transform, false);
+            var textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            var text = textGo.GetComponent<TextMeshProUGUI>();
+            text.fontSize = 22;
+            text.color = Color.white;
+            text.alignment = TextAlignmentOptions.Left;
+
+            var input = row.AddComponent<TMP_InputField>();
+            input.textViewport = textAreaRect;
+            input.textComponent = text;
+            input.placeholder = placeholderText;
+            input.lineType = TMP_InputField.LineType.SingleLine;
+            input.contentType = isPassword ? TMP_InputField.ContentType.Password : TMP_InputField.ContentType.Standard;
+
+            return input;
         }
 
         public static Slider CreateSliderRow(
@@ -153,9 +214,9 @@ namespace DreamGate.Battlegrounds.UI
             return toggle;
         }
 
-        public static SettingsPageView BuildSettingsPage(Transform parent, Action onBack)
+        public static SettingsPageView BuildSettingsPage(Transform parent, Action onBack, Action onLogout = null)
         {
-            return SettingsPageView.Create(parent, onBack);
+            return SettingsPageView.Create(parent, onBack, onLogout);
         }
 
         public static SupportPageView BuildSupportPage(Transform parent, Action onBack)
@@ -184,7 +245,7 @@ namespace DreamGate.Battlegrounds.UI
             return label;
         }
 
-        private static Button CreateActionButton(Transform parent, string label, Vector2 pos, UnityEngine.Events.UnityAction onClick)
+        public static Button CreateActionButton(Transform parent, string label, Vector2 pos, Action onClick)
         {
             var go = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
@@ -194,7 +255,10 @@ namespace DreamGate.Battlegrounds.UI
             go.GetComponent<Image>().color = ButtonColor;
 
             var button = go.GetComponent<Button>();
-            button.onClick.AddListener(onClick);
+            if (onClick != null)
+            {
+                button.onClick.AddListener(() => onClick());
+            }
 
             var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
             textGo.transform.SetParent(go.transform, false);
@@ -215,13 +279,15 @@ namespace DreamGate.Battlegrounds.UI
     public sealed class SettingsPageView
     {
         private readonly GameObject root;
+        private readonly GameObject logoutButton;
 
-        private SettingsPageView(GameObject root)
+        private SettingsPageView(GameObject root, GameObject logoutButton)
         {
             this.root = root;
+            this.logoutButton = logoutButton;
         }
 
-        public static SettingsPageView Create(Transform parent, Action onBack)
+        public static SettingsPageView Create(Transform parent, Action onBack, Action onLogout = null)
         {
             var root = MenuPageUI.CreateOverlay(parent, "SettingsPage");
             MenuPageUI.CreateTitle(root.transform, "Settings");
@@ -247,14 +313,25 @@ namespace DreamGate.Battlegrounds.UI
                 GameSettings.HapticsEnabled = v;
             });
 
+            GameObject logoutButton = null;
+            if (onLogout != null)
+            {
+                logoutButton = MenuPageUI.CreateActionButton(root.transform, "Log Out", new Vector2(0, -40), onLogout).gameObject;
+            }
+
             MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke());
             root.SetActive(false);
-            return new SettingsPageView(root);
+            return new SettingsPageView(root, logoutButton);
         }
 
         public void Show()
         {
             GameSettings.ApplyAudio();
+            if (logoutButton != null)
+            {
+                logoutButton.SetActive(DreamGateServices.IsLoggedIn);
+            }
+
             root.SetActive(true);
             root.transform.SetAsLastSibling();
         }

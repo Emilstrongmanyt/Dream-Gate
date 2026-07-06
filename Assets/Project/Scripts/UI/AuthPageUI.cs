@@ -1,0 +1,167 @@
+using System;
+using DreamGate.Battlegrounds.Services;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace DreamGate.Battlegrounds.UI
+{
+    public sealed class LoginPageView
+    {
+        private readonly GameObject root;
+        private readonly TMP_InputField emailInput;
+        private readonly TMP_InputField passwordInput;
+        private readonly TextMeshProUGUI statusText;
+        private readonly Action onSuccess;
+
+        private LoginPageView(GameObject root, TMP_InputField emailInput, TMP_InputField passwordInput, TextMeshProUGUI statusText, Action onSuccess)
+        {
+            this.root = root;
+            this.emailInput = emailInput;
+            this.passwordInput = passwordInput;
+            this.statusText = statusText;
+            this.onSuccess = onSuccess;
+        }
+
+        public static LoginPageView Create(Transform parent, Action onBack, Action onSuccess, Action openCreateAccount)
+        {
+            var root = MenuPageUI.CreateOverlay(parent, "LoginPage");
+            MenuPageUI.CreateTitle(root.transform, "Log In");
+            MenuPageUI.CreateBody(
+                root.transform,
+                "LoginDescription",
+                "Sign in to sync your rated MMR, match history, and display name.",
+                620f,
+                70f);
+
+            var emailInput = MenuPageUI.CreateInputField(root.transform, "Email", "Email address", 430f);
+            var passwordInput = MenuPageUI.CreateInputField(root.transform, "Password", "Password", 300f, true);
+            var statusText = MenuPageUI.CreateStatusText(root.transform, 170f);
+
+            var loginButton = MenuPageUI.CreateActionButton(root.transform, "Log In", new Vector2(0, 40), null);
+            MenuPageUI.CreateActionButton(root.transform, "Create Account", new Vector2(0, -60), () => openCreateAccount?.Invoke());
+
+            var view = new LoginPageView(root, emailInput, passwordInput, statusText, onSuccess);
+            loginButton.onClick.AddListener(view.Submit);
+            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke());
+            root.SetActive(false);
+            return view;
+        }
+
+        public void Show()
+        {
+            statusText.text = string.Empty;
+            root.SetActive(true);
+            root.transform.SetAsLastSibling();
+        }
+
+        public void Hide() => root.SetActive(false);
+
+        private void Submit()
+        {
+            if (DreamGateServices.TryLogin(emailInput.text, passwordInput.text, out var message))
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
+                return;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+    }
+
+    public sealed class CreateAccountPageView
+    {
+        private readonly GameObject root;
+        private readonly TMP_InputField displayNameInput;
+        private readonly TMP_InputField emailInput;
+        private readonly TMP_InputField passwordInput;
+        private readonly TMP_InputField confirmPasswordInput;
+        private readonly TextMeshProUGUI statusText;
+        private readonly Action onSuccess;
+
+        private CreateAccountPageView(
+            GameObject root,
+            TMP_InputField displayNameInput,
+            TMP_InputField emailInput,
+            TMP_InputField passwordInput,
+            TMP_InputField confirmPasswordInput,
+            TextMeshProUGUI statusText,
+            Action onSuccess)
+        {
+            this.root = root;
+            this.displayNameInput = displayNameInput;
+            this.emailInput = emailInput;
+            this.passwordInput = passwordInput;
+            this.confirmPasswordInput = confirmPasswordInput;
+            this.statusText = statusText;
+            this.onSuccess = onSuccess;
+        }
+
+        public static CreateAccountPageView Create(Transform parent, Action onBack, Action onSuccess, Action openLogin)
+        {
+            var root = MenuPageUI.CreateOverlay(parent, "CreateAccountPage");
+            MenuPageUI.CreateTitle(root.transform, "Create Account");
+            MenuPageUI.CreateBody(
+                root.transform,
+                "CreateDescription",
+                "Create a Dream Gate account to track your rated progress across devices on this install.",
+                660f,
+                80f);
+
+            var displayNameInput = MenuPageUI.CreateInputField(root.transform, "DisplayName", "Display name", 500f);
+            var emailInput = MenuPageUI.CreateInputField(root.transform, "Email", "Email address", 380f);
+            var passwordInput = MenuPageUI.CreateInputField(root.transform, "Password", "Password (6+ chars)", 260f, true);
+            var confirmPasswordInput = MenuPageUI.CreateInputField(root.transform, "ConfirmPassword", "Confirm password", 140f, true);
+            var statusText = MenuPageUI.CreateStatusText(root.transform, 10f);
+
+            var createButton = MenuPageUI.CreateActionButton(root.transform, "Create Account", new Vector2(0, -110), null);
+            MenuPageUI.CreateActionButton(root.transform, "Already have an account?", new Vector2(0, -210), () => openLogin?.Invoke());
+
+            var view = new CreateAccountPageView(
+                root,
+                displayNameInput,
+                emailInput,
+                passwordInput,
+                confirmPasswordInput,
+                statusText,
+                onSuccess);
+            createButton.onClick.AddListener(view.Submit);
+            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -760f);
+            root.SetActive(false);
+            return view;
+        }
+
+        public void Show()
+        {
+            statusText.text = string.Empty;
+            root.SetActive(true);
+            root.transform.SetAsLastSibling();
+        }
+
+        public void Hide() => root.SetActive(false);
+
+        private void Submit()
+        {
+            if (DreamGateServices.TryRegister(
+                    displayNameInput.text,
+                    emailInput.text,
+                    passwordInput.text,
+                    confirmPasswordInput.text,
+                    out var message))
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
+                return;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+    }
+}

@@ -1,20 +1,30 @@
 using DreamGate.Battlegrounds.Core;
+using DreamGate.Battlegrounds.Services;
 using DreamGate.Battlegrounds.UI;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class HomeMenuController : MonoBehaviour
 {
     private Transform pageRoot;
+    private TextMeshProUGUI accountStatusText;
     private SettingsPageView settingsPage;
     private SupportPageView supportPage;
+    private LoginPageView loginPage;
+    private CreateAccountPageView createAccountPage;
 
     private void Start()
     {
         GameSettings.ApplyAudio();
+        DreamGateServices.Initialize();
         pageRoot = EnsureUiRoot();
-        settingsPage = MenuPageUI.BuildSettingsPage(pageRoot, CloseOverlays);
+        accountStatusText = CreateAccountStatusBanner(pageRoot);
+
+        settingsPage = MenuPageUI.BuildSettingsPage(pageRoot, CloseOverlays, OnLogout);
         supportPage = MenuPageUI.BuildSupportPage(pageRoot, CloseOverlays);
+        loginPage = LoginPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowCreateAccount);
+        createAccountPage = CreateAccountPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowLogin);
 
         BindButton("Settings", () =>
         {
@@ -26,11 +36,66 @@ public class HomeMenuController : MonoBehaviour
             CloseOverlays();
             supportPage.Show();
         });
+        BindButton("Login", ShowLogin);
+        BindButton("CreateAccount", ShowCreateAccount);
+        RefreshAccountStatus();
     }
 
     public void GoToMainMenu()
     {
+        if (!DreamGateServices.IsLoggedIn)
+        {
+            ShowLogin();
+            return;
+        }
+
         SceneNavigator.LoadMainMenu();
+    }
+
+    private void ShowLogin()
+    {
+        CloseOverlays();
+        createAccountPage.Hide();
+        loginPage.Show();
+    }
+
+    private void ShowCreateAccount()
+    {
+        CloseOverlays();
+        loginPage.Hide();
+        createAccountPage.Show();
+    }
+
+    private void OnLogout()
+    {
+        DreamGateServices.Logout();
+        CloseOverlays();
+        RefreshAccountStatus();
+    }
+
+    private void RefreshAccountStatus()
+    {
+        if (accountStatusText != null)
+        {
+            accountStatusText.text = DreamGateServices.GetHomeStatusLine();
+        }
+    }
+
+    private TextMeshProUGUI CreateAccountStatusBanner(Transform parent)
+    {
+        var go = new GameObject("AccountStatus", typeof(RectTransform), typeof(TextMeshProUGUI));
+        go.transform.SetParent(parent, false);
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 1f);
+        rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0, -40);
+        rect.sizeDelta = new Vector2(900, 80);
+        var text = go.GetComponent<TextMeshProUGUI>();
+        text.fontSize = 22;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = new Color(0.85f, 0.92f, 1f, 1f);
+        return text;
     }
 
     private Transform EnsureUiRoot()
@@ -75,5 +140,7 @@ public class HomeMenuController : MonoBehaviour
     {
         settingsPage?.Hide();
         supportPage?.Hide();
+        loginPage?.Hide();
+        createAccountPage?.Hide();
     }
 }
