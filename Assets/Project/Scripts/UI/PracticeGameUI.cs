@@ -60,7 +60,8 @@ namespace DreamGate.Battlegrounds.UI
         private const float CardScaleFactor = 1.2f;
         private static readonly Vector2 CardSlotSize = new(132f * CardScaleFactor, 168f * CardScaleFactor);
         private const float ShopSlotSpacing = 148f * CardScaleFactor;
-        private const float BoardSlotSpacing = 138f * CardScaleFactor;
+        private const float BoardSlotSpacing = 128f * CardScaleFactor;
+        private const float HandSlotSpacing = 138f * CardScaleFactor;
         private const float RowLabelOffsetY = 95f * CardScaleFactor;
         private static readonly Vector2 RecruitShopkeeperHeroCenter = new(0, 580);
         private static readonly Vector2 ShopRowCenter = new(0, 150);
@@ -280,7 +281,7 @@ namespace DreamGate.Battlegrounds.UI
 
             CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, ShopSlotSpacing, CardSlotDisplayMode.Shop, OnShopClicked);
             CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 5, BoardSlotSpacing, CardSlotDisplayMode.Board, OnBoardClicked);
-            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 8, BoardSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
+            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 8, HandSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
 
             refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-420, 150), OnRefreshShopClicked);
             upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(420, 150), OnUpgradeClicked);
