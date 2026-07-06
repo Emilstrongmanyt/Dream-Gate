@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DreamGate.Battlegrounds.Combat;
+using DreamGate.Battlegrounds.Core;
 
 namespace DreamGate.Battlegrounds.Cards
 {
@@ -114,7 +115,7 @@ namespace DreamGate.Battlegrounds.Cards
                 return;
             }
 
-            if (board.Count >= 6)
+            if (board.Count >= MatchConfig.BoardSize)
             {
                 var fizzle = $"{definition.displayName} deathrattle fizzled (board full).";
                 log.Add(fizzle);
@@ -143,7 +144,7 @@ namespace DreamGate.Battlegrounds.Cards
             List<string> log,
             List<CombatEvent> events)
         {
-            if (board.Count >= 6)
+            if (board.Count >= MatchConfig.BoardSize)
             {
                 return;
             }

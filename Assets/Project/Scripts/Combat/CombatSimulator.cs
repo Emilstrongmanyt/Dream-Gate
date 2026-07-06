@@ -53,65 +53,84 @@ namespace DreamGate.Battlegrounds.Combat
                 return result;
             }
 
-            var round = 0;
-            while (HasLivingMinions(attackerBoard) && HasLivingMinions(defenderBoard) && round < 200)
-            {
-                round++;
-                var attackerIndex = GetNextLivingIndex(attackerBoard, round - 1);
-                var defenderIndex = GetDefenderTargetIndex(defenderBoard, round - 1);
+            var attackerLiving = CountLivingMinions(attackerBoard);
+            var defenderLiving = CountLivingMinions(defenderBoard);
+            var attackerSideTurn = attackerLiving > defenderLiving;
 
-                if (attackerIndex < 0 || defenderIndex < 0)
+            var strikeRound = 0;
+            while (HasLivingMinions(attackerBoard) && HasLivingMinions(defenderBoard) && strikeRound < 400)
+            {
+                strikeRound++;
+
+                List<MinionInstance> strikingBoard;
+                List<MinionInstance> defendingBoard;
+                bool strikingIsAttackerSide;
+
+                if (attackerSideTurn)
+                {
+                    strikingBoard = attackerBoard;
+                    defendingBoard = defenderBoard;
+                    strikingIsAttackerSide = true;
+                }
+                else
+                {
+                    strikingBoard = defenderBoard;
+                    defendingBoard = attackerBoard;
+                    strikingIsAttackerSide = false;
+                }
+
+                var strikerIndex = GetLeftmostLivingIndex(strikingBoard);
+                var targetIndex = GetDefenderTargetIndex(defendingBoard, strikeRound - 1);
+
+                if (strikerIndex < 0 || targetIndex < 0)
                 {
                     break;
                 }
 
-                var attackerMinion = attackerBoard[attackerIndex];
-                var defenderMinion = defenderBoard[defenderIndex];
+                var striker = strikingBoard[strikerIndex];
+                var target = defendingBoard[targetIndex];
+                var targetIsAttackerSide = !strikingIsAttackerSide;
 
                 var attackMessage =
-                    $"{GetName(attackerMinion)} ({attackerMinion.attack}/{attackerMinion.health}) attacks " +
-                    $"{GetName(defenderMinion)} ({defenderMinion.attack}/{defenderMinion.health}).";
+                    $"{GetName(striker)} ({striker.attack}/{striker.health}) attacks " +
+                    $"{GetName(target)} ({target.attack}/{target.health}).";
                 result.combatLog.Add(attackMessage);
                 result.combatEvents.Add(new CombatEvent
                 {
                     type = CombatEventType.Attack,
                     message = attackMessage,
-                    attackerBoardIndex = attackerIndex,
-                    defenderBoardIndex = defenderIndex
+                    attackerBoardIndex = strikerIndex,
+                    defenderBoardIndex = targetIndex,
+                    isAttackerBoard = strikingIsAttackerSide
                 });
 
-                defenderMinion.health -= attackerMinion.attack;
-                attackerMinion.health -= defenderMinion.attack;
+                target.health -= striker.attack;
 
-                if (defenderMinion.health > 0)
+                if (target.health > 0)
                 {
                     AbilitySystem.OnMinionDamaged(
-                        defenderMinion,
-                        defenderIndex,
-                        defenderBoard,
-                        false,
+                        target,
+                        targetIndex,
+                        defendingBoard,
+                        targetIsAttackerSide,
                         result.combatLog,
                         result.combatEvents);
                 }
 
-                if (attackerMinion.health > 0)
+                if (AbilitySystem.HasCleave(striker))
                 {
-                    AbilitySystem.OnMinionDamaged(
-                        attackerMinion,
-                        attackerIndex,
-                        attackerBoard,
-                        true,
-                        result.combatLog,
-                        result.combatEvents);
+                    ApplyCleave(
+                        striker,
+                        strikerIndex,
+                        strikingIsAttackerSide,
+                        defendingBoard,
+                        targetIndex,
+                        targetIsAttackerSide,
+                        result);
                 }
 
-                if (AbilitySystem.HasCleave(attackerMinion))
-                {
-                    ApplyCleave(attackerMinion, attackerBoard, attackerIndex, defenderBoard, defenderIndex, result);
-                }
-
-                ResolveDeath(defenderMinion, defenderBoard, false, result);
-                ResolveDeath(attackerMinion, attackerBoard, true, result);
+                ResolveDeath(target, defendingBoard, targetIsAttackerSide, result);
+                attackerSideTurn = !attackerSideTurn;
             }
 
             var attackerAlive = HasLivingMinions(attackerBoard);
@@ -137,11 +156,12 @@ namespace DreamGate.Battlegrounds.Combat
         }
 
         private static void ApplyCleave(
-            MinionInstance attackerMinion,
-            List<MinionInstance> attackerBoard,
-            int attackerIndex,
-            List<MinionInstance> defenderBoard,
+            MinionInstance striker,
+            int strikerIndex,
+            bool strikerIsAttackerSide,
+            List<MinionInstance> defendingBoard,
             int primaryIndex,
+            bool targetIsAttackerSide,
             CombatResult result)
         {
             var cleaveTargets = new List<int>();
@@ -150,29 +170,29 @@ namespace DreamGate.Battlegrounds.Combat
                 cleaveTargets.Add(primaryIndex - 1);
             }
 
-            if (primaryIndex + 1 < defenderBoard.Count)
+            if (primaryIndex + 1 < defendingBoard.Count)
             {
                 cleaveTargets.Add(primaryIndex + 1);
             }
 
             foreach (var index in cleaveTargets)
             {
-                var target = defenderBoard[index];
+                var target = defendingBoard[index];
                 if (target.isDead || target.health <= 0)
                 {
                     continue;
                 }
 
-                target.health -= attackerMinion.attack;
-                var message = $"{GetName(attackerMinion)} cleaves {GetName(target)} for {attackerMinion.attack}.";
+                target.health -= striker.attack;
+                var message = $"{GetName(striker)} cleaves {GetName(target)} for {striker.attack}.";
                 result.combatLog.Add(message);
                 result.combatEvents.Add(new CombatEvent
                 {
                     type = CombatEventType.Attack,
                     message = message,
-                    attackerBoardIndex = attackerIndex,
+                    attackerBoardIndex = strikerIndex,
                     defenderBoardIndex = index,
-                    isAttackerBoard = true,
+                    isAttackerBoard = strikerIsAttackerSide,
                     isCleave = true
                 });
 
@@ -181,13 +201,13 @@ namespace DreamGate.Battlegrounds.Combat
                     AbilitySystem.OnMinionDamaged(
                         target,
                         index,
-                        defenderBoard,
-                        false,
+                        defendingBoard,
+                        targetIsAttackerSide,
                         result.combatLog,
                         result.combatEvents);
                 }
 
-                ResolveDeath(target, defenderBoard, false, result);
+                ResolveDeath(target, defendingBoard, targetIsAttackerSide, result);
             }
         }
 
@@ -287,6 +307,25 @@ namespace DreamGate.Battlegrounds.Combat
             }
 
             return false;
+        }
+
+        private static int GetLeftmostLivingIndex(List<MinionInstance> board)
+        {
+            return GetNextLivingIndex(board, 0);
+        }
+
+        private static int CountLivingMinions(List<MinionInstance> board)
+        {
+            var count = 0;
+            foreach (var minion in board)
+            {
+                if (!minion.isDead && minion.health > 0)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private static int GetNextLivingIndex(List<MinionInstance> board, int preferredIndex)

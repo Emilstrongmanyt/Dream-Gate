@@ -279,8 +279,8 @@ namespace DreamGate.Battlegrounds.UI
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
 
             CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, ShopSlotSpacing, CardSlotDisplayMode.Shop, OnShopClicked);
-            CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 6, BoardSlotSpacing, CardSlotDisplayMode.Board, OnBoardClicked);
-            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, BoardSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
+            CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 5, BoardSlotSpacing, CardSlotDisplayMode.Board, OnBoardClicked);
+            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 8, BoardSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
 
             refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-420, 150), OnRefreshShopClicked);
             upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(420, 150), OnUpgradeClicked);
@@ -320,7 +320,7 @@ namespace DreamGate.Battlegrounds.UI
                 opponentCombatSlots,
                 "Rival Army",
                 OpponentBoardCenter,
-                6,
+                5,
                 BoardSlotSpacing,
                 CardSlotDisplayMode.Combat,
                 _ => { },
@@ -331,7 +331,7 @@ namespace DreamGate.Battlegrounds.UI
                 playerCombatSlots,
                 "Your Army",
                 PlayerBoardCenter,
-                6,
+                5,
                 BoardSlotSpacing,
                 CardSlotDisplayMode.Combat,
                 _ => { },
@@ -474,76 +474,42 @@ namespace DreamGate.Battlegrounds.UI
 
         private IEnumerator PlayAttackEvent(CombatEvent combatEvent)
         {
-            if (combatEvent.isCleave)
-            {
-                if (combatEvent.defenderBoardIndex < 0 ||
-                    combatOpponentBoard == null ||
-                    combatEvent.defenderBoardIndex >= combatOpponentBoard.Count)
-                {
-                    yield break;
-                }
-
-                var cleaveAttacker = GetCombatMinion(true, combatEvent.attackerBoardIndex);
-                var cleaveTarget = combatOpponentBoard[combatEvent.defenderBoardIndex];
-                if (cleaveAttacker != null && cleaveTarget != null && !cleaveTarget.isDead)
-                {
-                    cleaveTarget.health -= cleaveAttacker.attack;
-                    RefreshCombatSlot(opponentCombatSlots, combatOpponentBoard, combatEvent.defenderBoardIndex);
-
-                    var attackerSlot = GetCombatSlot(true, combatEvent.attackerBoardIndex);
-                    var defenderSlot = GetCombatSlot(false, combatEvent.defenderBoardIndex);
-                    if (attackerSlot?.CombatMotion != null)
-                    {
-                        yield return attackerSlot.CombatMotion.PlayAttackLunge(Vector2.up);
-                    }
-
-                    if (defenderSlot?.CombatMotion != null)
-                    {
-                        yield return defenderSlot.CombatMotion.PlayHitShake();
-                    }
-                }
-
-                yield break;
-            }
-
             if (combatEvent.attackerBoardIndex < 0 || combatEvent.defenderBoardIndex < 0)
             {
                 yield break;
             }
 
-            var attacker = GetCombatMinion(true, combatEvent.attackerBoardIndex);
-            var defender = GetCombatMinion(false, combatEvent.defenderBoardIndex);
-            if (attacker == null || defender == null || attacker.isDead || defender.isDead)
+            var striker = GetCombatMinion(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
+            var target = GetCombatMinion(!combatEvent.isAttackerBoard, combatEvent.defenderBoardIndex);
+            if (striker == null || target == null || striker.isDead || target.isDead)
             {
                 yield break;
             }
 
-            var defenderDamage = attacker.attack;
-            var attackerDamage = defender.attack;
-            defender.health -= defenderDamage;
-            attacker.health -= attackerDamage;
+            target.health -= striker.attack;
+            RefreshCombatSlot(
+                combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots,
+                combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard,
+                combatEvent.attackerBoardIndex);
+            RefreshCombatSlot(
+                combatEvent.isAttackerBoard ? opponentCombatSlots : playerCombatSlots,
+                combatEvent.isAttackerBoard ? combatOpponentBoard : combatPlayerBoard,
+                combatEvent.defenderBoardIndex);
 
-            RefreshCombatSlot(playerCombatSlots, combatPlayerBoard, combatEvent.attackerBoardIndex);
-            RefreshCombatSlot(opponentCombatSlots, combatOpponentBoard, combatEvent.defenderBoardIndex);
+            var strikerSlot = GetCombatSlot(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
+            var targetSlot = GetCombatSlot(!combatEvent.isAttackerBoard, combatEvent.defenderBoardIndex);
+            var lungeDirection = combatEvent.isAttackerBoard ? Vector2.up : Vector2.down;
 
-            var playerSlot = GetCombatSlot(true, combatEvent.attackerBoardIndex);
-            var enemySlot = GetCombatSlot(false, combatEvent.defenderBoardIndex);
-
-            if (playerSlot?.CombatMotion != null && enemySlot?.CombatMotion != null)
+            if (strikerSlot?.CombatMotion != null && targetSlot?.CombatMotion != null)
             {
-                var lunge = playerSlot.CombatMotion.PlayAttackLunge(Vector2.up);
-                var hit = enemySlot.CombatMotion.PlayHitShake();
+                var lunge = strikerSlot.CombatMotion.PlayAttackLunge(lungeDirection);
+                var hit = targetSlot.CombatMotion.PlayHitShake();
                 yield return lunge;
                 yield return hit;
             }
             else
             {
                 yield return new WaitForSeconds(0.2f);
-            }
-
-            if (attacker.health > 0 && playerSlot?.CombatMotion != null)
-            {
-                yield return playerSlot.CombatMotion.PlayHitShake();
             }
         }
 

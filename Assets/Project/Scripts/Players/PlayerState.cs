@@ -33,7 +33,7 @@ namespace DreamGate.Battlegrounds.Players
 
         public int BoardCount => board.Count;
         public bool BoardFull => board.Count >= MatchConfig.BoardSize;
-        public bool HandFull => hand.Count >= MatchConfig.BoardSize;
+        public bool HandFull => hand.Count >= MatchConfig.MaxHandSize;
 
         public int CountCopies(string cardId, bool includeGolden = false)
         {
