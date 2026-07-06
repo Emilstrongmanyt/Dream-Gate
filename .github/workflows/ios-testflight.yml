@@ -135,6 +135,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           PROFILE_NAME: ${{ env.PROFILE_NAME }}
+          PROFILE_UUID: ${{ env.PROFILE_UUID }}
         run: |
           XCODE_DIR=$(find build/iOS -name Unity-iPhone.xcodeproj -print -quit | xargs dirname)
           if [ -z "$XCODE_DIR" ]; then
@@ -158,6 +159,7 @@ jobs:
               plistlib.dump(payload, f)
           print(f"Wrote {path}")
           PY
+          security find-identity -v -p codesigning
           cd "$XCODE_DIR"
           xcodebuild -allowProvisioningUpdates \
             -scheme Unity-iPhone \
@@ -167,6 +169,8 @@ jobs:
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             Unity-iPhone_CODE_SIGN_STYLE=Manual \
             Unity-iPhone_CODE_SIGN_IDENTITY="iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN" \
+            Unity-iPhone_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            Unity-iPhone_PROVISIONING_PROFILE="$PROFILE_UUID" \
             Unity-iPhone_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             UnityFramework_CODE_SIGN_STYLE=Automatic \
             UnityFramework_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
