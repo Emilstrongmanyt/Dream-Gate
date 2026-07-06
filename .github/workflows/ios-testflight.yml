@@ -1,17 +1,5 @@
-# Builds Dream Gate for iOS on a cloud Mac and uploads to TestFlight.
-# No local Mac required — push to GitHub and configure the secrets below.
-#
-# Required GitHub secrets:
-#   UNITY_EMAIL          — Unity account email
-#   UNITY_PASSWORD       — Unity account password (alphanumeric recommended)
-#   UNITY_LICENSE        — Full contents of Unity_lic.ulf (Personal license)
-#   APPLE_CONNECT_KEY    — App Store Connect API .p8 key file (base64)
-#   APPLE_CONNECT_KEY_ID — Key ID from App Store Connect
-#   APPLE_CONNECT_ISSUER_ID — Issuer ID from App Store Connect
-#   APPLE_TEAM_ID        — Apple Developer Team ID
-#   IOS_P12_BASE64       — Distribution certificate .p12 (base64)
-#   IOS_P12_PASSWORD     — Password for the .p12 file
-#   IOS_MOBILEPROVISION_BASE64 — App Store provisioning profile (base64)
+# Dream Gate iOS TestFlight — Unity build on Linux, sign/upload on Mac.
+# Personal license: UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD (no serial needed in secrets).
 
 name: iOS TestFlight
 
@@ -33,9 +21,9 @@ env:
   BUNDLE_ID: com.solodreams.dreamgate
 
 jobs:
-  build-ios:
-    name: Build iOS & Upload TestFlight
-    runs-on: macos-latest
+  build-unity-ios:
+    name: Build Unity iOS project
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,26 +40,37 @@ jobs:
             Library-iOS-
             Library-
 
-      - name: Install Unity Personal license
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-        run: |
-          sudo mkdir -p "/Library/Application Support/Unity"
-          printf '%s' "$UNITY_LICENSE" | sudo tee "/Library/Application Support/Unity/Unity_lic.ulf" > /dev/null
-          sudo chmod -R 777 "/Library/Application Support/Unity"
-
       - name: Build iOS Xcode project
         uses: game-ci/unity-builder@v4
-        id: unityBuild
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: iOS
           projectPath: ${{ env.PROJECT_PATH }}
           buildName: ${{ env.BUILD_NAME }}
           versioning: None
-          cacheUnityInstallationOnMac: true
-          skipActivation: true
           customParameters: -bundleVersion 1.0 -buildNumber 1
+
+      - name: Upload Xcode project artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-iOS
+          path: build/iOS
+          if-no-files-found: error
+
+  upload-testflight:
+    name: Sign IPA and upload TestFlight
+    runs-on: macos-latest
+    needs: build-unity-ios
+    steps:
+      - name: Download Xcode project
+        uses: actions/download-artifact@v4
+        with:
+          name: build-iOS
+          path: build/iOS
 
       - name: Import signing certificate
         env:
