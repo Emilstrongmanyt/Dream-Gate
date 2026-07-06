@@ -22,7 +22,7 @@ namespace DreamGate.Battlegrounds.Core
     {
         public const int MaxPlayers = 8;
         public const int BoardSize = 5;
-        public const int MaxHandSize = 8;
+        public const int MaxHandSize = 6;
         public const int ShopSlotCount = 5;
         public const int MaxTavernTier = 6;
 

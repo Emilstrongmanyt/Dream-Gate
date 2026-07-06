@@ -281,7 +281,7 @@ namespace DreamGate.Battlegrounds.UI
 
             CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, ShopSlotSpacing, CardSlotDisplayMode.Shop, OnShopClicked);
             CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 5, BoardSlotSpacing, CardSlotDisplayMode.Board, OnBoardClicked);
-            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 8, HandSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
+            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, HandSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
 
             refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-420, 150), OnRefreshShopClicked);
             upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(420, 150), OnUpgradeClicked);
