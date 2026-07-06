@@ -137,13 +137,7 @@ namespace DreamGate.Battlegrounds.Core
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             }
 
-            var scaler = canvas.GetComponent<CanvasScaler>();
-            if (scaler != null)
-            {
-                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                scaler.referenceResolution = new Vector2(1080, 1920);
-                scaler.matchWidthOrHeight = 0.5f;
-            }
+            UiCanvasSetup.Apply(canvas);
         }
 
         private static RectTransform CreateUiRoot()
@@ -156,6 +150,7 @@ namespace DreamGate.Battlegrounds.Core
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
+            UiCanvasSetup.ApplySafeArea(rect);
             return rect;
         }
 

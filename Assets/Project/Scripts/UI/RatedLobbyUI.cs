@@ -94,6 +94,9 @@ namespace DreamGate.Battlegrounds.UI
             rect.sizeDelta = new Vector2(900, 120);
             var text = go.GetComponent<TextMeshProUGUI>();
             text.fontSize = fontSize;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = Mathf.Max(14, fontSize - 10);
+            text.fontSizeMax = fontSize;
             text.alignment = align;
             text.color = Color.white;
             return text;

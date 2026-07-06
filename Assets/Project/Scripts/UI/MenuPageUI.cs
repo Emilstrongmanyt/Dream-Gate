@@ -22,6 +22,7 @@ namespace DreamGate.Battlegrounds.UI
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             panel.GetComponent<Image>().color = PanelColor;
+            UiCanvasSetup.ApplySafeArea(rect);
             return panel;
         }
 
@@ -239,6 +240,9 @@ namespace DreamGate.Battlegrounds.UI
             rect.sizeDelta = new Vector2(900, 120);
             var label = go.GetComponent<TextMeshProUGUI>();
             label.fontSize = fontSize;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = Mathf.Max(14, fontSize - 10);
+            label.fontSizeMax = fontSize;
             label.alignment = align;
             label.color = Color.white;
             label.text = text;
@@ -269,6 +273,9 @@ namespace DreamGate.Battlegrounds.UI
             textRect.offsetMax = Vector2.zero;
             var text = textGo.GetComponent<TextMeshProUGUI>();
             text.fontSize = 22;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 16;
+            text.fontSizeMax = 22;
             text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
             text.text = label;

@@ -17,6 +17,7 @@ public class HomeMenuController : MonoBehaviour
     private void Start()
     {
         GameSettings.ApplyAudio();
+        UiCanvasSetup.ApplyToScene();
         DreamGateServices.Initialize();
         pageRoot = EnsureUiRoot();
         accountStatusText = CreateAccountStatusBanner(pageRoot);
@@ -89,10 +90,13 @@ public class HomeMenuController : MonoBehaviour
         rect.anchorMin = new Vector2(0.5f, 1f);
         rect.anchorMax = new Vector2(0.5f, 1f);
         rect.pivot = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(0, -40);
-        rect.sizeDelta = new Vector2(900, 80);
+        rect.anchoredPosition = new Vector2(0, -12);
+        rect.sizeDelta = new Vector2(980, 72);
         var text = go.GetComponent<TextMeshProUGUI>();
         text.fontSize = 22;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 16;
+        text.fontSizeMax = 24;
         text.alignment = TextAlignmentOptions.Center;
         text.color = new Color(0.85f, 0.92f, 1f, 1f);
         return text;
@@ -113,6 +117,7 @@ public class HomeMenuController : MonoBehaviour
         rect.anchorMax = Vector2.one;
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
+        UiCanvasSetup.ApplySafeArea(rect);
         transform.SetParent(uiRoot.transform, false);
         return uiRoot.transform;
     }

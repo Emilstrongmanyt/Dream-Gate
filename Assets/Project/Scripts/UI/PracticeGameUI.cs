@@ -271,6 +271,11 @@ namespace DreamGate.Battlegrounds.UI
             refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-380, 250), OnRefreshShopClicked);
             upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(380, 120), OnUpgradeClicked);
             endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(380, 30), OnEndTurnClicked);
+            if (matchManager.Mode == MatchMode.Rated)
+            {
+                endTurnButton.gameObject.SetActive(false);
+            }
+
             speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(380, -60), OnSpeedClicked);
             menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(380, -150), () => SceneNavigator.LoadMainMenu());
 
@@ -782,7 +787,10 @@ namespace DreamGate.Battlegrounds.UI
             var player = matchManager.GetHumanPlayer();
             refreshShopButton.interactable = enabled && player.gold >= MatchConfig.ShopRefreshCost;
             upgradeButton.interactable = enabled;
-            endTurnButton.interactable = enabled;
+            if (endTurnButton != null && matchManager.Mode != MatchMode.Rated)
+            {
+                endTurnButton.interactable = enabled;
+            }
         }
 
         private void SetAllSlotButtonsInteractable(bool enabled)

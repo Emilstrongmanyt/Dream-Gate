@@ -1,5 +1,6 @@
 using DreamGate.Battlegrounds.Core;
 using DreamGate.Battlegrounds.Services;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,8 +15,8 @@ public class MainMenuController : MonoBehaviour
             DreamGateServices.Initialize();
         }
 
-        EnsureRatedButton();
-        EnsureBackButton();
+        UiCanvasSetup.ApplyToScene();
+        SetupMenuButtons();
     }
 
     public void StartPracticeGame()
@@ -40,13 +41,9 @@ public class MainMenuController : MonoBehaviour
         SceneNavigator.LoadHome();
     }
 
-    private void EnsureRatedButton()
+    private void SetupMenuButtons()
     {
-        if (ratedButton != null)
-        {
-            ratedButton.onClick.AddListener(StartRatedLobby);
-            return;
-        }
+        CleanupRuntimeButtons();
 
         var practiceButton = FindPracticeButton();
         if (practiceButton == null)
@@ -54,64 +51,150 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
-        var ratedGo = Instantiate(practiceButton.gameObject, practiceButton.transform.parent);
-        ratedGo.name = "RatedButton";
-        var rect = ratedGo.GetComponent<RectTransform>();
+        practiceButton.gameObject.name = "PracticeButton";
+        practiceButton.onClick.RemoveAllListeners();
+        practiceButton.onClick.AddListener(StartPracticeGame);
+
+        DisableAnimator(practiceButton.gameObject);
+
         var practiceRect = practiceButton.GetComponent<RectTransform>();
-        rect.anchoredPosition = practiceRect.anchoredPosition + new Vector2(0f, -240f);
+        var parent = practiceButton.transform.parent;
 
-        var image = ratedGo.GetComponent<Image>();
-        var ratedSprites = Resources.LoadAll<Sprite>("RatedButton");
-        if (ratedSprites != null && ratedSprites.Length > 0)
+        if (ratedButton == null)
         {
-            image.sprite = ratedSprites[0];
+            ratedButton = CreateSpriteButton(
+                "RatedButton",
+                parent,
+                practiceRect.anchoredPosition + new Vector2(0f, -260f),
+                practiceRect.sizeDelta,
+                LoadSprite("RatedButton"),
+                StartRatedLobby);
+        }
+        else
+        {
+            ratedButton.onClick.RemoveAllListeners();
+            ratedButton.onClick.AddListener(StartRatedLobby);
         }
 
-        var label = ratedGo.GetComponentInChildren<TMPro.TextMeshProUGUI>();
-        if (label != null)
-        {
-            label.text = string.Empty;
-        }
-
-        ratedButton = ratedGo.GetComponent<Button>();
-        ratedButton.onClick.RemoveAllListeners();
-        ratedButton.onClick.AddListener(StartRatedLobby);
+        CreateBackButton(parent);
     }
 
-    private void EnsureBackButton()
+    private void CreateBackButton(Transform parent)
     {
-        var practiceButton = FindPracticeButton();
-        if (practiceButton == null)
-        {
-            return;
-        }
+        var go = new GameObject("BackButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        go.transform.SetParent(parent, false);
 
-        var backGo = Instantiate(practiceButton.gameObject, practiceButton.transform.parent);
-        backGo.name = "BackButton";
-        var rect = backGo.GetComponent<RectTransform>();
-        var practiceRect = practiceButton.GetComponent<RectTransform>();
-        rect.anchoredPosition = practiceRect.anchoredPosition + new Vector2(-320f, 0f);
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(32f, -32f);
+        rect.sizeDelta = new Vector2(220f, 72f);
 
-        var image = backGo.GetComponent<Image>();
+        var image = go.GetComponent<Image>();
         image.color = new Color(0.15f, 0.2f, 0.35f, 0.95f);
 
-        var label = backGo.GetComponentInChildren<TMPro.TextMeshProUGUI>();
-        if (label != null)
+        var button = go.GetComponent<Button>();
+        button.onClick.AddListener(BackToHome);
+
+        var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textGo.transform.SetParent(go.transform, false);
+        var textRect = textGo.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+
+        var label = textGo.GetComponent<TextMeshProUGUI>();
+        label.text = "Back";
+        label.fontSize = 28;
+        label.alignment = TextAlignmentOptions.Center;
+        label.color = Color.white;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 18;
+        label.fontSizeMax = 28;
+    }
+
+    private static Button CreateSpriteButton(
+        string name,
+        Transform parent,
+        Vector2 anchoredPosition,
+        Vector2 sizeDelta,
+        Sprite sprite,
+        UnityEngine.Events.UnityAction onClick)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+        go.transform.SetParent(parent, false);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = sizeDelta;
+
+        var image = go.GetComponent<Image>();
+        if (sprite != null)
         {
-            label.text = "Back";
-            label.fontSize = 28;
+            image.sprite = sprite;
+            image.color = Color.white;
+        }
+        else
+        {
+            image.color = new Color(0.15f, 0.2f, 0.35f, 0.95f);
         }
 
-        var backButton = backGo.GetComponent<Button>();
-        backButton.onClick.RemoveAllListeners();
-        backButton.onClick.AddListener(BackToHome);
+        var button = go.GetComponent<Button>();
+        button.onClick.AddListener(onClick);
+        return button;
+    }
+
+    private static void CleanupRuntimeButtons()
+    {
+        DestroyIfExists("RatedButton");
+        DestroyIfExists("BackButton");
+    }
+
+    private static void DestroyIfExists(string objectName)
+    {
+        var existing = GameObject.Find(objectName);
+        if (existing != null)
+        {
+            Destroy(existing);
+        }
+    }
+
+    private static void DisableAnimator(GameObject target)
+    {
+        var animator = target.GetComponent<Animator>();
+        if (animator != null)
+        {
+            animator.enabled = false;
+        }
+    }
+
+    private static Sprite LoadSprite(string resourceName)
+    {
+        var sprites = Resources.LoadAll<Sprite>(resourceName);
+        return sprites != null && sprites.Length > 0 ? sprites[0] : null;
     }
 
     private static Button FindPracticeButton()
     {
+        var practiceObject = GameObject.Find("PracticeButton");
+        if (practiceObject != null)
+        {
+            return practiceObject.GetComponent<Button>();
+        }
+
         var buttons = FindObjectsByType<Button>(FindObjectsSortMode.None);
         foreach (var button in buttons)
         {
+            if (button.gameObject.name is "RatedButton" or "BackButton")
+            {
+                continue;
+            }
+
             var image = button.GetComponent<Image>();
             if (image == null || image.sprite == null)
             {
