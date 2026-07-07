@@ -57,7 +57,8 @@ namespace DreamGate.Battlegrounds.Economy
             var triple = TripleSystem.TryCombine(player, cardId);
             if (triple.triggered)
             {
-                message = $"Triple! Golden {definition.displayName} created (+{triple.goldRewarded} gold).";
+                message =
+                    $"Triple! {TripleSystem.GetTripleRewardDisplayName(cardId)} created (+{triple.goldRewarded} gold).";
             }
             else
             {

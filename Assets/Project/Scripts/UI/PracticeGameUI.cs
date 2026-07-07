@@ -2129,7 +2129,10 @@ namespace DreamGate.Battlegrounds.UI
 
             dragging = true;
             inspectHandler?.CancelInspect();
-            handLift?.enabled = false;
+            if (handLift != null)
+            {
+                handLift.enabled = false;
+            }
 
             originalParent = rect.parent;
             originalSiblingIndex = rect.GetSiblingIndex();
@@ -2176,7 +2179,10 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             dragging = false;
-            handLift?.enabled = true;
+            if (handLift != null)
+            {
+                handLift.enabled = true;
+            }
 
             var draggedDistance = Vector2.Distance(basePosition, rect.anchoredPosition);
             if (draggedDistance >= DragSuppressDistance)

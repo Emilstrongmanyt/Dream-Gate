@@ -44,8 +44,9 @@ namespace DreamGate.Battlegrounds.Economy
             RemoveInstance(player.hand, toCombine);
 
             var definition = CardRegistry.Get(cardId);
-            var golden = definition != null
-                ? MinionInstance.FromDefinition(definition, golden: true)
+            var rewardDefinition = ResolveTripleReward(definition);
+            var golden = rewardDefinition != null
+                ? MinionInstance.FromDefinition(rewardDefinition, golden: true)
                 : new MinionInstance { cardId = cardId };
 
             golden.attack = totalAttack;
@@ -73,6 +74,38 @@ namespace DreamGate.Battlegrounds.Economy
             result.goldenMinion = golden;
             result.goldRewarded = MatchConfig.TripleGoldReward;
             return result;
+        }
+
+        private static MinionCardDefinition ResolveTripleReward(MinionCardDefinition definition)
+        {
+            if (definition == null)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(definition.tripleRewardCardId))
+            {
+                return CardRegistry.Get(definition.tripleRewardCardId) ?? definition;
+            }
+
+            return definition;
+        }
+
+        public static string GetTripleRewardDisplayName(string cardId)
+        {
+            var definition = CardRegistry.Get(cardId);
+            var reward = ResolveTripleReward(definition);
+            if (reward == null)
+            {
+                return cardId;
+            }
+
+            if (reward.cardId != cardId)
+            {
+                return reward.displayName;
+            }
+
+            return $"Golden {reward.displayName}";
         }
 
         private static void CollectCopies(MinionInstance[] source, string cardId, List<MinionInstance> output)

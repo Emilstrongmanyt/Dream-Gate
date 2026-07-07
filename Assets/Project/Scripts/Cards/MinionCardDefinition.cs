@@ -17,6 +17,8 @@ namespace DreamGate.Battlegrounds.Cards
         public string abilityText;
         [Tooltip("Used by DeathrattleSummon abilities.")]
         public string summonCardId;
+        [Tooltip("When tripled, becomes this card instead of a golden copy.")]
+        public string tripleRewardCardId;
         public Sprite cardArt;
     }
 }

@@ -85,8 +85,10 @@ namespace DreamGate.Battlegrounds.Cards
             Register(CreateCard("dark_stump", "Dark Stump", 2, 2, 4, artFile: "DarkStumpCard"));
             Register(CreateCard("jr_wraith", "Jr. Wraith", 2, 3, 2, artFile: "Jr.WraithCard"));
             Register(CreateCard("brown_teddy", "Brown Teddy", 2, 2, 3, artFile: "BrownTeddyCard"));
-            Register(CreateCard("baby_balrog", "Baby Balrog", 2, 3, 3, artFile: "BabyBalrogCard"));
-            Register(CreateCard("baby_balrog_gang", "Baby Balrog Gang", 2, 4, 5, artFile: "BabyBalrogGangCard"));
+            Register(CreateCard("baby_balrog", "Baby Balrog", 2, 3, 3, tripleRewardCardId: "baby_balrog_gang",
+                artFile: "BabyBalrogCard"));
+            Register(CreateCard("baby_balrog_gang", "Baby Balrog Gang", 2, 4, 5, canAppearInShop: false,
+                artFile: "BabyBalrogGangCard"));
 
             // Tier 3 — budget ~7-10 stats; premium bodies pay for keywords.
             Register(CreateCard("stone_golem", "Stone Golem", 3, 2, 6, AbilityType.OnDamageTransform,
@@ -124,6 +126,7 @@ namespace DreamGate.Battlegrounds.Cards
             AbilityType ability = AbilityType.None,
             string abilityText = "",
             string summonCardId = "",
+            string tripleRewardCardId = "",
             int abilityValue = 1,
             bool isToken = false,
             bool canAppearInShop = true,
@@ -139,6 +142,7 @@ namespace DreamGate.Battlegrounds.Cards
             card.abilityValue = abilityValue;
             card.abilityText = abilityText;
             card.summonCardId = summonCardId;
+            card.tripleRewardCardId = tripleRewardCardId;
             card.isToken = isToken;
             card.canAppearInShop = canAppearInShop;
             card.cardArt = LoadArt(tier, artFile);
