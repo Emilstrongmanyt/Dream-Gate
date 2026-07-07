@@ -66,6 +66,20 @@ jobs:
             Library-iOS-
             Library-
 
+      - name: Set iOS build number from CI run
+        run: |
+          python3 <<'PY'
+          import os, re
+          run_no = os.environ["GITHUB_RUN_NUMBER"]
+          path = "ProjectSettings/ProjectSettings.asset"
+          text = open(path, encoding="utf-8").read()
+          patched, count = re.subn(r"(\s+iPhone: )\d+", rf"\g<1>{run_no}", text, count=1)
+          if count != 1:
+              raise SystemExit(f"Failed to patch iPhone build number in {path}")
+          open(path, "w", encoding="utf-8").write(patched)
+          print(f"Set iPhone build number to {run_no}")
+          PY
+
       - name: Build iOS Xcode project
         uses: game-ci/unity-builder@v4
         env:
