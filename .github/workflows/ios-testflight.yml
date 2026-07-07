@@ -79,7 +79,7 @@ jobs:
           buildName: ${{ env.BUILD_NAME }}
           versioning: None
           allowDirtyBuild: true
-          customParameters: -bundleVersion 1.0 -buildNumber 1
+          customParameters: -bundleVersion 1.0 -buildNumber ${{ github.run_number }}
 
       - name: Upload Xcode project artifact
         uses: actions/upload-artifact@v4
