@@ -27,10 +27,10 @@ namespace DreamGate.Battlegrounds.UI
         private TextMeshProUGUI hudText;
         private TextMeshProUGUI leaderboardText;
         private TextMeshProUGUI logText;
-        private TextMeshProUGUI combatLogText;
+        private GameObject compactLogPanel;
         private TextMeshProUGUI playerHeroText;
         private TextMeshProUGUI opponentHeroText;
-        private TextMeshProUGUI heroDamageText;
+        private CombatDamageFloater combatDamageFloater;
         private TextMeshProUGUI resultsText;
         private GameObject recruitPanel;
         private GameObject combatPanel;
@@ -74,11 +74,10 @@ namespace DreamGate.Battlegrounds.UI
         private static readonly Vector2 PlayerBoardCenter = new(0, -320);
         private static readonly Vector2 PlayerHeroCenter = new(0, -740);
         private static readonly Vector2 HeroOvalSize = new(156, 172);
-        private const int CompactLogMaxLines = 3;
-        private const int CompactLogMaxChars = 900;
-        private static readonly Color HudPanelColor = new(0.04f, 0.06f, 0.12f, 0.72f);
-        private static readonly Color LogPanelColor = new(0.04f, 0.06f, 0.12f, 0.65f);
-        private static readonly Color CombatPanelColor = new(0.03f, 0.05f, 0.1f, 0.55f);
+        private const int CompactLogMaxLines = 2;
+        private const int CompactLogMaxChars = 420;
+        private static readonly Color HudPanelColor = new(0.04f, 0.06f, 0.12f, 0.58f);
+        private static readonly Color CombatPanelColor = new(0f, 0f, 0f, 0f);
 
         public void Initialize(MatchManager manager, Transform uiRoot)
         {
@@ -113,9 +112,7 @@ namespace DreamGate.Battlegrounds.UI
 
             recruitPanel.SetActive(false);
             combatPanel.SetActive(true);
-            combatLogText.text = opponent != null
-                ? $"COMBAT vs {opponent.heroName}\n"
-                : "COMBAT\n";
+            SetCombatHudMode(true, opponent);
 
             var player = result?.attackerSnapshot ?? matchManager.GetHumanPlayer();
             var defender = result?.defenderSnapshot ?? opponent;
@@ -129,26 +126,12 @@ namespace DreamGate.Battlegrounds.UI
             opponentHeroText = combatOpponentHero?.NameText;
 
             RefreshCombatBoards();
-            heroDamageText.gameObject.SetActive(false);
             SetRecruitControls(false);
             SetAllSlotButtonsInteractable(false);
         }
 
-        public void ShowCombatLine(string message)
-        {
-            if (string.IsNullOrEmpty(message))
-            {
-                return;
-            }
-
-            combatLogText.text += message + "\n";
-            AppendLog(message);
-        }
-
         public IEnumerator PlayCombatEvent(CombatEvent combatEvent, float stepSeconds)
         {
-            ShowCombatLine(combatEvent.message);
-
             switch (combatEvent.type)
             {
                 case CombatEventType.Attack:
@@ -208,13 +191,13 @@ namespace DreamGate.Battlegrounds.UI
                 yield break;
             }
 
-            heroDamageText.gameObject.SetActive(true);
-            heroDamageText.text = $"-{damage}";
-            heroDamageText.rectTransform.position = loserRect.position + new Vector3(0f, 36f, 0f);
-
             var elapsed = 0f;
             const float duration = 0.45f;
             var startPos = loserRect.anchoredPosition;
+            var floatRoutine = combatDamageFloater != null
+                ? StartCoroutine(combatDamageFloater.Show(loserRect, damage, CombatDamageStyle.Hero))
+                : null;
+
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
@@ -224,17 +207,17 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             loserRect.anchoredPosition = startPos;
-            ShowCombatLine(
-                result.outcome == CombatOutcome.AttackerWins
-                    ? $"Hero damage: {opponent?.heroName} takes {damage}!"
-                    : $"Hero damage: you take {damage}!");
+            if (floatRoutine != null)
+            {
+                yield return floatRoutine;
+            }
 
-            yield return new WaitForSeconds(0.55f);
-            heroDamageText.gameObject.SetActive(false);
+            yield return new WaitForSeconds(0.2f);
         }
 
         public void EndCombatPlayback()
         {
+            SetCombatHudMode(false, null);
             combatPanel.SetActive(false);
             recruitPanel.SetActive(true);
             activeCombatResult = null;
@@ -369,24 +352,43 @@ namespace DreamGate.Battlegrounds.UI
             playerHeroRect = combatPlayerHero.Root;
             playerHeroText = combatPlayerHero.NameText;
 
-            var combatLogPanel = CreatePanel(combatPanel.transform, "CombatLog", new Color(0.04f, 0.06f, 0.12f, 0.82f));
-            var logRect = combatLogPanel.GetComponent<RectTransform>();
-            logRect.anchorMin = new Vector2(0.5f, 0f);
-            logRect.anchorMax = new Vector2(0.5f, 0f);
-            logRect.pivot = new Vector2(0.5f, 0f);
-            logRect.anchoredPosition = new Vector2(-220, 24);
-            logRect.sizeDelta = new Vector2(520, 150);
+            var floaterGo = new GameObject("CombatDamageFloater", typeof(RectTransform));
+            floaterGo.transform.SetParent(combatPanel.transform, false);
+            var floaterRect = floaterGo.GetComponent<RectTransform>();
+            floaterRect.anchorMin = Vector2.zero;
+            floaterRect.anchorMax = Vector2.one;
+            floaterRect.offsetMin = Vector2.zero;
+            floaterRect.offsetMax = Vector2.zero;
+            combatDamageFloater = floaterGo.AddComponent<CombatDamageFloater>();
+            combatDamageFloater.Initialize(floaterGo.transform);
+        }
 
-            combatLogText = CreateText(combatLogPanel.transform, "CombatLogText", Vector2.zero, 15, TextAlignmentOptions.TopLeft);
-            combatLogText.rectTransform.anchorMin = Vector2.zero;
-            combatLogText.rectTransform.anchorMax = Vector2.one;
-            combatLogText.rectTransform.offsetMin = new Vector2(14, 10);
-            combatLogText.rectTransform.offsetMax = new Vector2(-14, -10);
+        private void SetCombatHudMode(bool inCombat, PlayerState opponent)
+        {
+            if (hudPanel != null)
+            {
+                hudPanel.SetActive(true);
+            }
 
-            heroDamageText = CreateText(combatPanel.transform, "HeroDamage", Vector2.zero, 34, TextAlignmentOptions.Center);
-            heroDamageText.color = new Color(1f, 0.35f, 0.3f);
-            heroDamageText.rectTransform.sizeDelta = new Vector2(160, 60);
-            heroDamageText.gameObject.SetActive(false);
+            if (leaderboardText != null)
+            {
+                leaderboardText.gameObject.SetActive(!inCombat);
+            }
+
+            if (compactLogPanel != null)
+            {
+                compactLogPanel.SetActive(!inCombat);
+            }
+
+            if (!inCombat || hudText == null)
+            {
+                return;
+            }
+
+            var player = matchManager?.GetHumanPlayer();
+            var opponentName = opponent?.heroName ?? "Opponent";
+            hudText.text = $"COMBAT  •  {player?.heroName ?? "You"} vs {opponentName}";
+            hudText.fontSize = 26;
         }
 
         // Hero ovals use UiImageSprites (runtime 1x1 sprite) — no builtin UISprite.psd.
@@ -545,6 +547,13 @@ namespace DreamGate.Battlegrounds.UI
                     combatEvent.attackerBoardIndex);
 
                 var strikerSlot = GetCombatSlot(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
+                Coroutine floatRoutine = null;
+                if (strikerSlot?.RootRect != null && combatDamageFloater != null)
+                {
+                    floatRoutine = StartCoroutine(
+                        combatDamageFloater.Show(strikerSlot.RootRect, damage, CombatDamageStyle.Recoil));
+                }
+
                 if (strikerSlot?.CombatMotion != null)
                 {
                     yield return strikerSlot.CombatMotion.PlayHitShake();
@@ -552,6 +561,11 @@ namespace DreamGate.Battlegrounds.UI
                 else
                 {
                     yield return new WaitForSeconds(0.2f);
+                }
+
+                if (floatRoutine != null)
+                {
+                    yield return floatRoutine;
                 }
 
                 yield break;
@@ -587,6 +601,13 @@ namespace DreamGate.Battlegrounds.UI
             var attackerSlot = GetCombatSlot(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
             var defenderSlot = GetCombatSlot(!combatEvent.isAttackerBoard, combatEvent.defenderBoardIndex);
             var lungeDirection = combatEvent.isAttackerBoard ? Vector2.up : Vector2.down;
+            var damageStyle = combatEvent.isCleave ? CombatDamageStyle.Cleave : CombatDamageStyle.Incoming;
+            Coroutine damageFloatRoutine = null;
+            if (defenderSlot?.RootRect != null && combatDamageFloater != null)
+            {
+                damageFloatRoutine = StartCoroutine(
+                    combatDamageFloater.Show(defenderSlot.RootRect, damage, damageStyle));
+            }
 
             if (!combatEvent.isCleave && attackerSlot?.CombatMotion != null && defenderSlot?.CombatMotion != null)
             {
@@ -602,6 +623,11 @@ namespace DreamGate.Battlegrounds.UI
             else
             {
                 yield return new WaitForSeconds(0.2f);
+            }
+
+            if (damageFloatRoutine != null)
+            {
+                yield return damageFloatRoutine;
             }
         }
 
@@ -791,21 +817,10 @@ namespace DreamGate.Battlegrounds.UI
 
         private void CreateBackground(Transform root)
         {
-            var bgGo = new GameObject("BoardBackground", typeof(RectTransform), typeof(Image));
-            bgGo.transform.SetParent(root, false);
-            bgGo.transform.SetAsFirstSibling();
-
-            var rect = bgGo.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-
-            var image = bgGo.GetComponent<Image>();
-            image.sprite = CardArtLoader.LoadBackground("PracticeGameBackground1");
-            image.preserveAspect = false;
-            image.raycastTarget = false;
-            image.color = Color.white;
+            UiBackgroundFit.CreateCoverBackground(
+                root,
+                CardArtLoader.LoadBackground("PracticeGameBackground1"),
+                "BoardBackground");
         }
 
         private void CreateHud(Transform root)
@@ -815,27 +830,27 @@ namespace DreamGate.Battlegrounds.UI
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
             hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0, -12);
-            hudRect.sizeDelta = new Vector2(980, 248);
+            hudRect.anchoredPosition = new Vector2(0, -8);
+            hudRect.sizeDelta = new Vector2(980, 188);
 
-            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, -24), 24, TextAlignmentOptions.Center);
-            hudText.rectTransform.sizeDelta = new Vector2(940, 84);
+            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, -20), 22, TextAlignmentOptions.Center);
+            hudText.rectTransform.sizeDelta = new Vector2(940, 72);
 
-            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -104), 16, TextAlignmentOptions.Center);
-            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 38);
+            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -88), 15, TextAlignmentOptions.Center);
+            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 32);
             leaderboardText.color = new Color(0.85f, 0.9f, 1f);
 
-            var compactLogPanel = new GameObject("CompactLog", typeof(RectTransform), typeof(Image));
+            compactLogPanel = new GameObject("CompactLog", typeof(RectTransform), typeof(Image));
             compactLogPanel.transform.SetParent(hudPanel.transform, false);
             var compactLogRect = compactLogPanel.GetComponent<RectTransform>();
             compactLogRect.anchorMin = new Vector2(0.5f, 0f);
             compactLogRect.anchorMax = new Vector2(0.5f, 0f);
             compactLogRect.pivot = new Vector2(0.5f, 0f);
-            compactLogRect.anchoredPosition = new Vector2(0, 10);
-            compactLogRect.sizeDelta = new Vector2(920, 72);
-            compactLogPanel.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.08f, 0.58f);
+            compactLogRect.anchoredPosition = new Vector2(0, 8);
+            compactLogRect.sizeDelta = new Vector2(920, 52);
+            compactLogPanel.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.08f, 0.42f);
 
-            logText = CreateText(compactLogPanel.transform, "Log", Vector2.zero, 13, TextAlignmentOptions.TopLeft);
+            logText = CreateText(compactLogPanel.transform, "Log", Vector2.zero, 12, TextAlignmentOptions.TopLeft);
             logText.rectTransform.anchorMin = Vector2.zero;
             logText.rectTransform.anchorMax = Vector2.one;
             logText.rectTransform.offsetMin = new Vector2(12, 6);
@@ -848,20 +863,27 @@ namespace DreamGate.Battlegrounds.UI
         private void Refresh()
         {
             var player = matchManager.GetHumanPlayer();
+            if (combatPanel != null && combatPanel.activeSelf)
+            {
+                RefreshRecruitHeroes(player);
+                return;
+            }
+
+            hudText.fontSize = 22;
             var modeLabel = matchManager.Mode == MatchMode.Rated ? "RATED" : "PRACTICE";
+            var timerSuffix = matchManager.Phase == MatchPhase.Recruit
+                ? $"  •  {Mathf.CeilToInt(matchManager.RecruitTimeRemaining)}s"
+                : string.Empty;
+            var mmrSuffix = matchManager.Mode == MatchMode.Rated &&
+                            DreamGateServices.IsInitialized &&
+                            DreamGateServices.IsLoggedIn &&
+                            DreamGateServices.Profile != null
+                ? $"  •  MMR {DreamGateServices.Profile.mmr}"
+                : string.Empty;
+
             hudText.text =
-                $"{modeLabel} | Turn {matchManager.Turn} | {player.heroName} | Phase: {matchManager.Phase}\n" +
-                $"Gold: {player.gold} | Tavern Tier: {player.tavernTier}/{MatchConfig.MaxTavernTier} | HP: {player.heroHealth}";
-
-            if (matchManager.Mode == MatchMode.Rated && DreamGateServices.IsInitialized && DreamGateServices.IsLoggedIn && DreamGateServices.Profile != null)
-            {
-                hudText.text += $"\nMMR: {DreamGateServices.Profile.mmr}";
-            }
-
-            if (matchManager.Phase == MatchPhase.Recruit)
-            {
-                hudText.text += $"\nTimer: {Mathf.CeilToInt(matchManager.RecruitTimeRemaining)}s";
-            }
+                $"{modeLabel}  •  Turn {matchManager.Turn}{timerSuffix}\n" +
+                $"Gold {player.gold}  •  Tier {player.tavernTier}/{MatchConfig.MaxTavernTier}  •  HP {player.heroHealth}{mmrSuffix}";
 
             leaderboardText.text = matchManager.GetLeaderboardSummary();
             RefreshRecruitHeroes(player);

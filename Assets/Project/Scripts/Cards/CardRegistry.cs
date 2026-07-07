@@ -64,49 +64,49 @@ namespace DreamGate.Battlegrounds.Cards
 
         private static void RegisterBuiltInCards()
         {
-            // Tier 1
+            // Tier 1 — budget ~3-5 stats; tokens and deathrattles sit slightly below curve.
             Register(CreateCard("snail", "Snail", 1, 1, 2, artFile: "SnailCard"));
-            Register(CreateCard("blue_snail", "Blue Snail", 1, 1, 2, artFile: "BlueSnailCard"));
-            Register(CreateCard("red_snail", "Red Snail", 1, 1, 3, artFile: "RedSnailCard"));
-            Register(CreateCard("shroom", "Shroom", 1, 1, 1, artFile: "ShroomCard"));
-            Register(CreateCard("green_mushroom", "Green Mushroom", 1, 2, 1, artFile: "GreenMushroomCard"));
-            Register(CreateCard("mano", "Mano", 1, 2, 2, artFile: "ManoCard"));
-            Register(CreateCard("octopus", "Octopus", 1, 1, 3, artFile: "OctopusCard"));
-            Register(CreateCard("stirge", "Stirge", 1, 1, 1, AbilityType.DeathrattleSummon,
+            Register(CreateCard("blue_snail", "Blue Snail", 1, 1, 3, artFile: "BlueSnailCard"));
+            Register(CreateCard("red_snail", "Red Snail", 1, 2, 2, artFile: "RedSnailCard"));
+            Register(CreateCard("shroom", "Shroom", 1, 1, 2, artFile: "ShroomCard"));
+            Register(CreateCard("green_mushroom", "Green Mushroom", 1, 2, 2, artFile: "GreenMushroomCard"));
+            Register(CreateCard("mano", "Mano", 1, 2, 3, artFile: "ManoCard"));
+            Register(CreateCard("octopus", "Octopus", 1, 1, 4, artFile: "OctopusCard"));
+            Register(CreateCard("stirge", "Stirge", 1, 1, 2, AbilityType.DeathrattleSummon,
                 "Deathrattle: Summon a Jr. Stirge.", summonCardId: "jr_stirge", artFile: "StirgeCard"));
             Register(CreateCard("jr_stirge", "Jr. Stirge", 1, 1, 1, isToken: true, canAppearInShop: false,
                 artFile: "JrStirgeCard"));
 
-            // Tier 2
-            Register(CreateCard("scuba_pepe", "Scuba Pepe", 2, 2, 3, artFile: "ScubaPepeCard"));
-            Register(CreateCard("horny_mushroom", "Horny Mushroom", 2, 2, 3, AbilityType.Taunt, "Taunt.",
+            // Tier 2 — budget ~5-7 stats; taunt trades attack for health.
+            Register(CreateCard("scuba_pepe", "Scuba Pepe", 2, 2, 4, artFile: "ScubaPepeCard"));
+            Register(CreateCard("horny_mushroom", "Horny Mushroom", 2, 1, 5, AbilityType.Taunt, "Taunt.",
                 artFile: "HornyMushroomCard"));
-            Register(CreateCard("axe_stump", "Axe Stump", 2, 2, 2, artFile: "AxeStumpCard"));
-            Register(CreateCard("dark_stump", "Dark Stump", 2, 3, 2, artFile: "DarkStumpCard"));
-            Register(CreateCard("jr_wraith", "Jr. Wraith", 2, 2, 2, artFile: "Jr.WraithCard"));
+            Register(CreateCard("axe_stump", "Axe Stump", 2, 3, 2, artFile: "AxeStumpCard"));
+            Register(CreateCard("dark_stump", "Dark Stump", 2, 2, 4, artFile: "DarkStumpCard"));
+            Register(CreateCard("jr_wraith", "Jr. Wraith", 2, 3, 2, artFile: "Jr.WraithCard"));
             Register(CreateCard("brown_teddy", "Brown Teddy", 2, 2, 3, artFile: "BrownTeddyCard"));
             Register(CreateCard("baby_balrog", "Baby Balrog", 2, 3, 3, artFile: "BabyBalrogCard"));
-            Register(CreateCard("baby_balrog_gang", "Baby Balrog Gang", 2, 4, 4, artFile: "BabyBalrogGangCard"));
+            Register(CreateCard("baby_balrog_gang", "Baby Balrog Gang", 2, 4, 5, artFile: "BabyBalrogGangCard"));
 
-            // Tier 3
-            Register(CreateCard("stone_golem", "Stone Golem", 3, 3, 5, AbilityType.OnDamageTransform,
+            // Tier 3 — budget ~7-10 stats; premium bodies pay for keywords.
+            Register(CreateCard("stone_golem", "Stone Golem", 3, 2, 6, AbilityType.OnDamageTransform,
                 "When damaged, becomes Enraged Stone Golem.", summonCardId: "enraged_stone_golem",
                 artFile: "StoneGolemCard"));
-            Register(CreateCard("enraged_stone_golem", "Enraged Stone Golem", 3, 6, 6,
+            Register(CreateCard("enraged_stone_golem", "Enraged Stone Golem", 3, 5, 5,
                 canAppearInShop: false, artFile: "EnragedStoneGolemCard"));
-            Register(CreateCard("king_slime", "King Slime", 3, 4, 4, artFile: "KingSlimeCard"));
-            Register(CreateCard("mushmom", "Mushmom", 3, 3, 5, artFile: "MushmomCard"));
-            Register(CreateCard("wraith", "Wraith", 3, 4, 3, AbilityType.Windfury, "Windfury.",
+            Register(CreateCard("king_slime", "King Slime", 3, 3, 5, artFile: "KingSlimeCard"));
+            Register(CreateCard("mushmom", "Mushmom", 3, 4, 5, artFile: "MushmomCard"));
+            Register(CreateCard("wraith", "Wraith", 3, 3, 3, AbilityType.Windfury, "Windfury.",
                 artFile: "WraithCard"));
             Register(CreateCard("ghost_stumpy", "Ghost Stumpy", 3, 3, 2, AbilityType.DeathrattleSummon,
                 "Deathrattle: Summon a Stump Spirit.", summonCardId: "stump_spirit", artFile: "GhostStumpyCard"));
-            Register(CreateCard("stump_spirit", "Stump Spirit", 3, 2, 1, isToken: true, canAppearInShop: false,
+            Register(CreateCard("stump_spirit", "Stump Spirit", 3, 2, 2, isToken: true, canAppearInShop: false,
                 artFile: "AxeStumpCard"));
             Register(CreateCard("master_soul_teddy", "Master Soul Teddy", 3, 4, 4, AbilityType.Cleave,
                 "Also damages minions adjacent to the target.", artFile: "MasterSoulTeddyCard"));
 
-            // Tier 4
-            Register(CreateCard("jr_balrog", "Jr. Balrog", 4, 8, 8, AbilityType.MegaWindfury, "Mega-Windfury.",
+            // Tier 4 — capstone; mega-windfury trades burst for survivability under recoil.
+            Register(CreateCard("jr_balrog", "Jr. Balrog", 4, 5, 12, AbilityType.MegaWindfury, "Mega-Windfury.",
                 artFile: "Jr.BalrogCard"));
         }
 

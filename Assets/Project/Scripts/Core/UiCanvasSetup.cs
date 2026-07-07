@@ -36,6 +36,8 @@ namespace DreamGate.Battlegrounds.Core
             scaler.referenceResolution = ReferenceResolution;
             scaler.matchWidthOrHeight = MatchWidthOrHeight;
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+
+            UiBackgroundFit.FitNamedBackground();
         }
 
         public static void ApplySafeArea(RectTransform root)
