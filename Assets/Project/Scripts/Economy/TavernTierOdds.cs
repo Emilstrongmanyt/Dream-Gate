@@ -5,20 +5,18 @@ namespace DreamGate.Battlegrounds.Economy
 {
     public static class TavernTierOdds
     {
-        // BG-style shop odds: index 0 = tier 1 chance at tavern tier 1, etc.
+        // BG-style shop odds for 4 minion tiers only.
         private static readonly int[][] OddsTable =
         {
-            new[] { 100, 0, 0, 0, 0, 0 },
-            new[] { 75, 25, 0, 0, 0, 0 },
-            new[] { 55, 30, 15, 0, 0, 0 },
-            new[] { 35, 30, 25, 10, 0, 0 },
-            new[] { 20, 25, 30, 20, 5, 0 },
-            new[] { 10, 20, 25, 25, 15, 5 }
+            new[] { 100, 0, 0, 0 },
+            new[] { 75, 25, 0, 0 },
+            new[] { 55, 30, 15, 0 },
+            new[] { 35, 30, 25, 10 }
         };
 
         public static MinionCardDefinition RollCard(int tavernTier, System.Random random)
         {
-            var tierIndex = UnityEngine.Mathf.Clamp(tavernTier, 1, 6) - 1;
+            var tierIndex = UnityEngine.Mathf.Clamp(tavernTier, 1, 4) - 1;
             var odds = OddsTable[tierIndex];
             var roll = random.Next(100);
             var cumulative = 0;
@@ -33,6 +31,8 @@ namespace DreamGate.Battlegrounds.Economy
                     break;
                 }
             }
+
+            chosenMinionTier = UnityEngine.Mathf.Clamp(chosenMinionTier, 1, 4);
 
             var pool = CardRegistry.GetCardsAtTier(chosenMinionTier);
             if (pool.Count == 0)

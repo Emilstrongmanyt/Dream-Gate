@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using DreamGate.Battlegrounds.Cards;
 using DreamGate.Battlegrounds.Core;
 using DreamGate.Battlegrounds.Players;
-using UnityEngine;
 
 namespace DreamGate.Battlegrounds.Economy
 {
@@ -71,13 +70,19 @@ namespace DreamGate.Battlegrounds.Economy
         public static bool TrySell(PlayerState player, int boardIndex, out string message)
         {
             message = string.Empty;
-            if (boardIndex < 0 || boardIndex >= player.board.Count)
+            if (boardIndex < 0 || boardIndex >= player.board.Length)
             {
                 message = "Invalid board slot.";
                 return false;
             }
 
-            player.board.RemoveAt(boardIndex);
+            if (player.board[boardIndex] == null)
+            {
+                message = "Board slot is empty.";
+                return false;
+            }
+
+            player.board[boardIndex] = null;
             player.gold += MatchConfig.SellValue;
             message = $"Sold minion (+{MatchConfig.SellValue} gold).";
             return true;
@@ -123,7 +128,7 @@ namespace DreamGate.Battlegrounds.Economy
         public static bool TryReorderBoard(PlayerState player, int fromIndex, int toIndex, out string message)
         {
             message = string.Empty;
-            if (fromIndex < 0 || fromIndex >= player.board.Count)
+            if (fromIndex < 0 || fromIndex >= player.board.Length)
             {
                 message = "Invalid board slot.";
                 return false;
@@ -140,27 +145,37 @@ namespace DreamGate.Battlegrounds.Economy
                 return true;
             }
 
-            var minion = player.board[fromIndex];
-            player.board.RemoveAt(fromIndex);
-
-            var insertIndex = toIndex;
-            if (insertIndex > fromIndex)
+            if (player.board[fromIndex] == null)
             {
-                insertIndex--;
+                message = "Source slot is empty.";
+                return false;
             }
 
-            insertIndex = Mathf.Clamp(insertIndex, 0, player.board.Count);
-            player.board.Insert(insertIndex, minion);
+            var minion = player.board[fromIndex];
+            player.board[fromIndex] = player.board[toIndex];
+            player.board[toIndex] = minion;
             message = "Board rearranged.";
             return true;
         }
 
         public static bool TryPlayFromHand(PlayerState player, int handIndex, out string message)
         {
+            var slot = player.GetDefaultPlaySlot();
+            return TryPlayFromHandToSlot(player, handIndex, slot, out message);
+        }
+
+        public static bool TryPlayFromHandToSlot(PlayerState player, int handIndex, int boardIndex, out string message)
+        {
             message = string.Empty;
             if (handIndex < 0 || handIndex >= player.hand.Count)
             {
                 message = "Invalid hand slot.";
+                return false;
+            }
+
+            if (boardIndex < 0 || boardIndex >= player.board.Length)
+            {
+                message = "Invalid board slot.";
                 return false;
             }
 
@@ -170,9 +185,16 @@ namespace DreamGate.Battlegrounds.Economy
                 return false;
             }
 
+            if (player.board[boardIndex] != null)
+            {
+                message = "Board slot is occupied.";
+                return false;
+            }
+
             var minion = player.hand[handIndex];
             player.hand.RemoveAt(handIndex);
-            player.board.Add(minion);
+            player.board[boardIndex] = minion;
+            AbilitySystem.OnBattlecry(minion, boardIndex, player.board);
             message = "Minion played to board.";
             return true;
         }

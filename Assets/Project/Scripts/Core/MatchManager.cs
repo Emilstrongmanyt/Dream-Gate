@@ -24,7 +24,7 @@ namespace DreamGate.Battlegrounds.Core
         public const int BoardSize = 5;
         public const int MaxHandSize = 6;
         public const int ShopSlotCount = 5;
-        public const int MaxTavernTier = 6;
+        public const int MaxTavernTier = 4;
 
         public const int StartingHeroHealth = 40;
         public const int StartingGoldTurnOne = 3;
@@ -200,6 +200,19 @@ namespace DreamGate.Battlegrounds.Core
         {
             EnsureRecruitPhase();
             var success = ShopSystem.TryPlayFromHand(humanPlayer, handIndex, out message);
+            if (success)
+            {
+                Post(message);
+                StateChanged?.Invoke();
+            }
+
+            return success;
+        }
+
+        public bool TryPlayFromHandToSlot(int handIndex, int boardIndex, out string message)
+        {
+            EnsureRecruitPhase();
+            var success = ShopSystem.TryPlayFromHandToSlot(humanPlayer, handIndex, boardIndex, out message);
             if (success)
             {
                 Post(message);

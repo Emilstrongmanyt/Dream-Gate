@@ -64,25 +64,50 @@ namespace DreamGate.Battlegrounds.Cards
 
         private static void RegisterBuiltInCards()
         {
-            Register(CreateCard("blue_snail", "Blue Snail", 1, 1, 2, artFile: "BlueSnailCardT1"));
+            // Tier 1
+            Register(CreateCard("snail", "Snail", 1, 1, 2, artFile: "SnailCard"));
+            Register(CreateCard("blue_snail", "Blue Snail", 1, 1, 2, artFile: "BlueSnailCard"));
+            Register(CreateCard("red_snail", "Red Snail", 1, 1, 3, artFile: "RedSnailCard"));
+            Register(CreateCard("shroom", "Shroom", 1, 1, 1, artFile: "ShroomCard"));
+            Register(CreateCard("green_mushroom", "Green Mushroom", 1, 2, 1, artFile: "GreenMushroomCard"));
+            Register(CreateCard("mano", "Mano", 1, 2, 2, artFile: "ManoCard"));
+            Register(CreateCard("octopus", "Octopus", 1, 1, 3, artFile: "OctopusCard"));
             Register(CreateCard("stirge", "Stirge", 1, 1, 1, AbilityType.DeathrattleSummon,
-                "Final Stand: Summon a Jr. Stirge", summonCardId: "jr_stirge", artFile: "StirgeCardT1"));
-            Register(CreateCard("jr_stirge", "Jr. Stirge", 1, 1, 1, isToken: true, canAppearInShop: false, artFile: "JrStirgeCardT1"));
-            Register(CreateCard("mushmom", "Mushmom", 1, 1, 3, artFile: "MushmomCardT1"));
-            Register(CreateCard("teddy", "Teddy", 1, 2, 1, artFile: "TeddyCardT1"));
+                "Deathrattle: Summon a Jr. Stirge.", summonCardId: "jr_stirge", artFile: "StirgeCard"));
+            Register(CreateCard("jr_stirge", "Jr. Stirge", 1, 1, 1, isToken: true, canAppearInShop: false,
+                artFile: "JrStirgeCard"));
 
-            Register(CreateCard("evil_eye", "Evil Eye", 2, 4, 2, artFile: "EvilEyeCardT2"));
-            Register(CreateCard("blue_mushroom", "Blue Mushroom", 2, 2, 2, AbilityType.OnDamageSummonCopy,
-                "Summons an exact copy when hit.", artFile: "BlueMushroomCardT2"));
-            Register(CreateCard("scuba_pepe", "Scuba Pepe", 2, 2, 3, artFile: "ScubaPepeCardT2"));
+            // Tier 2
+            Register(CreateCard("scuba_pepe", "Scuba Pepe", 2, 2, 3, artFile: "ScubaPepeCard"));
+            Register(CreateCard("horny_mushroom", "Horny Mushroom", 2, 2, 3, AbilityType.Taunt, "Taunt.",
+                artFile: "HornyMushroomCard"));
+            Register(CreateCard("axe_stump", "Axe Stump", 2, 2, 2, artFile: "AxeStumpCard"));
+            Register(CreateCard("dark_stump", "Dark Stump", 2, 3, 2, artFile: "DarkStumpCard"));
+            Register(CreateCard("jr_wraith", "Jr. Wraith", 2, 2, 2, artFile: "Jr.WraithCard"));
+            Register(CreateCard("brown_teddy", "Brown Teddy", 2, 2, 3, artFile: "BrownTeddyCard"));
+            Register(CreateCard("baby_balrog", "Baby Balrog", 2, 3, 3, artFile: "BabyBalrogCard"));
+            Register(CreateCard("baby_balrog_gang", "Baby Balrog Gang", 2, 4, 4, artFile: "BabyBalrogGangCard"));
 
-            Register(CreateCard("stone_golem", "Stone Golem", 3, 3, 3, AbilityType.OnDamageTransform,
-                "Becomes Enraged when hit.", summonCardId: "enraged_stone_golem", artFile: "StoneGolemCardT3"));
+            // Tier 3
+            Register(CreateCard("stone_golem", "Stone Golem", 3, 3, 5, AbilityType.OnDamageTransform,
+                "When damaged, becomes Enraged Stone Golem.", summonCardId: "enraged_stone_golem",
+                artFile: "StoneGolemCard"));
             Register(CreateCard("enraged_stone_golem", "Enraged Stone Golem", 3, 6, 6,
-                canAppearInShop: false, artFile: "EnragedStoneGolemCardT3"));
-            Register(CreateCard("iron_hog", "Iron Hog", 3, 2, 7, AbilityType.Taunt, "'Taunt'", artFile: "IronHogCardT3"));
-            Register(CreateCard("master_death_teddy", "Master Death Teddy", 3, 3, 3, AbilityType.Cleave,
-                "This monster also damages enemies next to its target.", artFile: "MasterDeathTeddyCardT3"));
+                canAppearInShop: false, artFile: "EnragedStoneGolemCard"));
+            Register(CreateCard("king_slime", "King Slime", 3, 4, 4, artFile: "KingSlimeCard"));
+            Register(CreateCard("mushmom", "Mushmom", 3, 3, 5, artFile: "MushmomCard"));
+            Register(CreateCard("wraith", "Wraith", 3, 4, 3, AbilityType.Windfury, "Windfury.",
+                artFile: "WraithCard"));
+            Register(CreateCard("ghost_stumpy", "Ghost Stumpy", 3, 3, 2, AbilityType.DeathrattleSummon,
+                "Deathrattle: Summon a Stump Spirit.", summonCardId: "stump_spirit", artFile: "GhostStumpyCard"));
+            Register(CreateCard("stump_spirit", "Stump Spirit", 3, 2, 1, isToken: true, canAppearInShop: false,
+                artFile: "AxeStumpCard"));
+            Register(CreateCard("master_soul_teddy", "Master Soul Teddy", 3, 4, 4, AbilityType.Cleave,
+                "Also damages minions adjacent to the target.", artFile: "MasterSoulTeddyCard"));
+
+            // Tier 4
+            Register(CreateCard("jr_balrog", "Jr. Balrog", 4, 8, 8, AbilityType.MegaWindfury, "Mega-Windfury.",
+                artFile: "Jr.BalrogCard"));
         }
 
         private static void Register(MinionCardDefinition card)

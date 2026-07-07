@@ -18,6 +18,8 @@ namespace DreamGate.Battlegrounds.Combat
         public int boardIndex;
         public bool isAttackerBoard;
         public bool isCleave;
+        public bool isRecoil;
+        public int damageAmount;
         public int attackDelta;
         public int healthDelta;
         public string abilityCardId;

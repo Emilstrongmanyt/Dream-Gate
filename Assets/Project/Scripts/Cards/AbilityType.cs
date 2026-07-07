@@ -8,6 +8,9 @@ namespace DreamGate.Battlegrounds.Cards
         OnDamageSummonCopy,
         OnDamageTransform,
         Taunt,
-        Cleave
+        Cleave,
+        Battlecry,
+        Windfury,
+        MegaWindfury
     }
 }

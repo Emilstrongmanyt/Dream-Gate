@@ -42,8 +42,8 @@ namespace DreamGate.Battlegrounds.UI
         private HeroPortraitSlot combatOpponentHero;
         private RectTransform playerHeroRect;
         private RectTransform opponentHeroRect;
-        private List<MinionInstance> combatPlayerBoard;
-        private List<MinionInstance> combatOpponentBoard;
+        private MinionInstance[] combatPlayerBoard;
+        private MinionInstance[] combatOpponentBoard;
         private CombatResult activeCombatResult;
         private CardInspectOverlay cardInspectOverlay;
         private Button upgradeButton;
@@ -51,6 +51,7 @@ namespace DreamGate.Battlegrounds.UI
         private Button endTurnButton;
         private Button menuButton;
         private Button speedButton;
+        private TextMeshProUGUI speedLabelText;
         private Button playAgainButton;
         private readonly StringBuilder logBuilder = new();
         private Action<float> onCombatSpeedChanged;
@@ -100,12 +101,12 @@ namespace DreamGate.Battlegrounds.UI
             activeCombatResult = result;
             combatPlayerBoard = CloneBoardMinions(result?.attackerBoardStart);
             combatOpponentBoard = CloneBoardMinions(result?.defenderBoardStart);
-            if (combatPlayerBoard.Count == 0)
+            if (CountLivingCombatMinions(combatPlayerBoard) == 0)
             {
                 combatPlayerBoard = CloneBoardMinions(result?.attackerSnapshot?.board);
             }
 
-            if (combatOpponentBoard.Count == 0)
+            if (CountLivingCombatMinions(combatOpponentBoard) == 0)
             {
                 combatOpponentBoard = CloneBoardMinions(result?.defenderSnapshot?.board);
             }
@@ -118,11 +119,12 @@ namespace DreamGate.Battlegrounds.UI
 
             var player = result?.attackerSnapshot ?? matchManager.GetHumanPlayer();
             var defender = result?.defenderSnapshot ?? opponent;
-            combatPlayerHero?.SetHero(player.heroName, player.heroId, player.heroHealth);
+            combatPlayerHero?.SetHero(player.heroName, player.heroId, player.heroHealth, combatDisplay: true);
             combatOpponentHero?.SetHero(
                 defender?.heroName ?? "Opponent",
                 defender?.heroId,
-                defender?.heroHealth ?? 0);
+                defender?.heroHealth ?? 0,
+                combatDisplay: true);
             playerHeroText = combatPlayerHero?.NameText;
             opponentHeroText = combatOpponentHero?.NameText;
 
@@ -186,7 +188,7 @@ namespace DreamGate.Battlegrounds.UI
                     if (opponent != null)
                     {
                         var remaining = Mathf.Max(0, opponent.heroHealth - damage);
-                        combatOpponentHero?.SetHero(opponent.heroName, opponent.heroId, remaining);
+                        combatOpponentHero?.SetHero(opponent.heroName, opponent.heroId, remaining, combatDisplay: true);
                     }
 
                     break;
@@ -195,7 +197,7 @@ namespace DreamGate.Battlegrounds.UI
                     if (player != null)
                     {
                         var remaining = Mathf.Max(0, player.heroHealth - damage);
-                        combatPlayerHero?.SetHero(player.heroName, player.heroId, remaining);
+                        combatPlayerHero?.SetHero(player.heroName, player.heroId, remaining, combatDisplay: true);
                     }
 
                     break;
@@ -280,19 +282,38 @@ namespace DreamGate.Battlegrounds.UI
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
 
             CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, ShopSlotSpacing, CardSlotDisplayMode.Shop, OnShopClicked);
-            CreateSlotRow(recruitPanel.transform, boardSlots, "Your Army", RecruitPlayerBoardCenter, 5, BoardSlotSpacing, CardSlotDisplayMode.Board, OnBoardClicked);
-            CreateSlotRow(recruitPanel.transform, handSlots, "Hand", HandRowCenter, 6, HandSlotSpacing, CardSlotDisplayMode.Hand, OnHandClicked);
+            CreateSlotRow(
+                recruitPanel.transform,
+                boardSlots,
+                "Your Army",
+                RecruitPlayerBoardCenter,
+                5,
+                BoardSlotSpacing,
+                CardSlotDisplayMode.Board,
+                OnBoardClicked,
+                showSectionLabel: false);
+            CreateSlotRow(
+                recruitPanel.transform,
+                handSlots,
+                "Hand",
+                HandRowCenter,
+                6,
+                HandSlotSpacing,
+                CardSlotDisplayMode.Hand,
+                OnHandClicked,
+                showSectionLabel: false);
 
-            refreshShopButton = CreateActionButton(recruitPanel.transform, "Refresh (1g)", new Vector2(-420, 150), OnRefreshShopClicked);
-            upgradeButton = CreateActionButton(recruitPanel.transform, "Upgrade Tavern (4g)", new Vector2(420, 150), OnUpgradeClicked);
-            endTurnButton = CreateActionButton(recruitPanel.transform, "End Turn Early", new Vector2(420, 40), OnEndTurnClicked);
+            refreshShopButton = CreateSpriteButton(recruitPanel.transform, "RefreshButton", new Vector2(-420, 150), new Vector2(180, 72), OnRefreshShopClicked);
+            upgradeButton = CreateSpriteButton(recruitPanel.transform, "TierUpgradeButton", new Vector2(420, 150), new Vector2(180, 72), OnUpgradeClicked);
+            endTurnButton = CreateSpriteButton(recruitPanel.transform, "StartCombatButton", new Vector2(420, 40), new Vector2(180, 72), OnEndTurnClicked);
             if (matchManager.Mode == MatchMode.Rated)
             {
                 endTurnButton.gameObject.SetActive(false);
             }
 
-            speedButton = CreateActionButton(recruitPanel.transform, "Combat Speed: 1x", new Vector2(420, -70), OnSpeedClicked);
-            menuButton = CreateActionButton(recruitPanel.transform, "Back", new Vector2(420, -180), () => SceneNavigator.LoadMainMenu());
+            speedButton = CreateSpriteButton(recruitPanel.transform, "FastCombatButton", new Vector2(420, -70), new Vector2(180, 72), OnSpeedClicked);
+            speedLabelText = CreateButtonOverlayLabel(speedButton.transform, "1x");
+            menuButton = CreateSpriteButton(recruitPanel.transform, "BackButton", new Vector2(420, -180), new Vector2(180, 72), () => SceneNavigator.LoadMainMenu());
 
             BuildCombatPanel(root);
 
@@ -312,7 +333,8 @@ namespace DreamGate.Battlegrounds.UI
                 combatPanel.transform,
                 "OpponentHero",
                 OpponentHeroCenter,
-                new Color(0.55f, 0.35f, 0.2f, 0.55f));
+                new Color(0.55f, 0.35f, 0.2f, 0.55f),
+                combatHero: true);
             opponentHeroRect = combatOpponentHero.Root;
             opponentHeroText = combatOpponentHero.NameText;
 
@@ -342,7 +364,8 @@ namespace DreamGate.Battlegrounds.UI
                 combatPanel.transform,
                 "PlayerHero",
                 PlayerHeroCenter,
-                new Color(0.2f, 0.35f, 0.65f, 0.55f));
+                new Color(0.2f, 0.35f, 0.65f, 0.55f),
+                combatHero: true);
             playerHeroRect = combatPlayerHero.Root;
             playerHeroText = combatPlayerHero.NameText;
 
@@ -371,7 +394,8 @@ namespace DreamGate.Battlegrounds.UI
             Transform parent,
             string name,
             Vector2 position,
-            Color placeholderColor)
+            Color placeholderColor,
+            bool combatHero = false)
         {
             var solidSprite = UiImageSprites.GetSolid();
             var rootGo = new GameObject(name, typeof(RectTransform));
@@ -427,7 +451,8 @@ namespace DreamGate.Battlegrounds.UI
             hpRect.offsetMin = Vector2.zero;
             hpRect.offsetMax = Vector2.zero;
             var hpText = hpGo.GetComponent<TextMeshProUGUI>();
-            hpText.fontSize = 15;
+            hpText.fontSize = combatHero ? 22 : 15;
+            hpText.fontStyle = combatHero ? FontStyles.Bold : FontStyles.Normal;
             hpText.alignment = TextAlignmentOptions.Center;
             hpText.color = new Color(0.9f, 0.95f, 1f);
             hpText.text = "— HP";
@@ -441,13 +466,13 @@ namespace DreamGate.Battlegrounds.UI
             RefreshCombatRow(opponentCombatSlots, combatOpponentBoard);
         }
 
-        private static void RefreshCombatRow(List<CardSlotView> slots, List<MinionInstance> board)
+        private static void RefreshCombatRow(List<CardSlotView> slots, MinionInstance[] board)
         {
             for (var i = 0; i < slots.Count; i++)
             {
-                if (board == null || i >= board.Count)
+                if (board == null || i >= board.Length || board[i] == null)
                 {
-                    slots[i].SetEmpty("—", false);
+                    slots[i].SetEmpty(string.Empty, false);
                     continue;
                 }
 
@@ -457,37 +482,99 @@ namespace DreamGate.Battlegrounds.UI
             }
         }
 
-        private static List<MinionInstance> CloneBoardMinions(List<MinionInstance> board)
+        private static MinionInstance[] CloneBoardMinions(MinionInstance[] board)
         {
-            var clone = new List<MinionInstance>();
+            var clone = new MinionInstance[MatchConfig.BoardSize];
             if (board == null)
             {
                 return clone;
             }
 
-            foreach (var minion in board)
+            for (var i = 0; i < board.Length && i < clone.Length; i++)
             {
-                clone.Add(minion.Clone());
+                clone[i] = board[i] != null ? board[i].Clone() : null;
             }
 
             return clone;
         }
 
+        private static int CountLivingCombatMinions(MinionInstance[] board)
+        {
+            if (board == null)
+            {
+                return 0;
+            }
+
+            var count = 0;
+            foreach (var minion in board)
+            {
+                if (minion != null && !minion.isDead)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         private IEnumerator PlayAttackEvent(CombatEvent combatEvent)
         {
-            if (combatEvent.attackerBoardIndex < 0 || combatEvent.defenderBoardIndex < 0)
+            if (combatEvent.attackerBoardIndex < 0)
             {
                 yield break;
             }
 
             var striker = GetCombatMinion(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
-            var target = GetCombatMinion(!combatEvent.isAttackerBoard, combatEvent.defenderBoardIndex);
-            if (striker == null || target == null || striker.isDead || target.isDead)
+            if (striker == null || striker.isDead)
             {
                 yield break;
             }
 
-            target.health -= striker.attack;
+            var damage = combatEvent.damageAmount;
+            if (combatEvent.isRecoil)
+            {
+                if (damage <= 0)
+                {
+                    yield break;
+                }
+
+                striker.health -= damage;
+                RefreshCombatSlot(
+                    combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots,
+                    combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard,
+                    combatEvent.attackerBoardIndex);
+
+                var strikerSlot = GetCombatSlot(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
+                if (strikerSlot?.CombatMotion != null)
+                {
+                    yield return strikerSlot.CombatMotion.PlayHitShake();
+                }
+                else
+                {
+                    yield return new WaitForSeconds(0.2f);
+                }
+
+                yield break;
+            }
+
+            if (combatEvent.defenderBoardIndex < 0)
+            {
+                yield break;
+            }
+
+            var target = GetCombatMinion(!combatEvent.isAttackerBoard, combatEvent.defenderBoardIndex);
+            if (target == null || target.isDead)
+            {
+                yield break;
+            }
+
+            if (damage <= 0)
+            {
+                damage = striker.attack;
+            }
+
+            target.health -= damage;
+
             RefreshCombatSlot(
                 combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots,
                 combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard,
@@ -497,16 +584,20 @@ namespace DreamGate.Battlegrounds.UI
                 combatEvent.isAttackerBoard ? combatOpponentBoard : combatPlayerBoard,
                 combatEvent.defenderBoardIndex);
 
-            var strikerSlot = GetCombatSlot(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
-            var targetSlot = GetCombatSlot(!combatEvent.isAttackerBoard, combatEvent.defenderBoardIndex);
+            var attackerSlot = GetCombatSlot(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
+            var defenderSlot = GetCombatSlot(!combatEvent.isAttackerBoard, combatEvent.defenderBoardIndex);
             var lungeDirection = combatEvent.isAttackerBoard ? Vector2.up : Vector2.down;
 
-            if (strikerSlot?.CombatMotion != null && targetSlot?.CombatMotion != null)
+            if (!combatEvent.isCleave && attackerSlot?.CombatMotion != null && defenderSlot?.CombatMotion != null)
             {
-                var lunge = strikerSlot.CombatMotion.PlayAttackLunge(lungeDirection);
-                var hit = targetSlot.CombatMotion.PlayHitShake();
+                var lunge = attackerSlot.CombatMotion.PlayAttackLunge(lungeDirection);
+                var hit = defenderSlot.CombatMotion.PlayHitShake();
                 yield return lunge;
                 yield return hit;
+            }
+            else if (combatEvent.isCleave && defenderSlot?.CombatMotion != null)
+            {
+                yield return defenderSlot.CombatMotion.PlayHitShake();
             }
             else
             {
@@ -524,7 +615,8 @@ namespace DreamGate.Battlegrounds.UI
 
             var slots = combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots;
             var board = combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard;
-            if (board == null || combatEvent.boardIndex >= board.Count)
+            if (board == null || combatEvent.boardIndex < 0 || combatEvent.boardIndex >= board.Length ||
+                board[combatEvent.boardIndex] == null)
             {
                 yield break;
             }
@@ -547,7 +639,7 @@ namespace DreamGate.Battlegrounds.UI
         private MinionInstance GetCombatMinion(bool isAttackerBoard, int boardIndex)
         {
             var board = isAttackerBoard ? combatPlayerBoard : combatOpponentBoard;
-            if (board == null || boardIndex < 0 || boardIndex >= board.Count)
+            if (board == null || boardIndex < 0 || boardIndex >= board.Length)
             {
                 return null;
             }
@@ -566,14 +658,20 @@ namespace DreamGate.Battlegrounds.UI
             return slots[boardIndex];
         }
 
-        private static void RefreshCombatSlot(List<CardSlotView> slots, List<MinionInstance> board, int index)
+        private static void RefreshCombatSlot(List<CardSlotView> slots, MinionInstance[] board, int index)
         {
-            if (board == null || index < 0 || index >= board.Count || index >= slots.Count)
+            if (board == null || index < 0 || index >= board.Length || index >= slots.Count)
             {
                 return;
             }
 
             var minion = board[index];
+            if (minion == null)
+            {
+                slots[index].SetEmpty("—", false);
+                return;
+            }
+
             var card = CardRegistry.Get(minion.cardId);
             slots[index].SetCombatMinion(card, minion);
         }
@@ -606,7 +704,8 @@ namespace DreamGate.Battlegrounds.UI
 
             var board = combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard;
             var slots = combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots;
-            if (board == null || combatEvent.boardIndex >= board.Count)
+            if (board == null || combatEvent.boardIndex < 0 || combatEvent.boardIndex >= board.Length ||
+                board[combatEvent.boardIndex] == null)
             {
                 return;
             }
@@ -642,21 +741,32 @@ namespace DreamGate.Battlegrounds.UI
                 return;
             }
 
-            if (combatEvent.boardIndex >= 0 && combatEvent.boardIndex < board.Count)
+            if (combatEvent.boardIndex >= 0 && combatEvent.boardIndex < board.Length)
             {
-                var minion = board[combatEvent.boardIndex];
-                minion.cardId = definition.cardId;
-                minion.attack = definition.attack;
-                minion.health = definition.health;
-                minion.maxHealth = definition.health;
+                if (board[combatEvent.boardIndex] != null)
+                {
+                    var minion = board[combatEvent.boardIndex];
+                    minion.cardId = definition.cardId;
+                    minion.attack = definition.attack;
+                    minion.health = definition.health;
+                    minion.maxHealth = definition.health;
+                    RefreshCombatSlot(slots, board, combatEvent.boardIndex);
+                    return;
+                }
+
+                board[combatEvent.boardIndex] = MinionInstance.FromDefinition(definition);
                 RefreshCombatSlot(slots, board, combatEvent.boardIndex);
                 return;
             }
 
-            if (board.Count < slots.Count)
+            for (var i = 0; i < board.Length; i++)
             {
-                board.Add(MinionInstance.FromDefinition(definition));
-                RefreshCombatBoards();
+                if (board[i] == null)
+                {
+                    board[i] = MinionInstance.FromDefinition(definition);
+                    RefreshCombatBoards();
+                    return;
+                }
             }
         }
 
@@ -803,7 +913,7 @@ namespace DreamGate.Battlegrounds.UI
             {
                 if (i >= player.shopCardIds.Count || string.IsNullOrEmpty(player.shopCardIds[i]))
                 {
-                    shopSlots[i].SetEmpty("Empty", false);
+                    shopSlots[i].SetEmpty(string.Empty, false);
                     continue;
                 }
 
@@ -816,9 +926,9 @@ namespace DreamGate.Battlegrounds.UI
         {
             for (var i = 0; i < boardSlots.Count; i++)
             {
-                if (i >= player.board.Count)
+                if (player.board[i] == null)
                 {
-                    boardSlots[i].SetEmpty($"Slot {i + 1}", false);
+                    boardSlots[i].SetEmpty(string.Empty, false);
                     continue;
                 }
 
@@ -840,7 +950,7 @@ namespace DreamGate.Battlegrounds.UI
             {
                 if (i >= player.hand.Count)
                 {
-                    handSlots[i].SetEmpty($"Hand {i + 1}", false);
+                    handSlots[i].SetEmpty(string.Empty, false);
                     continue;
                 }
 
@@ -870,20 +980,46 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             var player = matchManager.GetHumanPlayer();
-            return player != null && index < player.board.Count;
+            return player != null && index >= 0 && index < player.board.Length && player.board[index] != null;
         }
 
-        internal int GetBoardDropSlotIndex(Vector2 screenPosition, Camera eventCamera)
+        internal int GetBoardDropSlotIndex(Vector2 screenPosition, Camera eventCamera, bool requireEmpty = false)
         {
+            var player = matchManager?.GetHumanPlayer();
             for (var i = 0; i < boardSlots.Count; i++)
             {
                 if (RectTransformUtility.RectangleContainsScreenPoint(boardSlots[i].RootRect, screenPosition, eventCamera))
                 {
+                    if (requireEmpty && player != null && player.board[i] != null)
+                    {
+                        return -1;
+                    }
+
                     return i;
                 }
             }
 
             return -1;
+        }
+
+        internal bool CanDragHandSlot(int index)
+        {
+            if (matchManager == null || matchManager.Phase != MatchPhase.Recruit)
+            {
+                return false;
+            }
+
+            var player = matchManager.GetHumanPlayer();
+            return player != null && index >= 0 && index < player.hand.Count && !player.BoardFull;
+        }
+
+        internal void TryPlayHandToBoard(int handIndex, int boardIndex)
+        {
+            matchManager.TryPlayFromHandToSlot(handIndex, boardIndex, out var message);
+            if (!string.IsNullOrEmpty(message))
+            {
+                AppendLog(message);
+            }
         }
 
         internal void TryBoardReorder(int fromIndex, int toIndex)
@@ -927,7 +1063,11 @@ namespace DreamGate.Battlegrounds.UI
         {
             speedIndex = (speedIndex + 1) % SpeedOptions.Length;
             var speed = SpeedOptions[speedIndex];
-            speedButton.GetComponentInChildren<TextMeshProUGUI>().text = $"Combat Speed: {speed}x";
+            if (speedLabelText != null)
+            {
+                speedLabelText.text = $"{speed}x";
+            }
+
             onCombatSpeedChanged?.Invoke(speed);
         }
 
@@ -1037,13 +1177,17 @@ namespace DreamGate.Battlegrounds.UI
             float spacing,
             CardSlotDisplayMode mode,
             Action<int> onClick,
-            bool includeCombatMotion = false)
+            bool includeCombatMotion = false,
+            bool showSectionLabel = true)
         {
             slots.Clear();
             var totalWidth = (count - 1) * spacing;
             var startX = center.x - totalWidth * 0.5f;
 
-            CreateSectionLabel(parent, label, new Vector2(-470, center.y + RowLabelOffsetY));
+            if (showSectionLabel)
+            {
+                CreateSectionLabel(parent, label, new Vector2(-470, center.y + RowLabelOffsetY));
+            }
 
             for (var i = 0; i < count; i++)
             {
@@ -1061,6 +1205,11 @@ namespace DreamGate.Battlegrounds.UI
                 {
                     var dragHandler = slot.RootRect.GetComponent<BoardCardDragHandler>();
                     dragHandler.Configure(index, this);
+                }
+                else if (mode == CardSlotDisplayMode.Hand)
+                {
+                    var handDragHandler = slot.RootRect.GetComponent<HandCardDragHandler>();
+                    handDragHandler.Configure(index, this);
                 }
 
                 slots.Add(slot);
@@ -1084,14 +1233,14 @@ namespace DreamGate.Battlegrounds.UI
             rect.sizeDelta = CardSlotSize;
 
             var frameImage = rootGo.GetComponent<Image>();
-            frameImage.color = new Color(0.12f, 0.16f, 0.26f, 0.75f);
+            frameImage.color = new Color(0f, 0f, 0f, 0f);
             frameImage.raycastTarget = true;
 
             var artGo = new GameObject("Art", typeof(RectTransform), typeof(Image));
             artGo.transform.SetParent(rootGo.transform, false);
             var artRect = artGo.GetComponent<RectTransform>();
-            artRect.anchorMin = new Vector2(0.05f, 0.22f);
-            artRect.anchorMax = new Vector2(0.95f, 0.98f);
+            artRect.anchorMin = Vector2.zero;
+            artRect.anchorMax = Vector2.one;
             artRect.offsetMin = Vector2.zero;
             artRect.offsetMax = Vector2.zero;
             var artImage = artGo.GetComponent<Image>();
@@ -1109,6 +1258,7 @@ namespace DreamGate.Battlegrounds.UI
             if (mode == CardSlotDisplayMode.Hand)
             {
                 rootGo.AddComponent<HandCardLift>();
+                rootGo.AddComponent<HandCardDragHandler>();
             }
 
             if (mode == CardSlotDisplayMode.Board)
@@ -1131,6 +1281,10 @@ namespace DreamGate.Battlegrounds.UI
             statsRect.offsetMin = Vector2.zero;
             statsRect.offsetMax = Vector2.zero;
             statsGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.55f);
+            statsGo.SetActive(false);
+
+            var attackText = CreateCardStatOverlay(rootGo.transform, "AttackText", TextAlignmentOptions.BottomLeft, new Vector2(0.08f, 0.08f));
+            var healthText = CreateCardStatOverlay(rootGo.transform, "HealthText", TextAlignmentOptions.BottomRight, new Vector2(0.92f, 0.08f));
 
             var statsTextGo = new GameObject("StatsText", typeof(RectTransform), typeof(TextMeshProUGUI));
             statsTextGo.transform.SetParent(statsGo.transform, false);
@@ -1149,7 +1303,17 @@ namespace DreamGate.Battlegrounds.UI
             var inspectHandler = rootGo.AddComponent<CardInspectHandler>();
             var button = rootGo.GetComponent<Button>();
             CardSlotView slotView = null;
-            slotView = new CardSlotView(button, frameImage, artImage, statsText, idleMotion, combatMotion, inspectHandler, rect);
+            slotView = new CardSlotView(
+                button,
+                frameImage,
+                artImage,
+                statsText,
+                attackText,
+                healthText,
+                idleMotion,
+                combatMotion,
+                inspectHandler,
+                rect);
             inspectHandler.Configure(inspectOverlay, () => slotView.BuildInspectPayload());
             button.onClick.AddListener(() =>
             {
@@ -1197,6 +1361,87 @@ namespace DreamGate.Battlegrounds.UI
             var text = CreateText(parent, label + "Label", pos, 22, TextAlignmentOptions.Left);
             text.text = label;
             text.rectTransform.sizeDelta = new Vector2(200, 36);
+        }
+
+        private static TextMeshProUGUI CreateCardStatOverlay(
+            Transform parent,
+            string name,
+            TextAlignmentOptions align,
+            Vector2 anchor)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = align == TextAlignmentOptions.BottomLeft ? new Vector2(0f, 0f) : new Vector2(1f, 0f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(52f, 34f);
+
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.fontSize = 18;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = align;
+            text.color = Color.white;
+            text.outlineWidth = 0.2f;
+            text.outlineColor = Color.black;
+            text.gameObject.SetActive(false);
+            return text;
+        }
+
+        private static Button CreateSpriteButton(
+            Transform parent,
+            string resourceName,
+            Vector2 pos,
+            Vector2 size,
+            UnityEngine.Events.UnityAction onClick)
+        {
+            var sprite = Resources.Load<Sprite>(resourceName);
+            var go = new GameObject(resourceName, typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = pos;
+            rect.sizeDelta = size;
+
+            var image = go.GetComponent<Image>();
+            if (sprite != null)
+            {
+                image.sprite = sprite;
+                image.color = Color.white;
+            }
+            else
+            {
+                image.color = new Color(0.15f, 0.2f, 0.35f, 0.92f);
+            }
+
+            var button = go.GetComponent<Button>();
+            button.onClick.AddListener(onClick);
+            return button;
+        }
+
+        private static TextMeshProUGUI CreateButtonOverlayLabel(Transform parent, string label)
+        {
+            var textGo = new GameObject("OverlayLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(parent, false);
+            var textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            var text = textGo.GetComponent<TextMeshProUGUI>();
+            text.text = label;
+            text.fontSize = 18;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = Color.white;
+            text.outlineWidth = 0.2f;
+            text.outlineColor = Color.black;
+            return text;
         }
 
         private static Button CreateActionButton(Transform parent, string label, Vector2 pos, UnityEngine.Events.UnityAction onClick)
@@ -1607,7 +1852,7 @@ namespace DreamGate.Battlegrounds.UI
         public RectTransform Root { get; }
         public Image PortraitImage { get; }
         public TextMeshProUGUI NameText { get; }
-        private readonly TextMeshProUGUI hpText;
+        public TextMeshProUGUI HpText { get; }
 
         public HeroPortraitSlot(
             RectTransform root,
@@ -1618,19 +1863,34 @@ namespace DreamGate.Battlegrounds.UI
             Root = root;
             PortraitImage = portraitImage;
             NameText = nameText;
-            this.hpText = hpText;
+            HpText = hpText;
         }
 
         public void SetShopkeeper()
         {
+            NameText.text = HeroRegistry.ShopkeeperHeroName;
+            HpText.text = "Shop";
+
+            var shopKeeperSprite = Resources.Load<Sprite>("ShopKeeper");
+            if (shopKeeperSprite != null)
+            {
+                PortraitImage.sprite = shopKeeperSprite;
+                PortraitImage.color = Color.white;
+                PortraitImage.enabled = true;
+                return;
+            }
+
             SetHero(HeroRegistry.ShopkeeperHeroName, HeroRegistry.ShopkeeperHeroId, -1);
-            hpText.text = "Shop";
+            HpText.text = "Shop";
         }
 
-        public void SetHero(string heroName, string heroId, int heroHealth)
+        public void SetHero(string heroName, string heroId, int heroHealth, bool combatDisplay = false)
         {
             NameText.text = heroName;
-            hpText.text = heroHealth < 0 ? "Shop" : $"{heroHealth} HP";
+            HpText.text = heroHealth < 0 ? "Shop" : $"{heroHealth} HP";
+            HpText.fontSize = combatDisplay ? 22 : 15;
+            HpText.fontStyle = combatDisplay ? FontStyles.Bold : FontStyles.Normal;
+            HpText.gameObject.SetActive(heroHealth >= 0 || combatDisplay);
 
             var portrait = HeroRegistry.LoadPortrait(heroId);
             if (portrait != null)
@@ -1793,6 +2053,130 @@ namespace DreamGate.Battlegrounds.UI
                 rect = GetComponent<RectTransform>();
             }
 
+            basePosition = rect.anchoredPosition;
+            baseScale = rect.localScale;
+        }
+    }
+
+    /// <summary>
+    /// Drag hand cards onto empty board slots during the recruit phase.
+    /// </summary>
+    public class HandCardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        private const float DragScale = 1.08f;
+        private const float DragAlpha = 0.72f;
+        private const float DragSuppressDistance = 12f;
+
+        private PracticeGameUI ui;
+        private CardInspectHandler inspectHandler;
+        private HandCardLift handLift;
+        private CanvasGroup canvasGroup;
+        private RectTransform rect;
+        private Transform dragLayer;
+        private Transform originalParent;
+        private Vector2 basePosition;
+        private Vector2 dragOffset;
+        private Vector3 baseScale;
+        private int originalSiblingIndex;
+        private int slotIndex;
+        private bool dragging;
+
+        public void Configure(int index, PracticeGameUI owner)
+        {
+            slotIndex = index;
+            ui = owner;
+            inspectHandler = GetComponent<CardInspectHandler>();
+            handLift = GetComponent<HandCardLift>();
+            rect = GetComponent<RectTransform>();
+            canvasGroup = GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+
+            dragLayer = owner.GetBoardDragLayer();
+            CacheBase();
+        }
+
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            if (ui == null || !ui.CanDragHandSlot(slotIndex))
+            {
+                return;
+            }
+
+            dragging = true;
+            inspectHandler?.CancelInspect();
+            handLift?.enabled = false;
+
+            originalParent = rect.parent;
+            originalSiblingIndex = rect.GetSiblingIndex();
+            basePosition = rect.anchoredPosition;
+            baseScale = rect.localScale;
+
+            rect.SetParent(dragLayer, true);
+            rect.localScale = baseScale * DragScale;
+            canvasGroup.alpha = DragAlpha;
+            canvasGroup.blocksRaycasts = false;
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    rect,
+                    eventData.position,
+                    eventData.pressEventCamera,
+                    out var localPoint))
+            {
+                dragOffset = rect.anchoredPosition - localPoint;
+            }
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    dragLayer as RectTransform,
+                    eventData.position,
+                    eventData.pressEventCamera,
+                    out var localPoint))
+            {
+                rect.anchoredPosition = localPoint + dragOffset;
+            }
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            dragging = false;
+            handLift?.enabled = true;
+
+            var draggedDistance = Vector2.Distance(basePosition, rect.anchoredPosition);
+            if (draggedDistance >= DragSuppressDistance)
+            {
+                inspectHandler?.SuppressNextClick();
+                var dropIndex = ui.GetBoardDropSlotIndex(eventData.position, eventData.pressEventCamera, requireEmpty: true);
+                if (dropIndex >= 0)
+                {
+                    ui.TryPlayHandToBoard(slotIndex, dropIndex);
+                }
+            }
+
+            rect.SetParent(originalParent, false);
+            rect.SetSiblingIndex(originalSiblingIndex);
+            rect.anchoredPosition = basePosition;
+            rect.localScale = baseScale;
+            canvasGroup.alpha = 1f;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        private void CacheBase()
+        {
             basePosition = rect.anchoredPosition;
             baseScale = rect.localScale;
         }

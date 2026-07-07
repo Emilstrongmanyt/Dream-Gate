@@ -7,7 +7,7 @@ namespace DreamGate.Battlegrounds.Cards
     {
         public string cardId;
         public string displayName;
-        [Range(1, 6)] public int tier = 1;
+        [Range(1, 4)] public int tier = 1;
         public int attack = 1;
         public int health = 1;
         public bool isToken;

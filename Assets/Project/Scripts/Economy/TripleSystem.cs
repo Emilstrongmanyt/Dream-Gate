@@ -59,7 +59,8 @@ namespace DreamGate.Battlegrounds.Economy
             }
             else if (!player.BoardFull)
             {
-                player.board.Add(golden);
+                var slot = player.GetDefaultPlaySlot();
+                player.board[slot] = golden;
             }
             else
             {
@@ -74,6 +75,17 @@ namespace DreamGate.Battlegrounds.Economy
             return result;
         }
 
+        private static void CollectCopies(MinionInstance[] source, string cardId, List<MinionInstance> output)
+        {
+            foreach (var minion in source)
+            {
+                if (minion != null && minion.cardId == cardId && !minion.isGolden)
+                {
+                    output.Add(minion);
+                }
+            }
+        }
+
         private static void CollectCopies(List<MinionInstance> source, string cardId, List<MinionInstance> output)
         {
             foreach (var minion in source)
@@ -81,6 +93,17 @@ namespace DreamGate.Battlegrounds.Economy
                 if (minion.cardId == cardId && !minion.isGolden)
                 {
                     output.Add(minion);
+                }
+            }
+        }
+
+        private static void RemoveInstance(MinionInstance[] board, List<MinionInstance> toRemove)
+        {
+            for (var i = 0; i < board.Length; i++)
+            {
+                if (board[i] != null && toRemove.Contains(board[i]))
+                {
+                    board[i] = null;
                 }
             }
         }

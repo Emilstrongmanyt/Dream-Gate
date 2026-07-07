@@ -32,6 +32,8 @@ namespace DreamGate.Battlegrounds.UI
         public Image FrameImage { get; }
         public Image ArtImage { get; }
         public TextMeshProUGUI StatsText { get; }
+        public TextMeshProUGUI AttackText { get; }
+        public TextMeshProUGUI HealthText { get; }
         public CardIdleMotion IdleMotion { get; }
         public CombatMinionMotion CombatMotion { get; }
         public CardInspectHandler InspectHandler { get; }
@@ -46,6 +48,8 @@ namespace DreamGate.Battlegrounds.UI
             Image frameImage,
             Image artImage,
             TextMeshProUGUI statsText,
+            TextMeshProUGUI attackText,
+            TextMeshProUGUI healthText,
             CardIdleMotion idleMotion,
             CombatMinionMotion combatMotion,
             CardInspectHandler inspectHandler,
@@ -55,6 +59,8 @@ namespace DreamGate.Battlegrounds.UI
             FrameImage = frameImage;
             ArtImage = artImage;
             StatsText = statsText;
+            AttackText = attackText;
+            HealthText = healthText;
             IdleMotion = idleMotion;
             CombatMotion = combatMotion;
             InspectHandler = inspectHandler;
@@ -71,10 +77,11 @@ namespace DreamGate.Battlegrounds.UI
             lastCardKey = string.Empty;
             inspectPayload = CardInspectPayload.Empty;
             InspectHandler?.SetInspectable(false);
-            StatsText.text = label;
+            StatsText.text = string.Empty;
+            StatsText.gameObject.SetActive(false);
             ClearArt();
-            SetGoldenFrame(false);
-            FrameImage.color = new Color(0.12f, 0.16f, 0.26f, 0.75f);
+            SetTransparentFrame();
+            HideStatOverlays();
             IdleMotion?.SetActiveMotion(false);
             Button.interactable = interactable;
         }
@@ -83,14 +90,15 @@ namespace DreamGate.Battlegrounds.UI
         {
             if (card == null)
             {
-                SetEmpty("Empty", false);
+                SetEmpty(string.Empty, false);
                 return;
             }
 
             var cardKey = $"shop:{card.cardId}";
             ApplyArt(card, cardKey);
-            StatsText.text = $"T{card.tier} {card.displayName}\n{card.attack}/{card.health}\n3g";
-            SetGoldenFrame(false);
+            StatsText.gameObject.SetActive(false);
+            SetStatOverlays(card.attack, card.health);
+            SetTransparentFrame();
             IdleMotion?.SetActiveMotion(false);
             Button.interactable = interactable;
             inspectPayload = BuildShopInspectPayload(card);
@@ -101,18 +109,16 @@ namespace DreamGate.Battlegrounds.UI
         {
             if (minion == null)
             {
-                SetEmpty(mode == CardSlotDisplayMode.Hand ? "Hand" : "Slot", false);
+                SetEmpty(string.Empty, false);
                 return;
             }
 
             var cardKey = $"{mode}:{minion.instanceId}:{minion.cardId}:{minion.attack}:{minion.health}:{minion.isGolden}";
-            var name = card != null ? card.displayName : minion.cardId;
-            var prefix = minion.isGolden ? "★ " : string.Empty;
-            var action = mode == CardSlotDisplayMode.Board ? "Sell 1g" : "Play";
 
             ApplyArt(card, cardKey);
-            StatsText.text = $"{prefix}{name}\n{minion.attack}/{minion.health}\n{action}";
-            SetGoldenFrame(minion.isGolden);
+            StatsText.gameObject.SetActive(false);
+            SetStatOverlays(minion.attack, minion.health);
+            SetTransparentFrame();
 
             if (IdleMotion != null)
             {
@@ -139,15 +145,11 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             var cardKey = $"combat:{minion.instanceId}:{minion.cardId}:{minion.attack}:{minion.health}:{minion.isGolden}";
-            var name = card != null ? card.displayName : minion.cardId;
-            var prefix = minion.isGolden ? "★ " : string.Empty;
 
             ApplyArt(card, cardKey);
-            StatsText.text = $"{prefix}{name}\n{minion.attack}/{minion.health}";
-            SetGoldenFrame(minion.isGolden);
-            FrameImage.color = hasArt
-                ? new Color(0.08f, 0.1f, 0.16f, 0.82f)
-                : new Color(0.12f, 0.16f, 0.26f, 0.9f);
+            StatsText.gameObject.SetActive(false);
+            SetStatOverlays(minion.attack, minion.health);
+            SetTransparentFrame();
             Button.interactable = false;
 
             if (IdleMotion != null)
@@ -171,7 +173,8 @@ namespace DreamGate.Battlegrounds.UI
             inspectPayload = CardInspectPayload.Empty;
             InspectHandler?.SetInspectable(false);
             IdleMotion?.SetActiveMotion(false);
-            FrameImage.color = new Color(0.08f, 0.08f, 0.1f, 0.35f);
+            SetTransparentFrame();
+            HideStatOverlays();
             if (hasArt)
             {
                 ArtImage.color = new Color(0.45f, 0.45f, 0.45f, 0.45f);
@@ -207,17 +210,25 @@ namespace DreamGate.Battlegrounds.UI
             hasArt = false;
         }
 
-        private void SetGoldenFrame(bool isGolden)
+        private void SetTransparentFrame()
         {
-            if (isGolden)
-            {
-                FrameImage.color = new Color(0.45f, 0.35f, 0.08f, 0.85f);
-                return;
-            }
+            FrameImage.color = new Color(0f, 0f, 0f, 0f);
+        }
 
-            FrameImage.color = hasArt
-                ? new Color(0.08f, 0.1f, 0.16f, 0.55f)
-                : new Color(0.12f, 0.16f, 0.26f, 0.75f);
+        private void SetStatOverlays(int attack, int health)
+        {
+            AttackText.text = attack.ToString();
+            HealthText.text = health.ToString();
+            AttackText.gameObject.SetActive(true);
+            HealthText.gameObject.SetActive(true);
+        }
+
+        private void HideStatOverlays()
+        {
+            AttackText.text = string.Empty;
+            HealthText.text = string.Empty;
+            AttackText.gameObject.SetActive(false);
+            HealthText.gameObject.SetActive(false);
         }
 
         private CardInspectPayload BuildShopInspectPayload(MinionCardDefinition card)
@@ -283,6 +294,9 @@ namespace DreamGate.Battlegrounds.UI
                 AbilityType.StartOfCombatBuffSelf => "Start of Combat: Buff self",
                 AbilityType.OnDamageSummonCopy => "After damage: Summon a copy",
                 AbilityType.OnDamageTransform => "After damage: Transform",
+                AbilityType.Battlecry => "Battlecry",
+                AbilityType.Windfury => "Windfury",
+                AbilityType.MegaWindfury => "Mega-Windfury",
                 _ => string.Empty
             };
         }
