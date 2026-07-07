@@ -40,7 +40,8 @@ namespace DreamGate.Battlegrounds.Core
 
         public static void ApplyAudio()
         {
-            AudioListener.volume = Mathf.Clamp01((MusicVolume + SfxVolume) * 0.5f);
+            AudioListener.volume = 1f;
+            GameMusicPlayer.ApplyVolume();
         }
     }
 }

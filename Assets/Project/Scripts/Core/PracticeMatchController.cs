@@ -1,4 +1,5 @@
 using System.Collections;
+using DreamGate.Battlegrounds.Cards;
 using DreamGate.Battlegrounds.Combat;
 using DreamGate.Battlegrounds.Networking;
 using DreamGate.Battlegrounds.Services;
@@ -21,7 +22,9 @@ namespace DreamGate.Battlegrounds.Core
 
         private void Start()
         {
-            EnsureCanvas();
+            var canvas = EnsureCanvas();
+            CreateFullScreenBackground(canvas);
+            GameMusicPlayer.EnsurePlaying();
             if (hideBackgroundDuringUi)
             {
                 HideLegacyBackground();
@@ -127,7 +130,7 @@ namespace DreamGate.Battlegrounds.Core
             combatCoroutine = null;
         }
 
-        private void EnsureCanvas()
+        private Canvas EnsureCanvas()
         {
             var canvas = FindAnyObjectByType<Canvas>();
             if (canvas == null)
@@ -138,6 +141,18 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             UiCanvasSetup.Apply(canvas);
+            return canvas;
+        }
+
+        private static void CreateFullScreenBackground(Canvas canvas)
+        {
+            var sprite = CardArtLoader.LoadBackground("PracticeGameBackground1");
+            if (sprite == null)
+            {
+                return;
+            }
+
+            UiBackgroundFit.CreateCanvasCoverBackground(canvas, sprite, "BoardBackground");
         }
 
         private static RectTransform CreateUiRoot()

@@ -240,7 +240,6 @@ namespace DreamGate.Battlegrounds.UI
 
         private void BuildUI(Transform root)
         {
-            CreateBackground(root);
             CreateHud(root);
             cardInspectOverlay = gameObject.AddComponent<CardInspectOverlay>();
             cardInspectOverlay.Initialize(root);
@@ -813,14 +812,6 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             return 0;
-        }
-
-        private void CreateBackground(Transform root)
-        {
-            UiBackgroundFit.CreateCoverBackground(
-                root,
-                CardArtLoader.LoadBackground("PracticeGameBackground1"),
-                "BoardBackground");
         }
 
         private void CreateHud(Transform root)
