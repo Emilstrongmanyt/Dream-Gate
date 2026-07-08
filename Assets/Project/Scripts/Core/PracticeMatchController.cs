@@ -18,7 +18,7 @@ namespace DreamGate.Battlegrounds.Core
         private INetworkMatchHost networkHost;
         private PracticeGameUI practiceUi;
         private Coroutine combatCoroutine;
-        private float combatSpeedMultiplier = 1f;
+        private const float CombatSpeedMultiplier = 1f;
 
         private void Start()
         {
@@ -56,7 +56,6 @@ namespace DreamGate.Battlegrounds.Core
             var uiRoot = CreateUiRoot();
             practiceUi = uiRoot.gameObject.AddComponent<PracticeGameUI>();
             practiceUi.Initialize(matchManager, uiRoot);
-            practiceUi.SetCombatSpeedChanged(SetCombatSpeed);
 
             matchManager.CombatPlaybackReady += OnCombatPlaybackReady;
         }
@@ -85,11 +84,6 @@ namespace DreamGate.Battlegrounds.Core
             }
         }
 
-        private void SetCombatSpeed(float multiplier)
-        {
-            combatSpeedMultiplier = Mathf.Clamp(multiplier, 0.5f, 3f);
-        }
-
         private void OnCombatPlaybackReady()
         {
             if (combatCoroutine != null)
@@ -112,7 +106,7 @@ namespace DreamGate.Battlegrounds.Core
 
             foreach (var combatEvent in result.combatEvents)
             {
-                var delay = combatStepSeconds / combatSpeedMultiplier;
+                var delay = combatStepSeconds / CombatSpeedMultiplier;
                 if (combatEvent.type == CombatEventType.Attack)
                 {
                     delay *= 1.2f;

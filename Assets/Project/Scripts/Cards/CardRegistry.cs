@@ -73,10 +73,10 @@ namespace DreamGate.Battlegrounds.Cards
             Register(CreateCard("mano", "Mano", 1, 8, 8, AbilityType.DeathrattleSummon,
                 "Deathrattle: Summon a Red Snail.", summonCardId: "red_snail", canAppearInShop: false,
                 artFile: "ManoCard"));
-            Register(CreateSpell("divine_shield_spell", "Divine Shield", 1, SpellEffect.DivineShield,
-                "Give a friendly minion Divine Shield.", "DivineShieldCard"));
-            Register(CreateSpell("onyx_apple_spell", "Onyx Apple", 1, SpellEffect.OnyxApple,
+            Register(CreateSpell("onyx_apple_spell", "Onyx Apple", 3, SpellEffect.OnyxApple,
                 "Double a friendly minion's Attack.", "OnyxAppleCard"));
+            Register(CreateSpell("divine_shield_spell", "Divine Shield", 3, SpellEffect.DivineShield,
+                "Give a friendly minion Divine Shield.", "DivineShieldCard"));
             Register(CreateSpell("rage_spell", "Rage", 1, SpellEffect.Rage,
                 "Give all friendly minions +1 Attack.", "RageSpellCard"));
             Register(CreateSpell("doom_spell", "Doom", 1, SpellEffect.Doom,

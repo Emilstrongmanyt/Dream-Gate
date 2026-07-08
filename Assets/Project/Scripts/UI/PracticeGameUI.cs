@@ -50,16 +50,15 @@ namespace DreamGate.Battlegrounds.UI
         private Button refreshShopButton;
         private Button endTurnButton;
         private Button menuButton;
-        private Button speedButton;
-        private TextMeshProUGUI speedLabelText;
         private Button playAgainButton;
+        private TextMeshProUGUI recruitCountdownText;
+        private Image playerGoldCoinImage;
+        private TextMeshProUGUI playerGoldText;
         private int pendingSpellHandIndex = -1;
         private bool humanCombatPlaybackActive;
         private readonly StringBuilder logBuilder = new();
-        private Action<float> onCombatSpeedChanged;
-        private int speedIndex;
-
-        private static readonly float[] SpeedOptions = { 0.5f, 1f, 2f, 3f };
+        private const int RecruitCountdownStartSeconds = 20;
+        private static readonly Vector2 RecruitCompassCountdownCenter = new(0f, 0f);
         private const float CardScaleFactor = 1.2f;
         private static readonly Vector2 CardSlotSize = new(132f * CardScaleFactor, 168f * CardScaleFactor);
         private const float ShopSlotSpacing = 128f * CardScaleFactor;
@@ -91,12 +90,6 @@ namespace DreamGate.Battlegrounds.UI
             Refresh();
         }
 
-        public void SetCombatSpeedChanged(Action<float> callback)
-        {
-            onCombatSpeedChanged = callback;
-            onCombatSpeedChanged?.Invoke(SpeedOptions[speedIndex]);
-        }
-
         public void BeginCombatPlayback(PlayerState opponent, CombatResult result)
         {
             humanCombatPlaybackActive = true;
@@ -115,6 +108,11 @@ namespace DreamGate.Battlegrounds.UI
 
             recruitPanel.SetActive(false);
             combatPanel.SetActive(true);
+            if (recruitCountdownText != null)
+            {
+                recruitCountdownText.gameObject.SetActive(false);
+            }
+
             SetCombatHudMode(true, opponent);
 
             var player = result?.attackerSnapshot ?? matchManager.GetHumanPlayer();
@@ -282,6 +280,9 @@ namespace DreamGate.Battlegrounds.UI
                 "RecruitPlayerHero",
                 RecruitPlayerHeroCenter,
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
+            CreatePlayerGoldDisplay(recruitPanel.transform);
+
+            recruitCountdownText = CreateRecruitCountdown(recruitPanel.transform);
 
             CreateSlotRow(recruitPanel.transform, shopSlots, "Shop", ShopRowCenter, 5, ShopSlotSpacing, CardSlotDisplayMode.Shop, OnShopClicked);
             CreateSlotRow(
@@ -305,17 +306,15 @@ namespace DreamGate.Battlegrounds.UI
                 OnHandClicked,
                 showSectionLabel: false);
 
-            refreshShopButton = CreateSpriteButton(recruitPanel.transform, "RefreshButton", new Vector2(-420, 150), new Vector2(180, 72), OnRefreshShopClicked);
-            upgradeButton = CreateSpriteButton(recruitPanel.transform, "TierUpgradeButton", new Vector2(420, 150), new Vector2(180, 72), OnUpgradeClicked);
-            endTurnButton = CreateSpriteButton(recruitPanel.transform, "StartCombatButton", new Vector2(420, 40), new Vector2(180, 72), OnEndTurnClicked);
+            refreshShopButton = CreateSpriteButton(recruitPanel.transform, "RefreshButton", new Vector2(250, 610), new Vector2(180, 72), OnRefreshShopClicked);
+            upgradeButton = CreateSpriteButton(recruitPanel.transform, "TierUpgradeButton", new Vector2(250, 510), new Vector2(180, 72), OnUpgradeClicked);
+            endTurnButton = CreateSpriteButton(recruitPanel.transform, "StartCombatButton", new Vector2(420, -620), new Vector2(180, 72), OnEndTurnClicked);
             if (matchManager.Mode == MatchMode.Rated)
             {
                 endTurnButton.gameObject.SetActive(false);
             }
 
-            speedButton = CreateSpriteButton(recruitPanel.transform, "FastCombatButton", new Vector2(420, -70), new Vector2(180, 72), OnSpeedClicked);
-            speedLabelText = CreateButtonOverlayLabel(speedButton.transform, "1x");
-            menuButton = CreateSpriteButton(recruitPanel.transform, "BackButton", new Vector2(420, -180), new Vector2(180, 72), () => SceneNavigator.LoadMainMenu());
+            menuButton = CreateSpriteButton(recruitPanel.transform, "BackButton", new Vector2(420, -760), new Vector2(180, 72), () => SceneNavigator.LoadMainMenu());
 
             BuildCombatPanel(root);
 
@@ -545,7 +544,7 @@ namespace DreamGate.Battlegrounds.UI
                 yield break;
             }
 
-            if (combatEvent.damageAmount > 0)
+            if (combatEvent.damageAmount > 0 && !combatEvent.isRecoil)
             {
                 PlayOurCombatSfx(GameSfxPlayer.PlayHit);
             }
@@ -910,10 +909,12 @@ namespace DreamGate.Battlegrounds.UI
 
             hudText.text =
                 $"{modeLabel}  •  Turn {matchManager.Turn}{timerSuffix}\n" +
-                $"Gold {player.gold}  •  Tier {player.tavernTier}/{MatchConfig.MaxTavernTier}  •  HP {player.heroHealth}{mmrSuffix}";
+                $"Tier {player.tavernTier}/{MatchConfig.MaxTavernTier}  •  HP {player.heroHealth}{mmrSuffix}";
 
             leaderboardText.text = matchManager.GetLeaderboardSummary();
             RefreshRecruitHeroes(player);
+            RefreshPlayerGold(player);
+            RefreshRecruitCountdown();
 
             var inCombatPlayback = combatPanel != null && combatPanel.activeSelf;
             if (!inCombatPlayback)
@@ -991,6 +992,102 @@ namespace DreamGate.Battlegrounds.UI
         {
             recruitShopkeeperHero?.SetShopkeeper();
             recruitPlayerHero?.SetHero(player.heroName, player.heroId, player.heroHealth);
+        }
+
+        private void RefreshPlayerGold(PlayerState player)
+        {
+            if (playerGoldText == null)
+            {
+                return;
+            }
+
+            playerGoldText.text = player.gold.ToString();
+        }
+
+        private void RefreshRecruitCountdown()
+        {
+            if (recruitCountdownText == null)
+            {
+                return;
+            }
+
+            var showCountdown = matchManager.Phase == MatchPhase.Recruit &&
+                                (combatPanel == null || !combatPanel.activeSelf) &&
+                                matchManager.RecruitTimeRemaining <= RecruitCountdownStartSeconds;
+            recruitCountdownText.gameObject.SetActive(showCountdown);
+            if (!showCountdown)
+            {
+                return;
+            }
+
+            recruitCountdownText.text = Mathf.CeilToInt(matchManager.RecruitTimeRemaining).ToString();
+        }
+
+        private void CreatePlayerGoldDisplay(Transform parent)
+        {
+            var coinSprite = Resources.Load<Sprite>("Coin");
+            var go = new GameObject("PlayerGoldDisplay", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = RecruitPlayerHeroCenter + new Vector2(118f, 8f);
+            rect.sizeDelta = new Vector2(88f, 88f);
+
+            var coinGo = new GameObject("Coin", typeof(RectTransform), typeof(Image));
+            coinGo.transform.SetParent(go.transform, false);
+            var coinRect = coinGo.GetComponent<RectTransform>();
+            coinRect.anchorMin = Vector2.zero;
+            coinRect.anchorMax = Vector2.one;
+            coinRect.offsetMin = Vector2.zero;
+            coinRect.offsetMax = Vector2.zero;
+            playerGoldCoinImage = coinGo.GetComponent<Image>();
+            playerGoldCoinImage.sprite = coinSprite;
+            playerGoldCoinImage.preserveAspect = true;
+            playerGoldCoinImage.raycastTarget = false;
+            playerGoldCoinImage.color = coinSprite != null ? Color.white : new Color(0.85f, 0.7f, 0.15f, 0.95f);
+
+            var textGo = new GameObject("GoldAmount", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(go.transform, false);
+            var textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            playerGoldText = textGo.GetComponent<TextMeshProUGUI>();
+            playerGoldText.fontSize = 30;
+            playerGoldText.fontStyle = FontStyles.Bold;
+            playerGoldText.alignment = TextAlignmentOptions.Center;
+            playerGoldText.color = Color.white;
+            playerGoldText.outlineWidth = 0.35f;
+            playerGoldText.outlineColor = Color.black;
+            playerGoldText.text = "0";
+        }
+
+        private static TextMeshProUGUI CreateRecruitCountdown(Transform parent)
+        {
+            var go = new GameObject("RecruitCompassCountdown", typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = RecruitCompassCountdownCenter;
+            rect.sizeDelta = new Vector2(180f, 180f);
+
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.fontSize = 96;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = new Color(1f, 0.95f, 0.72f, 1f);
+            text.outlineWidth = 0.4f;
+            text.outlineColor = new Color(0.12f, 0.08f, 0.02f, 1f);
+            text.text = string.Empty;
+            go.SetActive(false);
+            return text;
         }
 
         private void RefreshHand(PlayerState player)
@@ -1176,18 +1273,6 @@ namespace DreamGate.Battlegrounds.UI
         private void OnEndTurnClicked()
         {
             matchManager.EndRecruitEarly();
-        }
-
-        private void OnSpeedClicked()
-        {
-            speedIndex = (speedIndex + 1) % SpeedOptions.Length;
-            var speed = SpeedOptions[speedIndex];
-            if (speedLabelText != null)
-            {
-                speedLabelText.text = $"{speed}x";
-            }
-
-            onCombatSpeedChanged?.Invoke(speed);
         }
 
         private void OnPlayAgainClicked()
