@@ -26,7 +26,7 @@ namespace DreamGate.Battlegrounds.Core
         public const int ShopSlotCount = 5;
         public const int MaxTavernTier = 4;
 
-        public const int StartingHeroHealth = 40;
+        public const int StartingHeroHealth = 30;
         public const int StartingGoldTurnOne = 3;
         public const int GoldPerTurnIncrement = 1;
         public const int MaxGold = 10;
