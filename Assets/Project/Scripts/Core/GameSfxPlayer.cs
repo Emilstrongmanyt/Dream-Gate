@@ -1,4 +1,3 @@
-using System;
 using DreamGate.Battlegrounds.Players;
 using UnityEngine;
 
@@ -18,7 +17,7 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             var go = new GameObject("GameSfxPlayer");
-            UnityEngine.Object.DontDestroyOnLoad(go);
+            Object.DontDestroyOnLoad(go);
             sfxSource = go.AddComponent<AudioSource>();
             sfxSource.playOnAwake = false;
             sfxSource.spatialBlend = 0f;
@@ -37,7 +36,7 @@ namespace DreamGate.Battlegrounds.Core
         }
 
         /// <summary>Recruit-phase economy SFX — only the human player's actions.</summary>
-        public static void PlayRecruit(PlayerState player, Action playClip)
+        public static void PlayRecruit(PlayerState player, System.Action playClip)
         {
             if (player != null && player.isHuman)
             {

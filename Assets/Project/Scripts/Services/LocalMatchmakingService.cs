@@ -51,6 +51,14 @@ namespace DreamGate.Battlegrounds.Services
                 return;
             }
 
+            if (coroutineHost == null)
+            {
+                IsSearching = false;
+                searchCoroutine = null;
+                QueueFailed?.Invoke("Matchmaking unavailable.");
+                return;
+            }
+
             if (searchCoroutine != null)
             {
                 coroutineHost.StopCoroutine(searchCoroutine);
@@ -62,6 +70,14 @@ namespace DreamGate.Battlegrounds.Services
 
         private IEnumerator SearchRoutine()
         {
+            if (coroutineHost == null)
+            {
+                IsSearching = false;
+                searchCoroutine = null;
+                QueueFailed?.Invoke("Matchmaking unavailable.");
+                yield break;
+            }
+
             var searchDuration = UnityEngine.Random.Range(MinSearchSeconds, MaxSearchSeconds);
             var elapsed = 0f;
             var playersFound = 1;
