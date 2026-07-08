@@ -21,6 +21,7 @@ public class HomeMenuController : MonoBehaviour
         UiCanvasSetup.ApplyToScene();
         DreamGateServices.Initialize();
         pageRoot = EnsureUiRoot();
+        HomeFallingCardsSpawner.Create(pageRoot);
         accountStatusText = CreateAccountStatusBanner(pageRoot);
 
         settingsPage = MenuPageUI.BuildSettingsPage(pageRoot, CloseOverlays, OnLogout);

@@ -253,7 +253,7 @@ namespace DreamGate.Battlegrounds.UI
                 hasCard = true,
                 title = card.displayName,
                 subtitle = $"Tier {card.tier}  •  {card.attack}/{card.health}  •  3 gold",
-                body = BuildAbilityBody(card),
+                body = string.Empty,
                 art = card.cardArt,
                 isGolden = false
             };
@@ -274,56 +274,16 @@ namespace DreamGate.Battlegrounds.UI
                     ? "Drag to rearrange. Tap to sell for 1 gold."
                     : string.Empty;
 
-            var body = BuildAbilityBody(card);
-            if (!string.IsNullOrEmpty(action))
-            {
-                body = string.IsNullOrEmpty(body) ? action : $"{body}\n\n{action}";
-            }
-
             return new CardInspectPayload
             {
                 hasCard = true,
                 title = $"{prefix}{name}",
                 subtitle = $"{minion.attack}/{minion.health}" + (card != null ? $"  •  Tier {card.tier}" : string.Empty),
-                body = body,
+                body = action,
                 art = card?.cardArt,
                 isGolden = minion.isGolden
             };
         }
 
-        private static string BuildAbilityBody(MinionCardDefinition card)
-        {
-            if (card == null)
-            {
-                return string.Empty;
-            }
-
-            if (!string.IsNullOrWhiteSpace(card.abilityText))
-            {
-                return card.abilityText.Trim();
-            }
-
-            return card.abilityType switch
-            {
-                AbilityType.Taunt => "Taunt",
-                AbilityType.DivineShield => "Divine Shield",
-                AbilityType.Cleave => "Cleave",
-                AbilityType.DeathrattleSummon => "Deathrattle: Summon",
-                AbilityType.StartOfCombatBuffSelf => "Start of Combat: Buff self",
-                AbilityType.OnDamageSummonCopy => "After damage: Summon a copy",
-                AbilityType.OnDamageTransform => "After damage: Transform",
-                AbilityType.Battlecry => "Battlecry",
-                AbilityType.BattlecryDamageHero => "Battlecry",
-                AbilityType.BattlecryBuffTribe => "Battlecry",
-                AbilityType.BattlecryBuffOtherTribeHealth => "Battlecry",
-                AbilityType.BattlecryBuffTribeAttack => "Battlecry",
-                AbilityType.DeathrattleBuffAllAttack => "Deathrattle",
-                AbilityType.OnDamageSummonCopyChance => "When damaged",
-                AbilityType.OnDamageDodge => "When damaged",
-                AbilityType.Windfury => "Windfury",
-                AbilityType.MegaWindfury => "Mega-Windfury",
-                _ => string.Empty
-            };
-        }
     }
 }

@@ -1402,8 +1402,8 @@ namespace DreamGate.Battlegrounds.UI
             statsGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.55f);
             statsGo.SetActive(false);
 
-            var attackText = CreateCardStatOverlay(rootGo.transform, "AttackText", TextAlignmentOptions.BottomLeft, new Vector2(0.08f, 0.08f));
-            var healthText = CreateCardStatOverlay(rootGo.transform, "HealthText", TextAlignmentOptions.BottomRight, new Vector2(0.92f, 0.08f));
+            var attackText = CreateCardStatOverlay(artGo.transform, "AttackText", new Vector2(0.12f, 0.11f));
+            var healthText = CreateCardStatOverlay(artGo.transform, "HealthText", new Vector2(0.88f, 0.11f));
 
             var statsTextGo = new GameObject("StatsText", typeof(RectTransform), typeof(TextMeshProUGUI));
             statsTextGo.transform.SetParent(statsGo.transform, false);
@@ -1482,25 +1482,21 @@ namespace DreamGate.Battlegrounds.UI
             text.rectTransform.sizeDelta = new Vector2(200, 36);
         }
 
-        private static TextMeshProUGUI CreateCardStatOverlay(
-            Transform parent,
-            string name,
-            TextAlignmentOptions align,
-            Vector2 anchor)
+        private static TextMeshProUGUI CreateCardStatOverlay(Transform parent, string name, Vector2 anchor)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
             var rect = go.GetComponent<RectTransform>();
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
-            rect.pivot = align == TextAlignmentOptions.BottomLeft ? new Vector2(0f, 0f) : new Vector2(1f, 0f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(52f, 34f);
+            rect.sizeDelta = new Vector2(48f, 48f);
 
             var text = go.GetComponent<TextMeshProUGUI>();
             text.fontSize = 24;
             text.fontStyle = FontStyles.Bold;
-            text.alignment = align;
+            text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
             text.outlineWidth = 0.35f;
             text.outlineColor = Color.black;
@@ -1791,7 +1787,9 @@ namespace DreamGate.Battlegrounds.UI
     /// </summary>
     public class CardInspectOverlay : MonoBehaviour
     {
-        private static readonly Vector2 InspectCardSize = new(286, 388);
+        private static readonly Vector2 InspectCardSize = new(429, 582);
+        private const float InspectShowScale = 1.5f;
+        private const float InspectHideScale = 1.35f;
         private static readonly Color DefaultFrameColor = new(0.12f, 0.16f, 0.26f, 0.95f);
         private static readonly Color GoldenFrameColor = new(0.45f, 0.35f, 0.08f, 0.95f);
 
@@ -1846,8 +1844,8 @@ namespace DreamGate.Battlegrounds.UI
             var artGo = new GameObject("Art", typeof(RectTransform), typeof(Image));
             artGo.transform.SetParent(cardGo.transform, false);
             var artRect = artGo.GetComponent<RectTransform>();
-            artRect.anchorMin = new Vector2(0.05f, 0.34f);
-            artRect.anchorMax = new Vector2(0.95f, 0.98f);
+            artRect.anchorMin = new Vector2(0.02f, 0.02f);
+            artRect.anchorMax = new Vector2(0.98f, 0.98f);
             artRect.offsetMin = Vector2.zero;
             artRect.offsetMax = Vector2.zero;
             artImage = artGo.GetComponent<Image>();
@@ -1870,7 +1868,9 @@ namespace DreamGate.Battlegrounds.UI
 
             titleText.text = payload.title;
             subtitleText.text = payload.subtitle;
-            bodyText.text = payload.body;
+            var hasBody = !string.IsNullOrWhiteSpace(payload.body);
+            bodyText.text = hasBody ? payload.body : string.Empty;
+            bodyText.gameObject.SetActive(hasBody);
             frameImage.color = payload.isGolden ? GoldenFrameColor : DefaultFrameColor;
 
             if (payload.art != null)
@@ -1887,7 +1887,7 @@ namespace DreamGate.Battlegrounds.UI
 
             root.transform.SetAsLastSibling();
             root.SetActive(true);
-            cardRect.localScale = Vector3.one * 0.9f;
+            cardRect.localScale = Vector3.one * InspectHideScale;
             RestartAnimation(true);
         }
 
@@ -1917,7 +1917,7 @@ namespace DreamGate.Battlegrounds.UI
             var startAlpha = canvasGroup.alpha;
             var targetAlpha = show ? 1f : 0f;
             var startScale = cardRect.localScale.x;
-            var targetScale = show ? 1f : 0.9f;
+            var targetScale = show ? InspectShowScale : InspectHideScale;
             var elapsed = 0f;
 
             canvasGroup.blocksRaycasts = show;
