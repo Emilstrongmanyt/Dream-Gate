@@ -52,7 +52,7 @@ namespace DreamGate.Battlegrounds.UI
             var profile = DreamGateServices.Profile;
             profileText.text =
                 $"{profile.displayName}\n" +
-                $"MMR {profile.mmr} | Games {profile.ratedGamesPlayed} | Wins {profile.wins} | Top 4 {profile.top4Finishes}";
+                $"MMR {profile.mmr} | W {profile.wins} / L {profile.losses} | Streak {profile.currentWinStreak} | Top 4 {profile.top4Finishes}";
             statusText.text = DreamGateServices.GetStatusLine();
         }
 

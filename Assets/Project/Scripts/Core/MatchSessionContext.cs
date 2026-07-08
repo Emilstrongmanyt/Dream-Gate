@@ -1,3 +1,5 @@
+using DreamGate.Battlegrounds.Services;
+
 namespace DreamGate.Battlegrounds.Core
 {
     /// <summary>
@@ -9,6 +11,11 @@ namespace DreamGate.Battlegrounds.Core
         public static int MatchSeed { get; private set; } = -1;
         public static string LobbyId { get; private set; }
         public static int HumanPlayerMmr { get; private set; } = 1500;
+        public static int HumanSlotIndex { get; private set; }
+        public static int HumanCount { get; private set; } = 1;
+        public static bool UsedBotFill { get; private set; }
+        public static string MatchServerUrl { get; private set; }
+        public static MatchSlot[] Slots { get; private set; } = System.Array.Empty<MatchSlot>();
 
         public static void BeginPractice()
         {
@@ -16,22 +23,29 @@ namespace DreamGate.Battlegrounds.Core
             MatchSeed = -1;
             LobbyId = null;
             HumanPlayerMmr = 1500;
+            HumanSlotIndex = 0;
+            HumanCount = 1;
+            UsedBotFill = false;
+            MatchServerUrl = null;
+            Slots = System.Array.Empty<MatchSlot>();
         }
 
-        public static void BeginRated(string lobbyId, int matchSeed, int playerMmr)
+        public static void BeginRated(MatchmakingResult result, int playerMmr)
         {
             Mode = MatchMode.Rated;
-            LobbyId = lobbyId;
-            MatchSeed = matchSeed;
+            LobbyId = result?.lobbyId;
+            MatchSeed = result?.matchSeed ?? -1;
             HumanPlayerMmr = playerMmr;
+            HumanSlotIndex = result?.humanSlotIndex ?? 0;
+            HumanCount = result?.humanCount ?? 1;
+            UsedBotFill = result?.usedBotFill ?? true;
+            MatchServerUrl = result?.matchServerUrl;
+            Slots = result?.slots ?? System.Array.Empty<MatchSlot>();
         }
 
         public static void Clear()
         {
-            Mode = MatchMode.Practice;
-            MatchSeed = -1;
-            LobbyId = null;
-            HumanPlayerMmr = 1500;
+            BeginPractice();
         }
     }
 }

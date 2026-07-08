@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using DreamGate.Battlegrounds.Services;
+using DreamGate.Battlegrounds.Services.Backend;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -30,7 +32,7 @@ namespace DreamGate.Battlegrounds.UI
             MenuPageUI.CreateBody(
                 root.transform,
                 "LoginDescription",
-                "Sign in to sync your rated MMR, match history, and display name.",
+                "Sign in to play rated matches and sync MMR, wins, streaks, and achievements.",
                 620f,
                 70f);
 
@@ -59,6 +61,14 @@ namespace DreamGate.Battlegrounds.UI
 
         private void Submit()
         {
+            if (DreamGateServices.UseCloudBackend)
+            {
+                statusText.color = Color.white;
+                statusText.text = "Signing in...";
+                CloudCoroutineHost.Instance.Run(SubmitRoutine());
+                return;
+            }
+
             if (DreamGateServices.TryLogin(emailInput.text, passwordInput.text, out var message))
             {
                 statusText.color = new Color(0.55f, 0.95f, 0.65f);
@@ -66,6 +76,29 @@ namespace DreamGate.Battlegrounds.UI
                 onSuccess?.Invoke();
                 Hide();
                 return;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+
+        private IEnumerator SubmitRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            yield return DreamGateServices.CoTryLogin(emailInput.text, passwordInput.text, (ok, msg) =>
+            {
+                success = ok;
+                message = msg;
+            });
+
+            if (success)
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
+                yield break;
             }
 
             statusText.color = new Color(1f, 0.55f, 0.55f);
@@ -108,7 +141,7 @@ namespace DreamGate.Battlegrounds.UI
             MenuPageUI.CreateBody(
                 root.transform,
                 "CreateDescription",
-                "Create a Dream Gate account to track your rated progress across devices on this install.",
+                "Create a Dream Gate account to play rated matches, track wins, streaks, and achievements.",
                 660f,
                 80f);
 
@@ -146,6 +179,14 @@ namespace DreamGate.Battlegrounds.UI
 
         private void Submit()
         {
+            if (DreamGateServices.UseCloudBackend)
+            {
+                statusText.color = Color.white;
+                statusText.text = "Creating account...";
+                CloudCoroutineHost.Instance.Run(SubmitRoutine());
+                return;
+            }
+
             if (DreamGateServices.TryRegister(
                     displayNameInput.text,
                     emailInput.text,
@@ -158,6 +199,34 @@ namespace DreamGate.Battlegrounds.UI
                 onSuccess?.Invoke();
                 Hide();
                 return;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+
+        private IEnumerator SubmitRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            yield return DreamGateServices.CoTryRegister(
+                displayNameInput.text,
+                emailInput.text,
+                passwordInput.text,
+                confirmPasswordInput.text,
+                (ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                });
+
+            if (success)
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
+                yield break;
             }
 
             statusText.color = new Color(1f, 0.55f, 0.55f);

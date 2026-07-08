@@ -6,6 +6,7 @@ using DreamGate.Battlegrounds.Combat;
 using DreamGate.Battlegrounds.Economy;
 using DreamGate.Battlegrounds.Heroes;
 using DreamGate.Battlegrounds.Players;
+using DreamGate.Battlegrounds.Services;
 using UnityEngine;
 
 namespace DreamGate.Battlegrounds.Core
@@ -85,7 +86,7 @@ namespace DreamGate.Battlegrounds.Core
             Initialize(MatchMode.Practice, humanId, -1);
         }
 
-        public void Initialize(MatchMode mode, int humanId = 0, int matchSeed = -1)
+        public void Initialize(MatchMode mode, int humanId = 0, int matchSeed = -1, MatchSlot[] slots = null)
         {
             CardRegistry.Initialize();
             players.Clear();
@@ -103,11 +104,13 @@ namespace DreamGate.Battlegrounds.Core
 
             for (var i = 0; i < MatchConfig.MaxPlayers; i++)
             {
+                var slot = slots != null && i < slots.Length ? slots[i] : null;
                 var isHuman = i == humanId;
+                var displayName = ResolveDisplayName(mode, i, isHuman, slot);
                 var player = new PlayerState
                 {
                     playerId = i,
-                    displayName = isHuman ? "You" : mode == MatchMode.Rated ? $"Player {i + 1}" : $"Bot {i}",
+                    displayName = displayName,
                     heroId = $"hero_{i}",
                     heroName = HeroRegistry.GetHeroName(i),
                     isHuman = isHuman,
@@ -123,6 +126,21 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             BeginRecruitPhase();
+        }
+
+        private static string ResolveDisplayName(MatchMode mode, int slotIndex, bool isHuman, MatchSlot slot)
+        {
+            if (isHuman)
+            {
+                return "You";
+            }
+
+            if (slot != null && !string.IsNullOrWhiteSpace(slot.displayName))
+            {
+                return slot.displayName;
+            }
+
+            return mode == MatchMode.Rated ? $"Player {slotIndex + 1}" : $"Bot {slotIndex}";
         }
 
         public PlayerState GetHumanPlayer() => humanPlayer;

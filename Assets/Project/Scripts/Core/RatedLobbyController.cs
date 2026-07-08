@@ -1,4 +1,5 @@
 using DreamGate.Battlegrounds.Services;
+using DreamGate.Battlegrounds.Services.Backend;
 using DreamGate.Battlegrounds.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,7 +23,7 @@ namespace DreamGate.Battlegrounds.Core
             lobbyUi.CancelClicked += OnCancel;
             lobbyUi.BackClicked += OnBack;
 
-            matchmaking = new LocalMatchmakingService(this);
+            matchmaking = MatchmakingServiceFactory.Create(this);
             matchmaking.QueueUpdated += OnQueueUpdated;
             matchmaking.MatchFound += OnMatchFound;
             matchmaking.QueueFailed += OnQueueFailed;
@@ -74,12 +75,17 @@ namespace DreamGate.Battlegrounds.Core
         private void OnMatchFound(MatchmakingResult result)
         {
             lobbyUi.SetSearching(false);
-            lobbyUi.SetQueueStatus("Match found! Entering the tavern...");
+            lobbyUi.SetQueueStatus(result.usedBotFill
+                ? $"Match found with {result.humanCount} player(s). Filling remaining slots with bots..."
+                : "Match found! Entering the tavern...");
 
-            MatchSessionContext.BeginRated(
-                result.lobbyId,
-                result.matchSeed,
-                DreamGateServices.Profile.mmr);
+            if (string.IsNullOrWhiteSpace(result.matchServerUrl))
+            {
+                var settings = BackendSettings.Load();
+                result.matchServerUrl = settings?.matchServerWebSocketUrl;
+            }
+
+            MatchSessionContext.BeginRated(result, DreamGateServices.Profile?.mmr ?? PlayerProfile.DefaultMmr);
 
             SceneNavigator.LoadPracticeGame();
         }

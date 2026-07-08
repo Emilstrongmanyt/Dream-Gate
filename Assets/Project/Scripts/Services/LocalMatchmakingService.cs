@@ -10,8 +10,7 @@ namespace DreamGate.Battlegrounds.Services
     public class LocalMatchmakingService : IMatchmakingService
     {
         private const int TargetPlayers = 8;
-        private const float MinSearchSeconds = 2f;
-        private const float MaxSearchSeconds = 6f;
+        private const float QueueTimeoutSeconds = 30f;
 
         private readonly MonoBehaviour coroutineHost;
         private Coroutine searchCoroutine;
@@ -78,34 +77,46 @@ namespace DreamGate.Battlegrounds.Services
                 yield break;
             }
 
-            var searchDuration = UnityEngine.Random.Range(MinSearchSeconds, MaxSearchSeconds);
             var elapsed = 0f;
-            var playersFound = 1;
+            var humansFound = 1;
 
-            QueueUpdated?.Invoke(playersFound, TargetPlayers);
+            QueueUpdated?.Invoke(humansFound, TargetPlayers);
 
-            while (elapsed < searchDuration)
+            while (elapsed < QueueTimeoutSeconds)
             {
                 elapsed += Time.deltaTime;
-                var nextCount = Mathf.Clamp(1 + Mathf.FloorToInt((elapsed / searchDuration) * (TargetPlayers - 1)), 1, TargetPlayers - 1);
-                if (nextCount != playersFound)
+                var nextCount = Mathf.Clamp(1 + Mathf.FloorToInt((elapsed / QueueTimeoutSeconds) * 2f), 1, 2);
+                if (nextCount != humansFound)
                 {
-                    playersFound = nextCount;
-                    QueueUpdated?.Invoke(playersFound, TargetPlayers);
+                    humansFound = nextCount;
+                    QueueUpdated?.Invoke(humansFound, TargetPlayers);
                 }
 
                 yield return null;
             }
 
-            playersFound = TargetPlayers;
-            QueueUpdated?.Invoke(playersFound, TargetPlayers);
+            QueueUpdated?.Invoke(humansFound, TargetPlayers);
+
+            var slots = new MatchSlot[TargetPlayers];
+            for (var i = 0; i < TargetPlayers; i++)
+            {
+                slots[i] = new MatchSlot
+                {
+                    slotIndex = i,
+                    isBot = i != 0,
+                    displayName = i == 0 ? "You" : $"Bot {i + 1}"
+                };
+            }
 
             var result = new MatchmakingResult
             {
                 lobbyId = $"local-{Guid.NewGuid():N}",
                 matchSeed = UnityEngine.Random.Range(1, int.MaxValue),
-                playersFound = playersFound,
-                usedBotFill = true
+                playersFound = humansFound,
+                humanCount = humansFound,
+                usedBotFill = true,
+                humanSlotIndex = 0,
+                slots = slots
             };
 
             IsSearching = false;

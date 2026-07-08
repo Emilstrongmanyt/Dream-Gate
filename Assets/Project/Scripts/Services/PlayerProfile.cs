@@ -13,7 +13,11 @@ namespace DreamGate.Battlegrounds.Services
         public int mmr = DefaultMmr;
         public int ratedGamesPlayed;
         public int wins;
+        public int losses;
         public int top4Finishes;
+        public int currentWinStreak;
+        public int bestWinStreak;
+        public int totalDamageDealt;
         public int highestMmr = DefaultMmr;
     }
 }

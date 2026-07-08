@@ -40,8 +40,12 @@ namespace DreamGate.Battlegrounds.Core
             var mode = MatchSessionContext.Mode;
             if (mode == MatchMode.Rated)
             {
-                matchManager.Initialize(mode, 0, MatchSessionContext.MatchSeed);
-                networkHost = new NetworkMatchHostStub();
+                matchManager.Initialize(
+                    mode,
+                    MatchSessionContext.HumanSlotIndex,
+                    MatchSessionContext.MatchSeed,
+                    MatchSessionContext.Slots);
+                networkHost = CreateRatedNetworkHost();
             }
             else
             {
@@ -58,6 +62,17 @@ namespace DreamGate.Battlegrounds.Core
             practiceUi.Initialize(matchManager, uiRoot);
 
             matchManager.CombatPlaybackReady += OnCombatPlaybackReady;
+        }
+
+        private static INetworkMatchHost CreateRatedNetworkHost()
+        {
+            if (!string.IsNullOrWhiteSpace(MatchSessionContext.MatchServerUrl) &&
+                MatchSessionContext.HumanCount > 1)
+            {
+                return new RemoteMatchClient(MatchSessionContext.MatchServerUrl, MatchSessionContext.LobbyId);
+            }
+
+            return new NetworkMatchHostStub();
         }
 
         private void OnDestroy()
