@@ -18,7 +18,7 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             var go = new GameObject("GameSfxPlayer");
-            Object.DontDestroyOnLoad(go);
+            UnityEngine.Object.DontDestroyOnLoad(go);
             sfxSource = go.AddComponent<AudioSource>();
             sfxSource.playOnAwake = false;
             sfxSource.spatialBlend = 0f;

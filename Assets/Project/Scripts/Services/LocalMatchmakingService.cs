@@ -29,6 +29,12 @@ namespace DreamGate.Battlegrounds.Services
 
         public void StartQueue()
         {
+            if (coroutineHost == null)
+            {
+                QueueFailed?.Invoke("Matchmaking unavailable.");
+                return;
+            }
+
             if (IsSearching)
             {
                 return;
