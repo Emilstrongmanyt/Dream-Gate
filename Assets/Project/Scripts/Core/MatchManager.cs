@@ -39,7 +39,7 @@ namespace DreamGate.Battlegrounds.Core
 
         public const int BaseRecruitSeconds = 20;
         public const int RecruitSecondsPerTurn = 5;
-        public const int MaxRecruitSeconds = 80;
+        public const int MaxRecruitSeconds = 60;
 
         public const int StartingTavernTier = 1;
 

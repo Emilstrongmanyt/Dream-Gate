@@ -1082,9 +1082,9 @@ namespace DreamGate.Battlegrounds.UI
             text.fontSize = 96;
             text.fontStyle = FontStyles.Bold;
             text.alignment = TextAlignmentOptions.Center;
-            text.color = new Color(1f, 0.95f, 0.72f, 1f);
-            text.outlineWidth = 0.4f;
-            text.outlineColor = new Color(0.12f, 0.08f, 0.02f, 1f);
+            text.color = Color.white;
+            text.outlineWidth = 0.25f;
+            text.outlineColor = Color.black;
             text.text = string.Empty;
             go.SetActive(false);
             return text;
