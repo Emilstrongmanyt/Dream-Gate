@@ -2256,7 +2256,6 @@ namespace DreamGate.Battlegrounds.UI
 
             dragging = false;
             var draggedDistance = Vector2.Distance(eventData.pressPosition, eventData.position);
-            var played = false;
             if (draggedDistance >= DragSuppressDistance)
             {
                 inspectHandler?.SuppressNextClick();
@@ -2264,7 +2263,6 @@ namespace DreamGate.Battlegrounds.UI
                 if (dropIndex >= 0)
                 {
                     ui.TryPlayHandToBoard(handIndex, dropIndex);
-                    played = true;
                 }
             }
 
