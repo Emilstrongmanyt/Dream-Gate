@@ -54,6 +54,7 @@ namespace DreamGate.Battlegrounds.UI
         private TextMeshProUGUI speedLabelText;
         private Button playAgainButton;
         private int pendingSpellHandIndex = -1;
+        private bool humanCombatPlaybackActive;
         private readonly StringBuilder logBuilder = new();
         private Action<float> onCombatSpeedChanged;
         private int speedIndex;
@@ -98,6 +99,7 @@ namespace DreamGate.Battlegrounds.UI
 
         public void BeginCombatPlayback(PlayerState opponent, CombatResult result)
         {
+            humanCombatPlaybackActive = true;
             activeCombatResult = result;
             combatPlayerBoard = CloneBoardMinions(result?.attackerBoardStart);
             combatOpponentBoard = CloneBoardMinions(result?.defenderBoardStart);
@@ -129,6 +131,20 @@ namespace DreamGate.Battlegrounds.UI
             RefreshCombatBoards();
             SetRecruitControls(false);
             SetAllSlotButtonsInteractable(false);
+        }
+
+        /// <summary>
+        /// Combat SFX only during the human player's own combat playback (both boards).
+        /// Background bot-vs-bot fights never enter this path.
+        /// </summary>
+        private void PlayOurCombatSfx(Action playClip)
+        {
+            if (!humanCombatPlaybackActive)
+            {
+                return;
+            }
+
+            playClip();
         }
 
         public IEnumerator PlayCombatEvent(CombatEvent combatEvent, float stepSeconds)
@@ -192,6 +208,8 @@ namespace DreamGate.Battlegrounds.UI
                 yield break;
             }
 
+            PlayOurCombatSfx(GameSfxPlayer.PlayHit);
+
             var elapsed = 0f;
             const float duration = 0.45f;
             var startPos = loserRect.anchoredPosition;
@@ -218,6 +236,7 @@ namespace DreamGate.Battlegrounds.UI
 
         public void EndCombatPlayback()
         {
+            humanCombatPlaybackActive = false;
             SetCombatHudMode(false, null);
             combatPanel.SetActive(false);
             recruitPanel.SetActive(true);
@@ -528,7 +547,7 @@ namespace DreamGate.Battlegrounds.UI
 
             if (combatEvent.damageAmount > 0)
             {
-                GameSfxPlayer.PlayCombat(GameSfxPlayer.PlayHit);
+                PlayOurCombatSfx(GameSfxPlayer.PlayHit);
             }
 
             var striker = GetCombatMinion(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
@@ -644,7 +663,7 @@ namespace DreamGate.Battlegrounds.UI
                 yield break;
             }
 
-            GameSfxPlayer.PlayCombat(GameSfxPlayer.PlaySellCard);
+            PlayOurCombatSfx(GameSfxPlayer.PlaySellCard);
 
             var slots = combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots;
             var board = combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard;
@@ -726,11 +745,11 @@ namespace DreamGate.Battlegrounds.UI
 
             if (combatEvent.type == CombatEventType.Deathrattle && combatEvent.boardIndex >= 0)
             {
-                GameSfxPlayer.PlayCombat(GameSfxPlayer.PlayDropCard);
+                PlayOurCombatSfx(GameSfxPlayer.PlayDropCard);
             }
             else if (combatEvent.attackDelta != 0 || combatEvent.healthDelta != 0)
             {
-                GameSfxPlayer.PlayCombat(GameSfxPlayer.PlayHit);
+                PlayOurCombatSfx(GameSfxPlayer.PlayHit);
             }
 
             yield return new WaitForSeconds(stepSeconds * 0.6f);

@@ -45,12 +45,6 @@ namespace DreamGate.Battlegrounds.Core
             }
         }
 
-        /// <summary>Combat playback SFX — every visible combat action on both boards.</summary>
-        public static void PlayCombat(Action playClip)
-        {
-            playClip();
-        }
-
         public static void PlayBuyCard() => Play("BuyCard");
         public static void PlaySellCard() => Play("SellCard");
         public static void PlayDropCard() => Play("DropCard");

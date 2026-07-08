@@ -348,6 +348,7 @@ namespace DreamGate.Battlegrounds.Core
             StateChanged?.Invoke();
         }
 
+        // Background bot-vs-bot fights: resolve silently (no UI playback, no combat SFX).
         private void ResolveBotOnlyCombats()
         {
             var bots = players
