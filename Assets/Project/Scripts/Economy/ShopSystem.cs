@@ -53,7 +53,10 @@ namespace DreamGate.Battlegrounds.Economy
 
             var minion = MinionInstance.FromDefinition(definition);
             player.hand.Add(minion);
-            GameSfxPlayer.PlayBuyCard();
+            if (player.isHuman)
+            {
+                GameSfxPlayer.PlayBuyCard();
+            }
 
             if (definition.cardKind == CardKind.Spell)
             {
@@ -92,7 +95,10 @@ namespace DreamGate.Battlegrounds.Economy
 
             player.board[boardIndex] = null;
             player.gold += MatchConfig.SellValue;
-            GameSfxPlayer.PlaySellCard();
+            if (player.isHuman)
+            {
+                GameSfxPlayer.PlaySellCard();
+            }
             message = $"Sold minion (+{MatchConfig.SellValue} gold).";
             return true;
         }
@@ -130,7 +136,10 @@ namespace DreamGate.Battlegrounds.Economy
             player.gold -= MatchConfig.TavernUpgradeCost;
             player.tavernTier++;
             RefreshShop(player);
-            GameSfxPlayer.PlayTierUp();
+            if (player.isHuman)
+            {
+                GameSfxPlayer.PlayTierUp();
+            }
             message = $"Tavern upgraded to tier {player.tavernTier}.";
             return true;
         }
@@ -212,7 +221,10 @@ namespace DreamGate.Battlegrounds.Economy
             player.hand.RemoveAt(handIndex);
             player.board[boardIndex] = minion;
             var battlecryMessage = AbilitySystem.OnBattlecry(minion, boardIndex, player);
-            GameSfxPlayer.PlayDropCard();
+            if (player.isHuman)
+            {
+                GameSfxPlayer.PlayDropCard();
+            }
             message = string.IsNullOrEmpty(battlecryMessage) ? "Minion played to board." : battlecryMessage;
             return true;
         }

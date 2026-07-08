@@ -1,6 +1,6 @@
+using DreamGate.Battlegrounds.Cards;
 using DreamGate.Battlegrounds.Core;
 using DreamGate.Battlegrounds.Economy;
-using UnityEngine;
 
 namespace DreamGate.Battlegrounds.Players
 {
@@ -18,10 +18,17 @@ namespace DreamGate.Battlegrounds.Players
                 var affordableSlots = new System.Collections.Generic.List<int>();
                 for (var i = 0; i < bot.shopCardIds.Count; i++)
                 {
-                    if (!string.IsNullOrEmpty(bot.shopCardIds[i]))
+                    if (string.IsNullOrEmpty(bot.shopCardIds[i]))
                     {
-                        affordableSlots.Add(i);
+                        continue;
                     }
+
+                    if (turn == 1 && IsSpell(bot.shopCardIds[i]))
+                    {
+                        continue;
+                    }
+
+                    affordableSlots.Add(i);
                 }
 
                 if (affordableSlots.Count == 0)
@@ -34,10 +41,7 @@ namespace DreamGate.Battlegrounds.Players
                 actions++;
             }
 
-            while (bot.hand.Count > 0 && !bot.BoardFull)
-            {
-                ShopSystem.TryPlayFromHand(bot, 0, out _);
-            }
+            PlayMinionsFromHand(bot);
 
             if (bot.tavernTier < MatchConfig.MaxTavernTier &&
                 bot.gold >= MatchConfig.TavernUpgradeCost &&
@@ -45,6 +49,38 @@ namespace DreamGate.Battlegrounds.Players
             {
                 ShopSystem.TryUpgradeTavern(bot, out _);
             }
+        }
+
+        private static void PlayMinionsFromHand(PlayerState bot)
+        {
+            while (bot.hand.Count > 0 && !bot.BoardFull)
+            {
+                var played = false;
+                for (var i = 0; i < bot.hand.Count; i++)
+                {
+                    if (IsSpell(bot.hand[i].cardId))
+                    {
+                        continue;
+                    }
+
+                    if (ShopSystem.TryPlayFromHand(bot, i, out _))
+                    {
+                        played = true;
+                        break;
+                    }
+                }
+
+                if (!played)
+                {
+                    break;
+                }
+            }
+        }
+
+        private static bool IsSpell(string cardId)
+        {
+            var definition = CardRegistry.Get(cardId);
+            return definition != null && definition.cardKind == CardKind.Spell;
         }
     }
 }
