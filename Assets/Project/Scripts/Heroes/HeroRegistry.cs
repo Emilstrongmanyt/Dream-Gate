@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+#if !SERVER_BUILD
 using UnityEngine;
+#endif
 
 namespace DreamGate.Battlegrounds.Heroes
 {
@@ -24,7 +26,9 @@ namespace DreamGate.Battlegrounds.Heroes
             "Evan"
         };
 
+#if !SERVER_BUILD
         private static readonly Dictionary<string, Sprite> PortraitCache = new();
+#endif
 
         public static IReadOnlyList<string> All => DefaultHeroes;
 
@@ -33,6 +37,7 @@ namespace DreamGate.Battlegrounds.Heroes
             return DefaultHeroes[playerId % DefaultHeroes.Length];
         }
 
+#if !SERVER_BUILD
         public static Sprite LoadPortrait(string heroId)
         {
             if (string.IsNullOrEmpty(heroId))
@@ -60,7 +65,9 @@ namespace DreamGate.Battlegrounds.Heroes
 
             return sprite;
         }
+#endif
 
+#if !SERVER_BUILD
         private static Sprite LoadPortraitSprite(string resourcePath, string assetName)
         {
             var sprites = Resources.LoadAll<Sprite>(resourcePath);
@@ -88,6 +95,7 @@ namespace DreamGate.Battlegrounds.Heroes
 
             return null;
         }
+#endif
 
         public const string ShopkeeperHeroId = "shopkeeper";
         public const string ShopkeeperHeroName = "Tavern Keeper";

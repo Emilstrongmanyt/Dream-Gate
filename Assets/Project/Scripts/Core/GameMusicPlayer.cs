@@ -19,6 +19,8 @@ namespace DreamGate.Battlegrounds.Core
     {
         private const string BgmRoot = "Sound/BGM/";
 
+        public static bool SuppressFeedback { get; set; }
+
         private static GameMusicPlayer instance;
         private AudioSource musicSource;
         private MusicContext currentContext;
@@ -29,12 +31,22 @@ namespace DreamGate.Battlegrounds.Core
 
         public static void PlayMenuMusic()
         {
+            if (SuppressFeedback)
+            {
+                return;
+            }
+
             EnsureInstance();
             instance.SwitchContext(MusicContext.Menu);
         }
 
         public static void StartMatchMusic(MatchMode mode)
         {
+            if (SuppressFeedback)
+            {
+                return;
+            }
+
             EnsureInstance();
             instance.lastAliveTier = -1;
             instance.SwitchContext(mode == MatchMode.Rated ? MusicContext.RankedMatch : MusicContext.PracticeMatch);
@@ -42,6 +54,11 @@ namespace DreamGate.Battlegrounds.Core
 
         public static void UpdateMatchMusic(int alivePlayers, bool playerWon = false)
         {
+            if (SuppressFeedback)
+            {
+                return;
+            }
+
             EnsureInstance();
             if (playerWon)
             {

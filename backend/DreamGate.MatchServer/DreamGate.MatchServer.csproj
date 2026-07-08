@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DreamGate.MatchServer</RootNamespace>
+    <DefineConstants>SERVER_BUILD</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\AbilitySystem.cs" Link="Simulation\Cards\AbilitySystem.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\AbilityType.cs" Link="Simulation\Cards\AbilityType.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\CardKind.cs" Link="Simulation\Cards\CardKind.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\CardRegistry.cs" Link="Simulation\Cards\CardRegistry.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\MinionCardDefinition.cs" Link="Simulation\Cards\MinionCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\MinionInstance.cs" Link="Simulation\Cards\MinionInstance.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\SpellEffect.cs" Link="Simulation\Cards\SpellEffect.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Cards\SpellSystem.cs" Link="Simulation\Cards\SpellSystem.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Combat\CombatEvent.cs" Link="Simulation\Combat\CombatEvent.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Combat\CombatResult.cs" Link="Simulation\Combat\CombatResult.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Combat\CombatSimulator.cs" Link="Simulation\Combat\CombatSimulator.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Combat\DamageCalculator.cs" Link="Simulation\Combat\DamageCalculator.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Core\MatchManager.cs" Link="Simulation\Core\MatchManager.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Core\MatchMode.cs" Link="Simulation\Core\MatchMode.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Core\MatchResult.cs" Link="Simulation\Core\MatchResult.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Economy\ShopSystem.cs" Link="Simulation\Economy\ShopSystem.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Economy\TripleSystem.cs" Link="Simulation\Economy\TripleSystem.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Economy\TavernTierOdds.cs" Link="Simulation\Economy\TavernTierOdds.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Heroes\HeroRegistry.cs" Link="Simulation\Heroes\HeroRegistry.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Networking\IMatchActionRelay.cs" Link="Simulation\Networking\IMatchActionRelay.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Networking\MatchSnapshot.cs" Link="Simulation\Networking\MatchSnapshot.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Networking\MatchSnapshotBuilder.cs" Link="Simulation\Networking\MatchSnapshotBuilder.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Networking\RatedMatchSession.cs" Link="Simulation\Networking\RatedMatchSession.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Players\BotPlayerController.cs" Link="Simulation\Players\BotPlayerController.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Players\PlayerState.cs" Link="Simulation\Players\PlayerState.cs" />
+    <Compile Include="..\..\Assets\Project\Scripts\Services\MatchSlot.cs" Link="Simulation\Services\MatchSlot.cs" />
+  </ItemGroup>
+</Project>

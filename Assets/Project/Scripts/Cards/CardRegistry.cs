@@ -19,6 +19,7 @@ namespace DreamGate.Battlegrounds.Cards
             CardsById.Clear();
             RegisterBuiltInCards();
 
+#if !SERVER_BUILD
             var database = Resources.Load<CardDatabase>("CardDatabase");
             if (database != null)
             {
@@ -30,6 +31,7 @@ namespace DreamGate.Battlegrounds.Cards
                     }
                 }
             }
+#endif
 
             initialized = true;
         }
@@ -153,7 +155,11 @@ namespace DreamGate.Battlegrounds.Cards
             string artFile = "",
             string cardTribe = "")
         {
+#if SERVER_BUILD
+            var card = new MinionCardDefinition();
+#else
             var card = ScriptableObject.CreateInstance<MinionCardDefinition>();
+#endif
             card.cardId = id;
             card.displayName = displayName;
             card.tier = tier;
@@ -167,8 +173,10 @@ namespace DreamGate.Battlegrounds.Cards
             card.tripleRewardCardId = tripleRewardCardId;
             card.isToken = isToken;
             card.canAppearInShop = canAppearInShop;
+#if !SERVER_BUILD
             card.cardArt = LoadArt(tier, artFile);
             card.name = displayName;
+#endif
             return card;
         }
 
@@ -186,9 +194,11 @@ namespace DreamGate.Battlegrounds.Cards
             return card;
         }
 
+#if !SERVER_BUILD
         private static Sprite LoadArt(int tier, string fileName)
         {
             return CardArtLoader.Load(tier, fileName);
         }
+#endif
     }
 }

@@ -6,6 +6,7 @@ using DreamGate.Battlegrounds.Combat;
 using DreamGate.Battlegrounds.Economy;
 using DreamGate.Battlegrounds.Heroes;
 using DreamGate.Battlegrounds.Players;
+using DreamGate.Battlegrounds.Networking;
 using DreamGate.Battlegrounds.Services;
 using UnityEngine;
 
@@ -61,6 +62,10 @@ namespace DreamGate.Battlegrounds.Core
         public event Action<string> MessagePosted;
         public event Action MatchEnded;
         public event Action CombatPlaybackReady;
+        public event Action RecruitPhaseEnded;
+
+        public bool AuthoritativeSimulation { get; set; }
+        public IMatchActionRelay ActionRelay { get; set; }
 
         public MatchMode Mode { get; private set; } = MatchMode.Practice;
         public int Turn { get; private set; } = 1;
@@ -80,6 +85,7 @@ namespace DreamGate.Battlegrounds.Core
         private int lastCombatOpponentId = -1;
         private int nextPlacement = MatchConfig.MaxPlayers;
         private int lastRecruitTimerDisplay = -1;
+        private int pendingHumanPlayerId = -1;
 
         public void Initialize(int humanId = 0)
         {
@@ -105,8 +111,9 @@ namespace DreamGate.Battlegrounds.Core
             for (var i = 0; i < MatchConfig.MaxPlayers; i++)
             {
                 var slot = slots != null && i < slots.Length ? slots[i] : null;
-                var isHuman = i == humanId;
-                var displayName = ResolveDisplayName(mode, i, isHuman, slot);
+                var isHuman = slot != null ? !slot.isBot : i == humanId;
+                var isLocalHuman = i == humanId;
+                var displayName = ResolveDisplayName(mode, i, isLocalHuman, slot);
                 var player = new PlayerState
                 {
                     playerId = i,
@@ -119,7 +126,11 @@ namespace DreamGate.Battlegrounds.Core
                 };
                 players.Add(player);
 
-                if (isHuman)
+                if (isLocalHuman)
+                {
+                    humanPlayer = player;
+                }
+                else if (humanPlayer == null && isHuman)
                 {
                     humanPlayer = player;
                 }
@@ -127,6 +138,9 @@ namespace DreamGate.Battlegrounds.Core
 
             BeginRecruitPhase();
         }
+
+        public PlayerState GetPlayer(int playerId) =>
+            players.FirstOrDefault(p => p.playerId == playerId);
 
         private static string ResolveDisplayName(MatchMode mode, int slotIndex, bool isHuman, MatchSlot slot)
         {
@@ -181,10 +195,19 @@ namespace DreamGate.Battlegrounds.Core
             }
         }
 
-        public bool TryBuyFromShop(int shopIndex, out string message)
+        public bool TryBuyFromShop(int shopIndex, out string message) =>
+            TryBuyFromShop(humanPlayerId, shopIndex, out message);
+
+        public bool TryBuyFromShop(int playerId, int shopIndex, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("buy_shop", playerId, new Dictionary<string, int> { { "shopIndex", shopIndex } }, out message);
+            }
+
             EnsureRecruitPhase();
-            var success = ShopSystem.TryBuy(humanPlayer, shopIndex, out message);
+            var player = RequirePlayer(playerId);
+            var success = ShopSystem.TryBuy(player, shopIndex, out message);
             if (success)
             {
                 Post(message);
@@ -195,10 +218,19 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
-        public bool TrySellFromBoard(int boardIndex, out string message)
+        public bool TrySellFromBoard(int boardIndex, out string message) =>
+            TrySellFromBoard(humanPlayerId, boardIndex, out message);
+
+        public bool TrySellFromBoard(int playerId, int boardIndex, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("sell_board", playerId, new Dictionary<string, int> { { "boardIndex", boardIndex } }, out message);
+            }
+
             EnsureRecruitPhase();
-            var success = ShopSystem.TrySell(humanPlayer, boardIndex, out message);
+            var player = RequirePlayer(playerId);
+            var success = ShopSystem.TrySell(player, boardIndex, out message);
             if (success)
             {
                 Post(message);
@@ -208,10 +240,19 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
-        public bool TryReorderBoard(int fromIndex, int toIndex, out string message)
+        public bool TryReorderBoard(int fromIndex, int toIndex, out string message) =>
+            TryReorderBoard(humanPlayerId, fromIndex, toIndex, out message);
+
+        public bool TryReorderBoard(int playerId, int fromIndex, int toIndex, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("reorder_board", playerId, new Dictionary<string, int> { { "fromIndex", fromIndex }, { "toIndex", toIndex } }, out message);
+            }
+
             EnsureRecruitPhase();
-            var success = ShopSystem.TryReorderBoard(humanPlayer, fromIndex, toIndex, out message);
+            var player = RequirePlayer(playerId);
+            var success = ShopSystem.TryReorderBoard(player, fromIndex, toIndex, out message);
             if (success && fromIndex != toIndex)
             {
                 Post(message);
@@ -221,10 +262,19 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
-        public bool TryPlayFromHand(int handIndex, out string message)
+        public bool TryPlayFromHand(int handIndex, out string message) =>
+            TryPlayFromHand(humanPlayerId, handIndex, out message);
+
+        public bool TryPlayFromHand(int playerId, int handIndex, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("play_hand", playerId, new Dictionary<string, int> { { "handIndex", handIndex } }, out message);
+            }
+
             EnsureRecruitPhase();
-            var success = ShopSystem.TryPlayFromHand(humanPlayer, handIndex, out message);
+            var player = RequirePlayer(playerId);
+            var success = ShopSystem.TryPlayFromHand(player, handIndex, out message);
             if (success)
             {
                 Post(message);
@@ -234,10 +284,19 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
-        public bool TryPlayFromHandToSlot(int handIndex, int boardIndex, out string message)
+        public bool TryPlayFromHandToSlot(int handIndex, int boardIndex, out string message) =>
+            TryPlayFromHandToSlot(humanPlayerId, handIndex, boardIndex, out message);
+
+        public bool TryPlayFromHandToSlot(int playerId, int handIndex, int boardIndex, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("play_hand_slot", playerId, new Dictionary<string, int> { { "handIndex", handIndex }, { "boardIndex", boardIndex } }, out message);
+            }
+
             EnsureRecruitPhase();
-            var success = ShopSystem.TryPlayFromHandToSlot(humanPlayer, handIndex, boardIndex, out message);
+            var player = RequirePlayer(playerId);
+            var success = ShopSystem.TryPlayFromHandToSlot(player, handIndex, boardIndex, out message);
             if (success)
             {
                 Post(message);
@@ -247,13 +306,22 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
-        public bool TryCastSpellFromHand(int handIndex, int targetBoardIndex, out string message)
+        public bool TryCastSpellFromHand(int handIndex, int targetBoardIndex, out string message) =>
+            TryCastSpellFromHand(humanPlayerId, handIndex, targetBoardIndex, out message);
+
+        public bool TryCastSpellFromHand(int playerId, int handIndex, int targetBoardIndex, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("cast_spell", playerId, new Dictionary<string, int> { { "handIndex", handIndex }, { "targetBoardIndex", targetBoardIndex } }, out message);
+            }
+
             EnsureRecruitPhase();
-            var success = SpellSystem.TryCast(humanPlayer, handIndex, targetBoardIndex, out message);
+            var player = RequirePlayer(playerId);
+            var success = SpellSystem.TryCast(player, handIndex, targetBoardIndex, out message);
             if (success)
             {
-                GameSfxPlayer.PlayRecruit(humanPlayer, GameSfxPlayer.PlayDropCard);
+                GameSfxPlayer.PlayRecruit(player, GameSfxPlayer.PlayDropCard);
                 Post(message);
                 StateChanged?.Invoke();
             }
@@ -261,10 +329,19 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
-        public bool TryUpgradeTavern(out string message)
+        public bool TryUpgradeTavern(out string message) =>
+            TryUpgradeTavern(humanPlayerId, out message);
+
+        public bool TryUpgradeTavern(int playerId, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("upgrade", playerId, new Dictionary<string, int>(), out message);
+            }
+
             EnsureRecruitPhase();
-            var success = ShopSystem.TryUpgradeTavern(humanPlayer, out message);
+            var player = RequirePlayer(playerId);
+            var success = ShopSystem.TryUpgradeTavern(player, out message);
             if (success)
             {
                 Post(message);
@@ -274,10 +351,19 @@ namespace DreamGate.Battlegrounds.Core
             return success;
         }
 
-        public bool TryRefreshShop(out string message)
+        public bool TryRefreshShop(out string message) =>
+            TryRefreshShop(humanPlayerId, out message);
+
+        public bool TryRefreshShop(int playerId, out string message)
         {
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                return ActionRelay.TryRelayAction("refresh", playerId, new Dictionary<string, int>(), out message);
+            }
+
             EnsureRecruitPhase();
-            var success = ShopSystem.TryRefreshShop(humanPlayer, out message);
+            var player = RequirePlayer(playerId);
+            var success = ShopSystem.TryRefreshShop(player, out message);
             if (success)
             {
                 Post(message);
@@ -302,7 +388,14 @@ namespace DreamGate.Battlegrounds.Core
                 return;
             }
 
-            ApplyCombatDamage(humanPlayer, PendingOpponent, PendingHumanCombat);
+            if (ActionRelay != null && ActionRelay.IsAuthoritative)
+            {
+                ActionRelay.TryRelayCompleteCombat(out _);
+                return;
+            }
+
+            var actingHuman = GetPlayer(pendingHumanPlayerId) ?? humanPlayer;
+            ApplyCombatDamage(actingHuman, PendingOpponent, PendingHumanCombat);
 
             if (PendingHumanCombat.outcome == CombatOutcome.AttackerWins)
             {
@@ -324,6 +417,13 @@ namespace DreamGate.Battlegrounds.Core
 
             PendingHumanCombat = null;
             PendingOpponent = null;
+            pendingHumanPlayerId = -1;
+            if (AuthoritativeSimulation)
+            {
+                StateChanged?.Invoke();
+                return;
+            }
+
             Phase = MatchPhase.DamageResolution;
             StateChanged?.Invoke();
             AdvanceTurnOrEndMatch();
@@ -334,8 +434,12 @@ namespace DreamGate.Battlegrounds.Core
             Phase = MatchPhase.Recruit;
             RecruitTimeRemaining = MatchConfig.GetRecruitDurationForTurn(Turn);
             lastRecruitTimerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
-            humanPlayer.gold = MatchConfig.GetGoldIncomeForTurn(Turn);
-            ShopSystem.RefreshShop(humanPlayer, matchRandom.Next());
+
+            foreach (var human in players.Where(p => p.isHuman && !p.isEliminated))
+            {
+                human.gold = MatchConfig.GetGoldIncomeForTurn(Turn);
+                ShopSystem.RefreshShop(human, matchRandom.Next());
+            }
 
             foreach (var bot in players.Where(p => !p.isHuman && !p.isEliminated))
             {
@@ -353,24 +457,58 @@ namespace DreamGate.Battlegrounds.Core
             Phase = MatchPhase.Combat;
             ResolveBotOnlyCombats();
 
+            if (AuthoritativeSimulation)
+            {
+                RecruitPhaseEnded?.Invoke();
+                StateChanged?.Invoke();
+                return;
+            }
+
             if (humanPlayer.isEliminated || humanPlayer.heroHealth <= 0)
             {
                 AdvanceTurnOrEndMatch();
                 return;
             }
 
-            var opponent = PickCombatOpponent();
-            if (opponent == null)
+            if (!TryBeginHumanCombat(humanPlayerId))
             {
                 AdvanceTurnOrEndMatch();
+            }
+        }
+
+        public bool TryBeginHumanCombat(int playerId)
+        {
+            var human = GetPlayer(playerId);
+            if (human == null || human.isEliminated || human.heroHealth <= 0)
+            {
+                return false;
+            }
+
+            var opponent = PickCombatOpponent(playerId);
+            if (opponent == null)
+            {
+                return false;
+            }
+
+            pendingHumanPlayerId = playerId;
+            PendingOpponent = opponent;
+            PendingHumanCombat = CombatSimulator.Simulate(human, opponent);
+            Post($"Combat: {human.displayName} vs {opponent.heroName} ({opponent.displayName}).");
+            CombatPlaybackReady?.Invoke();
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public void CompleteCombatPhase()
+        {
+            if (Phase != MatchPhase.Combat || IsAwaitingCombatPlayback)
+            {
                 return;
             }
 
-            PendingOpponent = opponent;
-            PendingHumanCombat = CombatSimulator.Simulate(humanPlayer, opponent);
-            Post($"Your combat vs {opponent.heroName} ({opponent.displayName}).");
-            CombatPlaybackReady?.Invoke();
+            Phase = MatchPhase.DamageResolution;
             StateChanged?.Invoke();
+            AdvanceTurnOrEndMatch();
         }
 
         // Background bot-vs-bot fights: resolve silently (no UI playback, no combat SFX).
@@ -443,6 +581,26 @@ namespace DreamGate.Battlegrounds.Core
 
         private void AdvanceTurnOrEndMatch()
         {
+            if (AuthoritativeSimulation)
+            {
+                if (GetAlivePlayerCount() <= 1)
+                {
+                    foreach (var survivor in players.Where(p => !p.isEliminated && p.heroHealth > 0))
+                    {
+                        survivor.placement = 1;
+                    }
+
+                    Phase = MatchPhase.GameOver;
+                    MatchEnded?.Invoke();
+                    StateChanged?.Invoke();
+                    return;
+                }
+
+                Turn++;
+                BeginRecruitPhase();
+                return;
+            }
+
             if (humanPlayer.isEliminated || humanPlayer.heroHealth <= 0)
             {
                 EliminatePlayer(humanPlayer);
@@ -494,10 +652,10 @@ namespace DreamGate.Battlegrounds.Core
             StateChanged?.Invoke();
         }
 
-        private PlayerState PickCombatOpponent()
+        private PlayerState PickCombatOpponent(int forPlayerId)
         {
             var candidates = players
-                .Where(p => !p.isHuman && !p.isEliminated && p.heroHealth > 0)
+                .Where(p => p.playerId != forPlayerId && !p.isEliminated && p.heroHealth > 0)
                 .ToList();
 
             if (candidates.Count == 0)
@@ -517,6 +675,115 @@ namespace DreamGate.Battlegrounds.Core
             var opponent = candidates[matchRandom.Next(candidates.Count)];
             lastCombatOpponentId = opponent.playerId;
             return opponent;
+        }
+
+        public void BeginCombatPlaybackFromSnapshot(CombatSnapshot combatSnapshot, int localSlotIndex)
+        {
+            if (combatSnapshot == null)
+            {
+                return;
+            }
+
+            pendingHumanPlayerId = localSlotIndex;
+            PendingOpponent = GetPlayer(combatSnapshot.opponentPlayerId) ?? new PlayerState
+            {
+                playerId = combatSnapshot.opponentPlayerId,
+                displayName = combatSnapshot.opponentDisplayName,
+                heroName = combatSnapshot.opponentHeroName
+            };
+
+            PendingHumanCombat = new CombatResult
+            {
+                outcome = (CombatOutcome)combatSnapshot.outcome,
+                damageToDefender = combatSnapshot.damageToDefender,
+                damageToAttacker = combatSnapshot.damageToAttacker,
+                combatEvents = combatSnapshot.events?.Select(e => new CombatEvent
+                {
+                    type = (CombatEventType)e.type,
+                    attackerBoardIndex = e.attackerSlot,
+                    defenderBoardIndex = e.defenderSlot,
+                    isRecoil = e.isRecoil,
+                    damageAmount = e.damage
+                }).ToList() ?? new List<CombatEvent>()
+            };
+
+            Phase = MatchPhase.Combat;
+            CombatPlaybackReady?.Invoke();
+            StateChanged?.Invoke();
+        }
+
+        public void ApplySnapshot(MatchSnapshot snapshot, int localSlotIndex)
+        {
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            humanPlayerId = localSlotIndex;
+            Turn = snapshot.turn;
+            Phase = (MatchPhase)snapshot.phase;
+            RecruitTimeRemaining = snapshot.recruitTimeRemaining;
+            lastRecruitTimerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
+
+            foreach (var playerSnapshot in snapshot.players)
+            {
+                var player = GetPlayer(playerSnapshot.playerId);
+                if (player == null)
+                {
+                    continue;
+                }
+
+                player.displayName = playerSnapshot.displayName;
+                player.heroId = playerSnapshot.heroId;
+                player.heroName = playerSnapshot.heroName;
+                player.isHuman = playerSnapshot.playerId == localSlotIndex;
+                player.isEliminated = playerSnapshot.isEliminated;
+                player.placement = playerSnapshot.placement;
+                player.heroHealth = playerSnapshot.heroHealth;
+                player.damageDealt = playerSnapshot.damageDealt;
+                player.damageTaken = playerSnapshot.damageTaken;
+                player.gold = playerSnapshot.gold;
+                player.tavernTier = playerSnapshot.tavernTier;
+                player.doomNextCombat = playerSnapshot.doomNextCombat;
+                player.board = playerSnapshot.board ?? new MinionInstance[MatchConfig.BoardSize];
+                player.hand = playerSnapshot.hand?.ToList() ?? new List<MinionInstance>();
+                player.shopCardIds = playerSnapshot.shopCardIds?.ToList() ?? new List<string>();
+
+                if (player.playerId == localSlotIndex)
+                {
+                    humanPlayer = player;
+                }
+            }
+
+            if (snapshot.matchEnded && snapshot.matchEnd != null)
+            {
+                Phase = MatchPhase.GameOver;
+                FinalResult = new MatchResult
+                {
+                    matchMode = Mode,
+                    playerWon = snapshot.matchEnd.playerWon,
+                    placement = snapshot.matchEnd.placement,
+                    turnsPlayed = snapshot.matchEnd.turnsPlayed,
+                    finalHeroHealth = snapshot.matchEnd.finalHeroHealth,
+                    damageDealt = snapshot.matchEnd.damageDealt,
+                    damageTaken = snapshot.matchEnd.damageTaken,
+                    heroName = snapshot.matchEnd.heroName
+                };
+                MatchEnded?.Invoke();
+            }
+
+            StateChanged?.Invoke();
+        }
+
+        private PlayerState RequirePlayer(int playerId)
+        {
+            var player = GetPlayer(playerId);
+            if (player == null)
+            {
+                throw new InvalidOperationException($"Player slot {playerId} not found.");
+            }
+
+            return player;
         }
 
         private void EnsureRecruitPhase()

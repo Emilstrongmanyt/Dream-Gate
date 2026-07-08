@@ -50,6 +50,7 @@
 ExportedObj/
 .consulo/
 *.csproj
+!backend/DreamGate.MatchServer/DreamGate.MatchServer.csproj
 *.unityproj
 *.sln
 *.suo

@@ -7,6 +7,8 @@ namespace DreamGate.Battlegrounds.Core
     {
         private const string SfxRoot = "Sound/Sound FX/";
 
+        public static bool SuppressFeedback { get; set; }
+
         private static AudioSource sfxSource;
 
         public static void EnsureInitialized()
@@ -25,6 +27,11 @@ namespace DreamGate.Battlegrounds.Core
 
         public static void Play(string clipName)
         {
+            if (SuppressFeedback)
+            {
+                return;
+            }
+
             EnsureInitialized();
             var clip = Resources.Load<AudioClip>(SfxRoot + clipName);
             if (clip == null || sfxSource == null)
@@ -38,6 +45,11 @@ namespace DreamGate.Battlegrounds.Core
         /// <summary>Recruit-phase economy SFX — only the human player's actions.</summary>
         public static void PlayRecruit(PlayerState player, System.Action playClip)
         {
+            if (SuppressFeedback)
+            {
+                return;
+            }
+
             if (player != null && player.isHuman)
             {
                 playClip();

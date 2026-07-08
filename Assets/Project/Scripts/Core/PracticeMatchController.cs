@@ -64,12 +64,19 @@ namespace DreamGate.Battlegrounds.Core
             matchManager.CombatPlaybackReady += OnCombatPlaybackReady;
         }
 
-        private static INetworkMatchHost CreateRatedNetworkHost()
+        private INetworkMatchHost CreateRatedNetworkHost()
         {
             if (!string.IsNullOrWhiteSpace(MatchSessionContext.MatchServerUrl) &&
-                MatchSessionContext.HumanCount > 1)
+                DreamGateServices.UseCloudBackend)
             {
-                return new RemoteMatchClient(MatchSessionContext.MatchServerUrl, MatchSessionContext.LobbyId);
+                var remote = new RemoteMatchClient(
+                    MatchSessionContext.MatchServerUrl,
+                    MatchSessionContext.LobbyId,
+                    MatchSessionContext.HumanSlotIndex,
+                    MatchSessionContext.Slots,
+                    MatchSessionContext.MatchSeed);
+                remote.CombatPlaybackRequested += OnCombatPlaybackReady;
+                return remote;
             }
 
             return new NetworkMatchHostStub();
@@ -83,11 +90,21 @@ namespace DreamGate.Battlegrounds.Core
                 matchManager.MatchEnded -= OnMatchEnded;
             }
 
+            if (networkHost is RemoteMatchClient remote)
+            {
+                remote.CombatPlaybackRequested -= OnCombatPlaybackReady;
+            }
+
             networkHost?.Dispose();
         }
 
         private void Update()
         {
+            if (networkHost is RemoteMatchClient { IsAuthoritative: true })
+            {
+                return;
+            }
+
             networkHost?.TickRecruitTimer(Time.deltaTime);
         }
 

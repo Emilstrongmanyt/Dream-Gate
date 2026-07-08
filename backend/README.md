@@ -1,6 +1,6 @@
 # Dream Gate Ranked Backend
 
-Cloud stack for rated PvP accounts, matchmaking, stats, and match coordination.
+Cloud stack for rated PvP accounts, matchmaking, stats, and **authoritative match simulation**.
 
 ## Components
 
@@ -9,60 +9,79 @@ Cloud stack for rated PvP accounts, matchmaking, stats, and match coordination.
 | `supabase/migrations/001_ranked_pvp.sql` | Profiles, queue, matches, history, achievements |
 | `supabase/functions/matchmaking` | 30s queue, MMR widening, bot fill to 8 players |
 | `supabase/functions/apply-match-result` | Server-side MMR, streaks, achievements |
-| `match-server/` | Lobby coordination server (HTTP join + WebSocket scaffold) |
+| `DreamGate.MatchServer/` | **Authoritative** .NET 8 match server (shared simulation code) |
+| `match-server/` | Legacy Node lobby scaffold (optional) |
 
-## Setup
+## Quick start
 
-### 1. Supabase project
+### 1. Supabase
 
-1. Create a Supabase project.
-2. Run the SQL migration in the SQL editor.
-3. Deploy edge functions:
+```powershell
+cd backend
+Copy-Item .env.example .env
+# Fill in SUPABASE_URL, keys, PROJECT_REF, MATCH_SERVER_URL
 
-```bash
-supabase functions deploy matchmaking --no-verify-jwt
-supabase functions deploy apply-match-result --no-verify-jwt
+# Link project (one time):
+supabase link --project-ref <PROJECT_REF>
+
+# Apply schema + deploy functions:
+.\scripts\setup-supabase.ps1
+.\scripts\deploy-functions.ps1
 ```
 
-4. Set function secrets:
+Local dev:
 
-```bash
-supabase secrets set MATCH_SERVER_URL=https://your-match-server.example.com
+```powershell
+.\scripts\setup-supabase.ps1 -Local
 ```
 
-### 2. Unity client
+### 2. Authoritative match server
 
-1. Open `Assets/Resources/BackendSettings` (create via **Dream Gate → Backend Settings** if missing).
-2. Enable **Use Cloud Backend**.
-3. Fill in:
-   - Supabase URL
-   - Supabase anon key
-   - Matchmaking function URL
-   - Apply match result function URL
-   - Match server WebSocket/HTTP URL (optional until multi-human sim is live)
-
-When cloud backend is disabled, the game keeps the existing local `PlayerPrefs` auth and `LocalMatchmakingService`.
-
-### 3. Match server (optional for now)
-
-```bash
-cd backend/match-server
-npm install
-npm start
+```powershell
+.\scripts\start-match-server.ps1
 ```
 
-Expose port `8787` and set `MATCH_SERVER_URL` in Supabase secrets.
+Runs on `http://localhost:8787` by default.
+
+Endpoints:
+- `POST /match/join` — create/join lobby, returns authoritative snapshot
+- `GET /match/state?lobbyId=&playerId=` — poll match state
+- `POST /match/action` — recruit-phase player action
+- `POST /match/complete-combat` — advance after combat playback
+
+Set `MATCH_SERVER_URL` in Supabase secrets and Unity `BackendSettings`.
+
+### 3. Unity client
+
+Open `Assets/Resources/BackendSettings`:
+
+| Field | Example |
+|-------|---------|
+| Use Cloud Backend | ✓ |
+| Supabase URL | `https://xyz.supabase.co` |
+| Supabase Anon Key | your anon key |
+| Matchmaking Function URL | `https://xyz.supabase.co/functions/v1/matchmaking` |
+| Apply Match Result Function URL | `https://xyz.supabase.co/functions/v1/apply-match-result` |
+| Match Server WebSocket URL | `http://localhost:8787` |
+
+When cloud backend is disabled, the game uses local `PlayerPrefs` auth and offline matchmaking.
 
 ## Rated flow
 
-1. Player signs in through Supabase Auth.
-2. Rated lobby uses `BackendMatchmakingService`.
-3. Matchmaking waits up to **30 seconds**, widening MMR range over time.
-4. If fewer than 8 humans are found, remaining slots are filled with bots.
-5. Match starts with shared `lobbyId`, `matchSeed`, and slot roster.
-6. Client runs the match locally today; multi-human authoritative simulation will connect through `RemoteMatchClient`.
-7. Match end posts to `apply-match-result` for server-side stats and achievements.
+1. Player signs in via Supabase Auth.
+2. Rated lobby queues through `BackendMatchmakingService` (30s max, bot fill).
+3. Match starts with shared `lobbyId`, `matchSeed`, and slot roster.
+4. Client connects to **DreamGate.MatchServer** via `RemoteMatchClient`.
+5. Server runs `MatchManager` authoritatively; clients send actions and receive snapshots.
+6. Match end posts to `apply-match-result` for cloud stats and achievements.
 
-## Next step: authoritative PvP
+## Architecture
 
-The match server currently coordinates lobby membership only. The next milestone is to move `MatchManager` simulation server-side and stream recruit/combat state to clients through WebSocket messages.
+```
+Unity Client ──► Supabase Auth / Profiles / Matchmaking
+      │
+      └── HTTP ──► DreamGate.MatchServer (.NET)
+                      └── MatchManager (shared C# simulation)
+```
+
+Practice mode stays fully local. Rated mode uses the match server when `MatchServerUrl` is configured.
