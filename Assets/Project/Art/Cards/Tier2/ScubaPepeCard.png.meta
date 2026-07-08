@@ -3,11 +3,8 @@ guid: 81744cacace05314ab8a0c4a0bf9aa6c
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 4275940824281677235
-    second: ScubaPepeCard_0
-  - first:
       213: 3721501027444664523
-    second: ScubaPepeCard_1
+    second: ScubaPepeCard_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -132,28 +129,6 @@ TextureImporter:
       name: ScubaPepeCard_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 225
-        width: 10
-        height: 552
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 3bd76e75681375b30800000000000000
-      internalID: 4275940824281677235
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: ScubaPepeCard_1
-      rect:
-        serializedVersion: 2
         x: 9
         y: 14
         width: 565
@@ -186,8 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ScubaPepeCard_0: 4275940824281677235
-      ScubaPepeCard_1: 3721501027444664523
+      ScubaPepeCard_0: 3721501027444664523
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

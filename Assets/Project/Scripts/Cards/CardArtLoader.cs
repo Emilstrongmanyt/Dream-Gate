@@ -20,14 +20,15 @@ namespace DreamGate.Battlegrounds.Cards
                 return cached;
             }
 
-            var sprite = Resources.Load<Sprite>(resourcePath);
-            if (sprite == null)
+            Sprite sprite = null;
+            var sprites = Resources.LoadAll<Sprite>(resourcePath);
+            if (sprites != null && sprites.Length > 0)
             {
-                var sprites = Resources.LoadAll<Sprite>(resourcePath);
-                if (sprites != null && sprites.Length > 0)
-                {
-                    sprite = PickBestSprite(sprites, fileName);
-                }
+                sprite = PickBestSprite(sprites, fileName);
+            }
+            else
+            {
+                sprite = Resources.Load<Sprite>(resourcePath);
             }
 
             if (sprite != null)
@@ -79,23 +80,40 @@ namespace DreamGate.Battlegrounds.Cards
 
         private static Sprite PickBestSprite(Sprite[] sprites, string fileName)
         {
+            Sprite best = null;
+            var bestArea = 0f;
+
             foreach (var sprite in sprites)
             {
-                if (sprite.name == fileName || sprite.name.StartsWith(fileName))
+                if (sprite.name != fileName && !sprite.name.StartsWith(fileName))
                 {
-                    return sprite;
+                    continue;
                 }
+
+                var area = sprite.rect.width * sprite.rect.height;
+                if (area > bestArea)
+                {
+                    bestArea = area;
+                    best = sprite;
+                }
+            }
+
+            if (best != null)
+            {
+                return best;
             }
 
             foreach (var sprite in sprites)
             {
-                if (sprite.name.EndsWith("_0"))
+                var area = sprite.rect.width * sprite.rect.height;
+                if (area > bestArea)
                 {
-                    return sprite;
+                    bestArea = area;
+                    best = sprite;
                 }
             }
 
-            return sprites[0];
+            return best ?? sprites[0];
         }
     }
 }
