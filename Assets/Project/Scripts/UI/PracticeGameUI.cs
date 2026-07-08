@@ -307,7 +307,7 @@ namespace DreamGate.Battlegrounds.UI
                 showSectionLabel: false);
 
             refreshShopButton = CreateSpriteButton(recruitPanel.transform, "RefreshButton", new Vector2(250, 610), new Vector2(180, 72), OnRefreshShopClicked);
-            upgradeButton = CreateSpriteButton(recruitPanel.transform, "TierUpgradeButton", new Vector2(250, 510), new Vector2(180, 72), OnUpgradeClicked);
+            upgradeButton = CreateSpriteButton(recruitPanel.transform, "TierUpgradeButton", new Vector2(-250, 560), new Vector2(180, 72), OnUpgradeClicked);
             endTurnButton = CreateSpriteButton(recruitPanel.transform, "StartCombatButton", new Vector2(420, -620), new Vector2(180, 72), OnEndTurnClicked);
             if (matchManager.Mode == MatchMode.Rated)
             {
@@ -1033,7 +1033,7 @@ namespace DreamGate.Battlegrounds.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = RecruitPlayerHeroCenter + new Vector2(118f, 8f);
+            rect.anchoredPosition = RecruitPlayerHeroCenter + new Vector2(148f, -24f);
             rect.sizeDelta = new Vector2(88f, 88f);
 
             var coinGo = new GameObject("Coin", typeof(RectTransform), typeof(Image));
