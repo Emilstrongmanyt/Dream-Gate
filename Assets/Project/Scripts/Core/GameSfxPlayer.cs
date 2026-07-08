@@ -1,3 +1,5 @@
+using System;
+using DreamGate.Battlegrounds.Players;
 using UnityEngine;
 
 namespace DreamGate.Battlegrounds.Core
@@ -32,6 +34,21 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             sfxSource.PlayOneShot(clip, GameSettings.SfxVolume);
+        }
+
+        /// <summary>Recruit-phase economy SFX — only the human player's actions.</summary>
+        public static void PlayRecruit(PlayerState player, Action playClip)
+        {
+            if (player != null && player.isHuman)
+            {
+                playClip();
+            }
+        }
+
+        /// <summary>Combat playback SFX — every visible combat action on both boards.</summary>
+        public static void PlayCombat(Action playClip)
+        {
+            playClip();
         }
 
         public static void PlayBuyCard() => Play("BuyCard");

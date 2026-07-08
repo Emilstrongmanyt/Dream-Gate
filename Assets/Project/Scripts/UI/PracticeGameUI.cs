@@ -526,9 +526,9 @@ namespace DreamGate.Battlegrounds.UI
                 yield break;
             }
 
-            if (combatEvent.damageAmount > 0 && !combatEvent.isCleave)
+            if (combatEvent.damageAmount > 0)
             {
-                GameSfxPlayer.PlayHit();
+                GameSfxPlayer.PlayCombat(GameSfxPlayer.PlayHit);
             }
 
             var striker = GetCombatMinion(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
@@ -644,6 +644,8 @@ namespace DreamGate.Battlegrounds.UI
                 yield break;
             }
 
+            GameSfxPlayer.PlayCombat(GameSfxPlayer.PlaySellCard);
+
             var slots = combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots;
             var board = combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard;
             if (board == null || combatEvent.boardIndex < 0 || combatEvent.boardIndex >= board.Length ||
@@ -720,6 +722,15 @@ namespace DreamGate.Battlegrounds.UI
             else
             {
                 RefreshCombatBoards();
+            }
+
+            if (combatEvent.type == CombatEventType.Deathrattle && combatEvent.boardIndex >= 0)
+            {
+                GameSfxPlayer.PlayCombat(GameSfxPlayer.PlayDropCard);
+            }
+            else if (combatEvent.attackDelta != 0 || combatEvent.healthDelta != 0)
+            {
+                GameSfxPlayer.PlayCombat(GameSfxPlayer.PlayHit);
             }
 
             yield return new WaitForSeconds(stepSeconds * 0.6f);

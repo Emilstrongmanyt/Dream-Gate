@@ -229,7 +229,7 @@ namespace DreamGate.Battlegrounds.Core
             var success = SpellSystem.TryCast(humanPlayer, handIndex, targetBoardIndex, out message);
             if (success)
             {
-                GameSfxPlayer.PlayDropCard();
+                GameSfxPlayer.PlayRecruit(humanPlayer, GameSfxPlayer.PlayDropCard);
                 Post(message);
                 StateChanged?.Invoke();
             }
