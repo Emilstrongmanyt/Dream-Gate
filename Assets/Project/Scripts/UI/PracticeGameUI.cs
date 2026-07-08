@@ -1014,12 +1014,6 @@ namespace DreamGate.Battlegrounds.UI
                     dragHandler.Configure(handIndex, visualSlot, this);
                 }
 
-                var handLift = handSlots[visualSlot].RootRect.GetComponent<HandCardLift>();
-                if (handLift != null)
-                {
-                    handLift.RecacheBase();
-                    handLift.ResetLift();
-                }
             }
         }
 
@@ -1664,6 +1658,7 @@ namespace DreamGate.Battlegrounds.UI
                 return;
             }
 
+            PauseHandLift();
             pointerDown = true;
             holdTimer = 0f;
             hoverEligible = false;
@@ -1760,6 +1755,29 @@ namespace DreamGate.Battlegrounds.UI
 
             inspectVisible = false;
             overlay.Hide();
+            ResumeHandLift();
+        }
+
+        private void PauseHandLift()
+        {
+            var lift = GetComponent<HandCardLift>();
+            if (lift == null)
+            {
+                return;
+            }
+
+            lift.PauseForInspect();
+        }
+
+        private void ResumeHandLift()
+        {
+            var lift = GetComponent<HandCardLift>();
+            if (lift == null)
+            {
+                return;
+            }
+
+            lift.ResumeAfterInspect();
         }
 
         private static bool UseHoverInspect()
@@ -1869,6 +1887,7 @@ namespace DreamGate.Battlegrounds.UI
 
             root.transform.SetAsLastSibling();
             root.SetActive(true);
+            cardRect.localScale = Vector3.one * 0.9f;
             RestartAnimation(true);
         }
 
@@ -2305,6 +2324,7 @@ namespace DreamGate.Battlegrounds.UI
             if (handLift != null)
             {
                 handLift.enabled = true;
+                handLift.ResetLift();
             }
 
             ui.ForceRefreshHand();
@@ -2352,14 +2372,16 @@ namespace DreamGate.Battlegrounds.UI
     public class HandCardLift : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         private static readonly Vector2 LiftOffset = new(0f, 42f * 1.2f);
+        private static readonly Vector3 NominalScale = Vector3.one;
         private const float LiftScale = 1.28f;
         private const float HoverDelay = 0.24f;
 
         private RectTransform rect;
         private Vector2 basePosition;
-        private Vector3 baseScale;
+        private Vector3 baseScale = NominalScale;
         private bool initialized;
         private bool hoverEligible;
+        private bool pausedForInspect;
         private float hoverTimer;
         private static HandCardLift activeLift;
 
@@ -2375,6 +2397,11 @@ namespace DreamGate.Battlegrounds.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            if (pausedForInspect)
+            {
+                return;
+            }
+
             if (!initialized)
             {
                 CacheBase();
@@ -2395,9 +2422,25 @@ namespace DreamGate.Battlegrounds.UI
             }
         }
 
+        public void PauseForInspect()
+        {
+            pausedForInspect = true;
+            hoverEligible = false;
+            hoverTimer = 0f;
+            ResetLift();
+            enabled = false;
+        }
+
+        public void ResumeAfterInspect()
+        {
+            pausedForInspect = false;
+            enabled = true;
+            ResetLift();
+        }
+
         private void Update()
         {
-            if (!hoverEligible || activeLift == this)
+            if (pausedForInspect || !hoverEligible || activeLift == this)
             {
                 return;
             }
@@ -2415,7 +2458,7 @@ namespace DreamGate.Battlegrounds.UI
 
             activeLift = this;
             rect.anchoredPosition = basePosition + LiftOffset;
-            rect.localScale = baseScale * LiftScale;
+            rect.localScale = NominalScale * LiftScale;
             transform.SetAsLastSibling();
         }
 
@@ -2429,14 +2472,25 @@ namespace DreamGate.Battlegrounds.UI
 
         private void CacheBase()
         {
-            basePosition = rect.anchoredPosition;
-            baseScale = rect.localScale;
+            if (activeLift != this && rect.localScale.x <= NominalScale.x * 1.01f)
+            {
+                basePosition = rect.anchoredPosition;
+            }
+
+            baseScale = NominalScale;
             initialized = true;
         }
 
         public void RecacheBase()
         {
-            CacheBase();
+            if (activeLift == this || rect.localScale.x > NominalScale.x * 1.01f)
+            {
+                return;
+            }
+
+            basePosition = rect.anchoredPosition;
+            baseScale = NominalScale;
+            initialized = true;
         }
 
         public void ResetLift()
@@ -2447,7 +2501,8 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             rect.anchoredPosition = basePosition;
-            rect.localScale = baseScale;
+            rect.localScale = NominalScale;
+            baseScale = NominalScale;
             if (activeLift == this)
             {
                 activeLift = null;

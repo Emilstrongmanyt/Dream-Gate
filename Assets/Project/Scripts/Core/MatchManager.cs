@@ -78,6 +78,7 @@ namespace DreamGate.Battlegrounds.Core
         private int humanPlayerId;
         private int lastCombatOpponentId = -1;
         private int nextPlacement = MatchConfig.MaxPlayers;
+        private int lastRecruitTimerDisplay = -1;
 
         public void Initialize(int humanId = 0)
         {
@@ -149,7 +150,12 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             RecruitTimeRemaining -= deltaTime;
-            StateChanged?.Invoke();
+            var timerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
+            if (timerDisplay != lastRecruitTimerDisplay)
+            {
+                lastRecruitTimerDisplay = timerDisplay;
+                StateChanged?.Invoke();
+            }
 
             if (RecruitTimeRemaining <= 0f)
             {
@@ -309,6 +315,7 @@ namespace DreamGate.Battlegrounds.Core
         {
             Phase = MatchPhase.Recruit;
             RecruitTimeRemaining = MatchConfig.GetRecruitDurationForTurn(Turn);
+            lastRecruitTimerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
             humanPlayer.gold = MatchConfig.GetGoldIncomeForTurn(Turn);
             ShopSystem.RefreshShop(humanPlayer, matchRandom.Next());
 
