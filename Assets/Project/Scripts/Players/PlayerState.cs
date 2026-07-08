@@ -25,6 +25,7 @@ namespace DreamGate.Battlegrounds.Players
         public MinionInstance[] board = new MinionInstance[MatchConfig.BoardSize];
         public List<MinionInstance> hand = new();
         public List<string> shopCardIds = new();
+        public bool doomNextCombat;
 
         public List<MinionInstance> GetLivingBoard()
         {

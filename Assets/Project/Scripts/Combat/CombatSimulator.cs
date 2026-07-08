@@ -19,6 +19,12 @@ namespace DreamGate.Battlegrounds.Combat
             var attackerBoard = result.attackerSnapshot.board;
             var defenderBoard = result.defenderSnapshot.board;
 
+            if (attacker.doomNextCombat)
+            {
+                ApplyDoomTransform(defenderBoard, random, result);
+                attacker.doomNextCombat = false;
+            }
+
             result.combatEvents.Add(new CombatEvent
             {
                 type = CombatEventType.Start,
@@ -181,15 +187,17 @@ namespace DreamGate.Battlegrounds.Combat
                 damageAmount = striker.attack
             });
 
-            target.health -= striker.attack;
+            var damageDealt = AbilitySystem.ApplyDamage(target, striker.attack, result.combatLog, result.combatEvents, targetIndex, targetIsAttackerSide);
 
-            if (target.health > 0)
+            if (target.health > 0 && damageDealt > 0)
             {
                 AbilitySystem.OnMinionDamaged(
                     target,
                     targetIndex,
                     defendingBoard,
                     targetIsAttackerSide,
+                    damageDealt,
+                    random,
                     result.combatLog,
                     result.combatEvents);
             }
@@ -212,7 +220,7 @@ namespace DreamGate.Battlegrounds.Combat
             var recoilDamage = target.attack;
             if (recoilDamage > 0 && IsLiving(striker))
             {
-                striker.health -= recoilDamage;
+                var recoilDealt = AbilitySystem.ApplyDamage(striker, recoilDamage, result.combatLog, result.combatEvents, strikerIndex, strikerIsAttackerSide);
                 var recoilMessage =
                     $"{GetName(striker)} takes {recoilDamage} recoil from {GetName(target)}.";
                 result.combatLog.Add(recoilMessage);
@@ -227,13 +235,15 @@ namespace DreamGate.Battlegrounds.Combat
                     damageAmount = recoilDamage
                 });
 
-                if (striker.health > 0)
+                if (striker.health > 0 && recoilDealt > 0)
                 {
                     AbilitySystem.OnMinionDamaged(
                         striker,
                         strikerIndex,
                         strikingBoard,
                         strikerIsAttackerSide,
+                        recoilDealt,
+                        random,
                         result.combatLog,
                         result.combatEvents);
                 }
@@ -271,7 +281,7 @@ namespace DreamGate.Battlegrounds.Combat
                     continue;
                 }
 
-                target.health -= striker.attack;
+                var cleaveDamage = AbilitySystem.ApplyDamage(target, striker.attack, result.combatLog, result.combatEvents, index, targetIsAttackerSide);
                 var message = $"{GetName(striker)} cleaves {GetName(target)} for {striker.attack}.";
                 result.combatLog.Add(message);
                 result.combatEvents.Add(new CombatEvent
@@ -285,13 +295,15 @@ namespace DreamGate.Battlegrounds.Combat
                     damageAmount = striker.attack
                 });
 
-                if (target.health > 0)
+                if (target.health > 0 && cleaveDamage > 0)
                 {
                     AbilitySystem.OnMinionDamaged(
                         target,
                         index,
                         defendingBoard,
                         targetIsAttackerSide,
+                        cleaveDamage,
+                        random,
                         result.combatLog,
                         result.combatEvents);
                 }
@@ -421,6 +433,43 @@ namespace DreamGate.Battlegrounds.Combat
                     board[i] = null;
                 }
             }
+        }
+
+        private static void ApplyDoomTransform(MinionInstance[] defenderBoard, System.Random random, CombatResult result)
+        {
+            var living = new List<int>();
+            for (var i = 0; i < defenderBoard.Length; i++)
+            {
+                if (IsLiving(defenderBoard[i]))
+                {
+                    living.Add(i);
+                }
+            }
+
+            if (living.Count == 0)
+            {
+                return;
+            }
+
+            var slot = living[random.Next(living.Count)];
+            var snailDefinition = CardRegistry.Get("snail");
+            if (snailDefinition == null)
+            {
+                return;
+            }
+
+            var doomed = MinionInstance.FromDefinition(snailDefinition);
+            defenderBoard[slot] = doomed;
+            var message = $"Doom transformed an enemy minion into {snailDefinition.displayName} ({doomed.attack}/{doomed.health}).";
+            result.combatLog.Add(message);
+            result.combatEvents.Add(new CombatEvent
+            {
+                type = CombatEventType.Start,
+                message = message,
+                boardIndex = slot,
+                isAttackerBoard = false,
+                abilityCardId = snailDefinition.cardId
+            });
         }
 
         private static string GetName(MinionInstance minion)

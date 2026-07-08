@@ -53,6 +53,7 @@ namespace DreamGate.Battlegrounds.UI
         private Button speedButton;
         private TextMeshProUGUI speedLabelText;
         private Button playAgainButton;
+        private int pendingSpellHandIndex = -1;
         private readonly StringBuilder logBuilder = new();
         private Action<float> onCombatSpeedChanged;
         private int speedIndex;
@@ -525,6 +526,11 @@ namespace DreamGate.Battlegrounds.UI
                 yield break;
             }
 
+            if (combatEvent.damageAmount > 0 && !combatEvent.isCleave)
+            {
+                GameSfxPlayer.PlayHit();
+            }
+
             var striker = GetCombatMinion(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
             if (striker == null || striker.isDead)
             {
@@ -959,17 +965,31 @@ namespace DreamGate.Battlegrounds.UI
 
         private void RefreshHand(PlayerState player)
         {
-            for (var i = 0; i < handSlots.Count; i++)
+            for (var visualSlot = 0; visualSlot < handSlots.Count; visualSlot++)
             {
-                if (i >= player.hand.Count)
+                var handIndex = HandLayout.GetHandIndexForVisualSlot(visualSlot, player.hand.Count);
+                if (handIndex < 0)
                 {
-                    handSlots[i].SetEmpty(string.Empty, false);
+                    handSlots[visualSlot].SetEmpty(string.Empty, false);
                     continue;
                 }
 
-                var minion = player.hand[i];
+                var minion = player.hand[handIndex];
                 var card = CardRegistry.Get(minion.cardId);
-                handSlots[i].SetMinionCard(card, minion, CardSlotDisplayMode.Hand, matchManager.Phase == MatchPhase.Recruit);
+                handSlots[visualSlot].SetMinionCard(card, minion, CardSlotDisplayMode.Hand, matchManager.Phase == MatchPhase.Recruit);
+
+                var dragHandler = handSlots[visualSlot].RootRect.GetComponent<HandCardDragHandler>();
+                if (dragHandler != null)
+                {
+                    dragHandler.Configure(handIndex, visualSlot, this);
+                }
+
+                var handLift = handSlots[visualSlot].RootRect.GetComponent<HandCardLift>();
+                if (handLift != null)
+                {
+                    handLift.RecacheBase();
+                    handLift.ResetLift();
+                }
             }
         }
 
@@ -981,6 +1001,14 @@ namespace DreamGate.Battlegrounds.UI
 
         private void OnBoardClicked(int index)
         {
+            if (pendingSpellHandIndex >= 0)
+            {
+                matchManager.TryCastSpellFromHand(pendingSpellHandIndex, index, out var castMessage);
+                pendingSpellHandIndex = -1;
+                AppendLog(castMessage);
+                return;
+            }
+
             matchManager.TrySellFromBoard(index, out var message);
             AppendLog(message);
         }
@@ -999,23 +1027,36 @@ namespace DreamGate.Battlegrounds.UI
         internal int GetBoardDropSlotIndex(Vector2 screenPosition, Camera eventCamera, bool requireEmpty = false)
         {
             var player = matchManager?.GetHumanPlayer();
+            var bestIndex = -1;
+            var bestDistance = float.MaxValue;
+
             for (var i = 0; i < boardSlots.Count; i++)
             {
-                if (RectTransformUtility.RectangleContainsScreenPoint(boardSlots[i].RootRect, screenPosition, eventCamera))
+                if (requireEmpty && player != null && player.board[i] != null)
                 {
-                    if (requireEmpty && player != null && player.board[i] != null)
-                    {
-                        return -1;
-                    }
+                    continue;
+                }
 
+                var slotRect = boardSlots[i].RootRect;
+                if (RectTransformUtility.RectangleContainsScreenPoint(slotRect, screenPosition, eventCamera))
+                {
                     return i;
+                }
+
+                var screenPoint = RectTransformUtility.WorldToScreenPoint(eventCamera, slotRect.position);
+                var distance = Vector2.Distance(screenPosition, screenPoint);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestIndex = i;
                 }
             }
 
-            return -1;
+            const float maxDropDistance = 220f;
+            return bestDistance <= maxDropDistance ? bestIndex : -1;
         }
 
-        internal bool CanDragHandSlot(int index)
+        internal bool CanDragHandSlot(int handIndex)
         {
             if (matchManager == null || matchManager.Phase != MatchPhase.Recruit)
             {
@@ -1023,7 +1064,13 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             var player = matchManager.GetHumanPlayer();
-            return player != null && index >= 0 && index < player.hand.Count && !player.BoardFull;
+            if (player == null || handIndex < 0 || handIndex >= player.hand.Count || player.BoardFull)
+            {
+                return false;
+            }
+
+            var definition = CardRegistry.Get(player.hand[handIndex].cardId);
+            return definition == null || definition.cardKind != CardKind.Spell;
         }
 
         internal void TryPlayHandToBoard(int handIndex, int boardIndex)
@@ -1032,6 +1079,15 @@ namespace DreamGate.Battlegrounds.UI
             if (!string.IsNullOrEmpty(message))
             {
                 AppendLog(message);
+            }
+        }
+
+        internal void ForceRefreshHand()
+        {
+            var player = matchManager?.GetHumanPlayer();
+            if (player != null)
+            {
+                RefreshHand(player);
             }
         }
 
@@ -1049,9 +1105,35 @@ namespace DreamGate.Battlegrounds.UI
             return recruitPanel != null ? recruitPanel.transform : transform;
         }
 
-        private void OnHandClicked(int index)
+        private void OnHandClicked(int visualSlotIndex)
         {
-            matchManager.TryPlayFromHand(index, out var message);
+            var player = matchManager.GetHumanPlayer();
+            var handIndex = HandLayout.GetHandIndexForVisualSlot(visualSlotIndex, player.hand.Count);
+            if (handIndex < 0)
+            {
+                return;
+            }
+
+            var definition = CardRegistry.Get(player.hand[handIndex].cardId);
+            if (definition != null && definition.cardKind == CardKind.Spell)
+            {
+                if (!SpellSystem.RequiresBoardTarget(definition.spellEffect))
+                {
+                    pendingSpellHandIndex = -1;
+                    matchManager.TryCastSpellFromHand(handIndex, -1, out var castMessage);
+                    AppendLog(castMessage);
+                }
+                else
+                {
+                    pendingSpellHandIndex = handIndex;
+                    AppendLog($"Select a friendly minion for {definition.displayName}.");
+                }
+
+                return;
+            }
+
+            pendingSpellHandIndex = -1;
+            matchManager.TryPlayFromHand(handIndex, out var message);
             AppendLog(message);
         }
 
@@ -1222,7 +1304,7 @@ namespace DreamGate.Battlegrounds.UI
                 else if (mode == CardSlotDisplayMode.Hand)
                 {
                     var handDragHandler = slot.RootRect.GetComponent<HandCardDragHandler>();
-                    handDragHandler.Configure(index, this);
+                    handDragHandler.Configure(-1, index, this);
                 }
 
                 slots.Add(slot);
@@ -1392,11 +1474,11 @@ namespace DreamGate.Battlegrounds.UI
             rect.sizeDelta = new Vector2(52f, 34f);
 
             var text = go.GetComponent<TextMeshProUGUI>();
-            text.fontSize = 18;
+            text.fontSize = 24;
             text.fontStyle = FontStyles.Bold;
             text.alignment = align;
             text.color = Color.white;
-            text.outlineWidth = 0.2f;
+            text.outlineWidth = 0.35f;
             text.outlineColor = Color.black;
             text.gameObject.SetActive(false);
             return text;
@@ -2077,7 +2159,6 @@ namespace DreamGate.Battlegrounds.UI
     public class HandCardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         private const float DragScale = 1.08f;
-        private const float DragAlpha = 0.72f;
         private const float DragSuppressDistance = 12f;
 
         private PracticeGameUI ui;
@@ -2091,12 +2172,14 @@ namespace DreamGate.Battlegrounds.UI
         private Vector2 dragOffset;
         private Vector3 baseScale;
         private int originalSiblingIndex;
-        private int slotIndex;
+        private int handIndex;
+        private int visualSlotIndex;
         private bool dragging;
 
-        public void Configure(int index, PracticeGameUI owner)
+        public void Configure(int listIndex, int visualIndex, PracticeGameUI owner)
         {
-            slotIndex = index;
+            handIndex = listIndex;
+            visualSlotIndex = visualIndex;
             ui = owner;
             inspectHandler = GetComponent<CardInspectHandler>();
             handLift = GetComponent<HandCardLift>();
@@ -2113,7 +2196,7 @@ namespace DreamGate.Battlegrounds.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
-            if (ui == null || !ui.CanDragHandSlot(slotIndex))
+            if (ui == null || !ui.CanDragHandSlot(handIndex))
             {
                 return;
             }
@@ -2130,13 +2213,15 @@ namespace DreamGate.Battlegrounds.UI
             basePosition = rect.anchoredPosition;
             baseScale = rect.localScale;
 
-            rect.SetParent(dragLayer, true);
+            rect.SetParent(dragLayer, false);
+            rect.SetAsLastSibling();
             rect.localScale = baseScale * DragScale;
-            canvasGroup.alpha = DragAlpha;
+            canvasGroup.alpha = 1f;
             canvasGroup.blocksRaycasts = false;
 
+            var dragLayerRect = dragLayer as RectTransform;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    rect,
+                    dragLayerRect,
                     eventData.position,
                     eventData.pressEventCamera,
                     out var localPoint))
@@ -2170,28 +2255,60 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             dragging = false;
-            if (handLift != null)
-            {
-                handLift.enabled = true;
-            }
-
-            var draggedDistance = Vector2.Distance(basePosition, rect.anchoredPosition);
+            var draggedDistance = Vector2.Distance(eventData.pressPosition, eventData.position);
+            var played = false;
             if (draggedDistance >= DragSuppressDistance)
             {
                 inspectHandler?.SuppressNextClick();
                 var dropIndex = ui.GetBoardDropSlotIndex(eventData.position, eventData.pressEventCamera, requireEmpty: true);
                 if (dropIndex >= 0)
                 {
-                    ui.TryPlayHandToBoard(slotIndex, dropIndex);
+                    ui.TryPlayHandToBoard(handIndex, dropIndex);
+                    played = true;
                 }
             }
 
             rect.SetParent(originalParent, false);
             rect.SetSiblingIndex(originalSiblingIndex);
-            rect.anchoredPosition = basePosition;
             rect.localScale = baseScale;
             canvasGroup.alpha = 1f;
             canvasGroup.blocksRaycasts = true;
+
+            if (handLift != null)
+            {
+                handLift.enabled = true;
+            }
+
+            ui.ForceRefreshHand();
+        }
+
+        private void OnDisable()
+        {
+            if (!dragging || rect == null)
+            {
+                return;
+            }
+
+            dragging = false;
+            if (originalParent != null)
+            {
+                rect.SetParent(originalParent, false);
+                rect.SetSiblingIndex(originalSiblingIndex);
+                rect.anchoredPosition = basePosition;
+                rect.localScale = baseScale;
+            }
+
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 1f;
+                canvasGroup.blocksRaycasts = true;
+            }
+
+            if (handLift != null)
+            {
+                handLift.enabled = true;
+                handLift.ResetLift();
+            }
         }
 
         private void CacheBase()
@@ -2289,8 +2406,18 @@ namespace DreamGate.Battlegrounds.UI
             initialized = true;
         }
 
-        private void ResetLift()
+        public void RecacheBase()
         {
+            CacheBase();
+        }
+
+        public void ResetLift()
+        {
+            if (!initialized)
+            {
+                CacheBase();
+            }
+
             rect.anchoredPosition = basePosition;
             rect.localScale = baseScale;
             if (activeLift == this)

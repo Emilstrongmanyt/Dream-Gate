@@ -53,6 +53,13 @@ namespace DreamGate.Battlegrounds.Economy
 
             var minion = MinionInstance.FromDefinition(definition);
             player.hand.Add(minion);
+            GameSfxPlayer.PlayBuyCard();
+
+            if (definition.cardKind == CardKind.Spell)
+            {
+                message = $"Purchased {definition.displayName}.";
+                return true;
+            }
 
             var triple = TripleSystem.TryCombine(player, cardId);
             if (triple.triggered)
@@ -85,6 +92,7 @@ namespace DreamGate.Battlegrounds.Economy
 
             player.board[boardIndex] = null;
             player.gold += MatchConfig.SellValue;
+            GameSfxPlayer.PlaySellCard();
             message = $"Sold minion (+{MatchConfig.SellValue} gold).";
             return true;
         }
@@ -122,6 +130,7 @@ namespace DreamGate.Battlegrounds.Economy
             player.gold -= MatchConfig.TavernUpgradeCost;
             player.tavernTier++;
             RefreshShop(player);
+            GameSfxPlayer.PlayTierUp();
             message = $"Tavern upgraded to tier {player.tavernTier}.";
             return true;
         }
@@ -193,10 +202,18 @@ namespace DreamGate.Battlegrounds.Economy
             }
 
             var minion = player.hand[handIndex];
+            var definition = CardRegistry.Get(minion.cardId);
+            if (definition != null && definition.cardKind == CardKind.Spell)
+            {
+                message = "Spells must be cast by tapping and selecting a target.";
+                return false;
+            }
+
             player.hand.RemoveAt(handIndex);
             player.board[boardIndex] = minion;
-            AbilitySystem.OnBattlecry(minion, boardIndex, player.board);
-            message = "Minion played to board.";
+            var battlecryMessage = AbilitySystem.OnBattlecry(minion, boardIndex, player);
+            GameSfxPlayer.PlayDropCard();
+            message = string.IsNullOrEmpty(battlecryMessage) ? "Minion played to board." : battlecryMessage;
             return true;
         }
     }

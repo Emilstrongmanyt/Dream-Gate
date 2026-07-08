@@ -97,7 +97,14 @@ namespace DreamGate.Battlegrounds.UI
             var cardKey = $"shop:{card.cardId}";
             ApplyArt(card, cardKey);
             StatsText.gameObject.SetActive(false);
-            SetStatOverlays(card.attack, card.health);
+            if (card.cardKind == CardKind.Spell)
+            {
+                HideStatOverlays();
+            }
+            else
+            {
+                SetStatOverlays(card.attack, card.health);
+            }
             SetTransparentFrame();
             IdleMotion?.SetActiveMotion(false);
             Button.interactable = interactable;
@@ -117,7 +124,15 @@ namespace DreamGate.Battlegrounds.UI
 
             ApplyArt(card, cardKey);
             StatsText.gameObject.SetActive(false);
-            SetStatOverlays(minion.attack, minion.health);
+            if (card != null && card.cardKind == CardKind.Spell)
+            {
+                HideStatOverlays();
+            }
+            else
+            {
+                SetStatOverlays(minion.attack, minion.health);
+            }
+
             SetTransparentFrame();
 
             if (IdleMotion != null)
@@ -251,7 +266,9 @@ namespace DreamGate.Battlegrounds.UI
         {
             var name = card != null ? card.displayName : minion.cardId;
             var prefix = minion.isGolden ? "★ Golden " : string.Empty;
-            var action = mode == CardSlotDisplayMode.Hand
+            var action = card != null && card.cardKind == CardKind.Spell
+                ? "Tap to cast this spell."
+                : mode == CardSlotDisplayMode.Hand
                 ? "Tap to play from hand."
                 : mode == CardSlotDisplayMode.Board
                     ? "Drag to rearrange. Tap to sell for 1 gold."
@@ -289,12 +306,20 @@ namespace DreamGate.Battlegrounds.UI
             return card.abilityType switch
             {
                 AbilityType.Taunt => "Taunt",
+                AbilityType.DivineShield => "Divine Shield",
                 AbilityType.Cleave => "Cleave",
                 AbilityType.DeathrattleSummon => "Deathrattle: Summon",
                 AbilityType.StartOfCombatBuffSelf => "Start of Combat: Buff self",
                 AbilityType.OnDamageSummonCopy => "After damage: Summon a copy",
                 AbilityType.OnDamageTransform => "After damage: Transform",
                 AbilityType.Battlecry => "Battlecry",
+                AbilityType.BattlecryDamageHero => "Battlecry",
+                AbilityType.BattlecryBuffTribe => "Battlecry",
+                AbilityType.BattlecryBuffOtherTribeHealth => "Battlecry",
+                AbilityType.BattlecryBuffTribeAttack => "Battlecry",
+                AbilityType.DeathrattleBuffAllAttack => "Deathrattle",
+                AbilityType.OnDamageSummonCopyChance => "When damaged",
+                AbilityType.OnDamageDodge => "When damaged",
                 AbilityType.Windfury => "Windfury",
                 AbilityType.MegaWindfury => "Mega-Windfury",
                 _ => string.Empty

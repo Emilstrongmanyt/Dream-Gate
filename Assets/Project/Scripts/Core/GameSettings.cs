@@ -41,6 +41,7 @@ namespace DreamGate.Battlegrounds.Core
         public static void ApplyAudio()
         {
             AudioListener.volume = 1f;
+            GameSfxPlayer.EnsureInitialized();
             GameMusicPlayer.ApplyVolume();
         }
     }

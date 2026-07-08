@@ -17,6 +17,7 @@ public class HomeMenuController : MonoBehaviour
     private void Start()
     {
         GameSettings.ApplyAudio();
+        GameMusicPlayer.PlayMenuMusic();
         UiCanvasSetup.ApplyToScene();
         DreamGateServices.Initialize();
         pageRoot = EnsureUiRoot();

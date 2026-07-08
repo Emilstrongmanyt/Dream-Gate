@@ -24,7 +24,8 @@ namespace DreamGate.Battlegrounds.Core
         {
             var canvas = EnsureCanvas();
             CreateFullScreenBackground(canvas);
-            GameMusicPlayer.EnsurePlaying();
+            var musicMode = MatchSessionContext.Mode;
+            GameMusicPlayer.StartMatchMusic(musicMode);
             if (hideBackgroundDuringUi)
             {
                 HideLegacyBackground();

@@ -49,10 +49,19 @@ namespace DreamGate.Battlegrounds.Economy
                 ? MinionInstance.FromDefinition(rewardDefinition, golden: true)
                 : new MinionInstance { cardId = cardId };
 
-            golden.attack = totalAttack;
-            golden.health = totalHealth;
-            golden.maxHealth = totalHealth;
             golden.isGolden = true;
+            if (rewardDefinition != null && rewardDefinition.cardId != cardId)
+            {
+                golden.attack = rewardDefinition.attack;
+                golden.health = rewardDefinition.health;
+                golden.maxHealth = rewardDefinition.health;
+            }
+            else
+            {
+                golden.attack = totalAttack;
+                golden.health = totalHealth;
+                golden.maxHealth = totalHealth;
+            }
 
             if (!player.HandFull)
             {

@@ -8,8 +8,16 @@ namespace DreamGate.Battlegrounds.Cards
         OnDamageSummonCopy,
         OnDamageTransform,
         Taunt,
+        DivineShield,
         Cleave,
         Battlecry,
+        BattlecryDamageHero,
+        BattlecryBuffTribe,
+        BattlecryBuffOtherTribeHealth,
+        BattlecryBuffTribeAttack,
+        DeathrattleBuffAllAttack,
+        OnDamageSummonCopyChance,
+        OnDamageDodge,
         Windfury,
         MegaWindfury
     }

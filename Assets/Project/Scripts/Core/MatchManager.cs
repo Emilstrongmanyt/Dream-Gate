@@ -165,6 +165,7 @@ namespace DreamGate.Battlegrounds.Core
             {
                 Post(message);
                 StateChanged?.Invoke();
+                GameMusicPlayer.UpdateMatchMusic(GetAlivePlayerCount());
             }
 
             return success;
@@ -215,6 +216,20 @@ namespace DreamGate.Battlegrounds.Core
             var success = ShopSystem.TryPlayFromHandToSlot(humanPlayer, handIndex, boardIndex, out message);
             if (success)
             {
+                Post(message);
+                StateChanged?.Invoke();
+            }
+
+            return success;
+        }
+
+        public bool TryCastSpellFromHand(int handIndex, int targetBoardIndex, out string message)
+        {
+            EnsureRecruitPhase();
+            var success = SpellSystem.TryCast(humanPlayer, handIndex, targetBoardIndex, out message);
+            if (success)
+            {
+                GameSfxPlayer.PlayDropCard();
                 Post(message);
                 StateChanged?.Invoke();
             }
@@ -304,6 +319,7 @@ namespace DreamGate.Battlegrounds.Core
 
             Post($"Turn {Turn} | {humanPlayer.heroName} | Gold: {humanPlayer.gold} | Tavern {humanPlayer.tavernTier} | Timer: {Mathf.CeilToInt(RecruitTimeRemaining)}s");
             Post(GetLeaderboardSummary());
+            GameMusicPlayer.UpdateMatchMusic(GetAlivePlayerCount());
             StateChanged?.Invoke();
         }
 
@@ -391,6 +407,12 @@ namespace DreamGate.Battlegrounds.Core
             player.placement = nextPlacement--;
             eliminationOrder.Add(player.displayName);
             Post($"{player.heroName} eliminated! Place: #{player.placement}");
+            if (player.isHuman)
+            {
+                GameSfxPlayer.PlayFailed();
+            }
+
+            GameMusicPlayer.UpdateMatchMusic(GetAlivePlayerCount());
         }
 
         private void AdvanceTurnOrEndMatch()
@@ -432,6 +454,16 @@ namespace DreamGate.Battlegrounds.Core
             Post(playerWon
                 ? $"Victory! {humanPlayer.heroName} wins!"
                 : $"Defeat. {humanPlayer.heroName} finished #{humanPlayer.placement}.");
+            if (playerWon)
+            {
+                GameSfxPlayer.PlayVictory();
+                GameMusicPlayer.UpdateMatchMusic(GetAlivePlayerCount(), playerWon: true);
+            }
+            else
+            {
+                GameSfxPlayer.PlayFailed();
+            }
+
             MatchEnded?.Invoke();
             StateChanged?.Invoke();
         }

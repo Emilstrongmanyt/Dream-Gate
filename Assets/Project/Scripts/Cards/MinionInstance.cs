@@ -12,6 +12,8 @@ namespace DreamGate.Battlegrounds.Cards
         public int maxHealth;
         public bool isGolden;
         public bool isDead;
+        public bool hasDivineShield;
+        public bool divineShieldGranted;
 
         public MinionInstance Clone()
         {
@@ -23,7 +25,9 @@ namespace DreamGate.Battlegrounds.Cards
                 health = health,
                 maxHealth = maxHealth,
                 isGolden = isGolden,
-                isDead = isDead
+                isDead = isDead,
+                hasDivineShield = hasDivineShield,
+                divineShieldGranted = divineShieldGranted
             };
         }
 
