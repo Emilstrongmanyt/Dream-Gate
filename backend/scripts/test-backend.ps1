@@ -30,13 +30,27 @@ catch {
 }
 
 if ($SupabaseUrl -and $AnonKey) {
+    $envValues = Read-BackendEnv
+    $testKey = $envValues["SUPABASE_SERVICE_ROLE_KEY"]
+    if ([string]::IsNullOrWhiteSpace($testKey)) {
+        $testKey = $AnonKey
+    }
+
     try {
-        $headers = @{ apikey = $AnonKey; Authorization = "Bearer $AnonKey" }
-        $rest = Invoke-WebRequest -Uri "$SupabaseUrl/rest/v1/" -Headers $headers -TimeoutSec 10
+        $headers = @{ apikey = $testKey; Authorization = "Bearer $testKey" }
+        $rest = Invoke-WebRequest -Uri "$SupabaseUrl/rest/v1/" -Headers $headers -TimeoutSec 10 -UseBasicParsing
         Write-Host "[OK] Supabase REST reachable (status $($rest.StatusCode))"
     }
     catch {
         Write-Host "[FAIL] Supabase REST - $($_.Exception.Message)"
+    }
+
+    try {
+        $auth = Invoke-RestMethod -Uri "$SupabaseUrl/auth/v1/health" -Headers @{ apikey = $AnonKey } -TimeoutSec 10
+        Write-Host "[OK] Supabase Auth: $($auth.name) $($auth.version)"
+    }
+    catch {
+        Write-Host "[FAIL] Supabase Auth - $($_.Exception.Message)"
     }
 }
 else {

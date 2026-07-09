@@ -36,7 +36,7 @@ function Write-DotEnv([hashtable]$values, [string]$path) {
         "SUPABASE_SERVICE_ROLE_KEY=$($values.SUPABASE_SERVICE_ROLE_KEY)"
         "MATCH_SERVER_URL=$($values.MATCH_SERVER_URL)"
         "PROJECT_REF=$($values.PROJECT_REF)"
-    ) | Set-Content -Path $path -Encoding UTF8
+    ) -join "`n" | Out-File -FilePath $path -Encoding ascii
 }
 
 function Update-BackendSettingsAsset(

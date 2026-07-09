@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f4c8e2a91b34d6e9c0f1a2b3c4d5e6f, type: 3}
   m_Name: BackendSettings
   m_EditorClassIdentifier: DreamGate.Battlegrounds.Services.Backend::DreamGate.Battlegrounds.Services.Backend.BackendSettings
-  useCloudBackend: 0
-  supabaseUrl: 
-  supabaseAnonKey: 
+  useCloudBackend: 1
+  supabaseUrl: https://hekknzzbudmkwxtzxkdi.supabase.co
+  supabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhla2tuenpidWRta3d4dHp4a2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NDgxMTUsImV4cCI6MjA5OTEyNDExNX0.Ahxxv2De9RfeTwhJWARCbyv0HoUc7R1bx6Jv662oraI
   matchmakingFunctionUrl: 
   applyMatchResultFunctionUrl: 
   matchServerWebSocketUrl: http://66.94.102.236:8787

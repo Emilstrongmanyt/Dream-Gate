@@ -16,7 +16,7 @@ $healthUrl = "http://localhost:$Port/health"
 
 try {
     $existing = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 2
-    Write-Host "[OK] Match server already listening on port $Port: $($existing | ConvertTo-Json -Compress)"
+    Write-Host "[OK] Match server already listening on port ${Port}: $($existing | ConvertTo-Json -Compress)"
     exit 0
 }
 catch {
