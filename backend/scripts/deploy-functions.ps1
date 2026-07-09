@@ -1,8 +1,10 @@
+. "$PSScriptRoot\_common.ps1"
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $PSScriptRoot
+Import-BackendCli
+$root = Get-BackendRoot
 
 if (-not (Get-Command supabase -ErrorAction SilentlyContinue)) {
-    Write-Error "Supabase CLI is not installed."
+    Write-Error "Supabase CLI is not installed. Run .\scripts\install-supabase-cli.ps1"
 }
 
 if (-not (Test-Path "$root\.env")) {

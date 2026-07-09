@@ -4,22 +4,17 @@ param(
     [string]$AnonKey
 )
 
+. "$PSScriptRoot\_common.ps1"
 $ErrorActionPreference = "Continue"
-$root = Split-Path -Parent $PSScriptRoot
-$envFile = Join-Path $root ".env"
-
-if (Test-Path $envFile) {
-    Get-Content $envFile | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
-            $name = $matches[1].Trim()
-            $value = $matches[2].Trim()
-            switch ($name) {
-                "MATCH_SERVER_URL" { if (-not $MatchServerUrl) { $MatchServerUrl = $value } }
-                "SUPABASE_URL" { if (-not $SupabaseUrl) { $SupabaseUrl = $value } }
-                "SUPABASE_ANON_KEY" { if (-not $AnonKey) { $AnonKey = $value } }
-            }
-        }
-    }
+$envValues = Read-BackendEnv
+if ($envValues.ContainsKey("MATCH_SERVER_URL") -and -not $PSBoundParameters.ContainsKey("MatchServerUrl")) {
+    $MatchServerUrl = $envValues["MATCH_SERVER_URL"]
+}
+if ($envValues.ContainsKey("SUPABASE_URL") -and -not $PSBoundParameters.ContainsKey("SupabaseUrl")) {
+    $SupabaseUrl = $envValues["SUPABASE_URL"]
+}
+if ($envValues.ContainsKey("SUPABASE_ANON_KEY") -and -not $PSBoundParameters.ContainsKey("AnonKey")) {
+    $AnonKey = $envValues["SUPABASE_ANON_KEY"]
 }
 
 Write-Host "Testing Dream Gate backend..."
