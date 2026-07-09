@@ -12,13 +12,22 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 }
 
 $env:PORT = "$Port"
+$healthUrl = "http://localhost:$Port/health"
+
+try {
+    $existing = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 2
+    Write-Host "[OK] Match server already listening on port $Port: $($existing | ConvertTo-Json -Compress)"
+    exit 0
+}
+catch {
+    # not running; continue startup
+}
 
 Push-Location $project
 Write-Host "Building Dream Gate authoritative match server..."
 dotnet build -v q
 if ($LASTEXITCODE -ne 0) {
-    Pop-Location
-    exit $LASTEXITCODE
+    Write-Host "[WARN] Build failed (server may be running). Attempting to start existing binary..."
 }
 
 if ($Background) {
