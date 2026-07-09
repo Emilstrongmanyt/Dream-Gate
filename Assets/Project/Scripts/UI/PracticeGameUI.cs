@@ -58,6 +58,9 @@ namespace DreamGate.Battlegrounds.UI
         private bool humanCombatPlaybackActive;
         private readonly StringBuilder logBuilder = new();
         private const int RecruitCountdownStartSeconds = 20;
+        private const float RecruitActionButtonY = 610f;
+        private static readonly Vector2 RecruitRefreshButtonPos = new(250f, RecruitActionButtonY);
+        private static readonly Vector2 RecruitUpgradeButtonPos = new(-250f, RecruitActionButtonY);
         private static readonly Vector2 RecruitCompassCountdownCenter = new(0f, 0f);
         private const float CardScaleFactor = 1.2f;
         private static readonly Vector2 CardSlotSize = new(132f * CardScaleFactor, 168f * CardScaleFactor);
@@ -306,15 +309,39 @@ namespace DreamGate.Battlegrounds.UI
                 OnHandClicked,
                 showSectionLabel: false);
 
-            refreshShopButton = CreateSpriteButton(recruitPanel.transform, "RefreshButton", new Vector2(250, 610), new Vector2(180, 72), OnRefreshShopClicked);
-            upgradeButton = CreateSpriteButton(recruitPanel.transform, "TierUpgradeButton", new Vector2(-250, 560), new Vector2(180, 72), OnUpgradeClicked);
-            endTurnButton = CreateSpriteButton(recruitPanel.transform, "StartCombatButton", new Vector2(420, -620), new Vector2(180, 72), OnEndTurnClicked);
+            refreshShopButton = CreateSpriteButton(
+                recruitPanel.transform,
+                "RefreshButton",
+                RecruitRefreshButtonPos,
+                new Vector2(180, 72),
+                OnRefreshShopClicked,
+                emphasizeVisibility: true);
+            upgradeButton = CreateSpriteButton(
+                recruitPanel.transform,
+                "TierUpgradeButton",
+                RecruitUpgradeButtonPos,
+                new Vector2(180, 72),
+                OnUpgradeClicked,
+                emphasizeVisibility: true);
+            endTurnButton = CreateSpriteButton(
+                recruitPanel.transform,
+                "StartCombatButton",
+                new Vector2(420, -620),
+                new Vector2(180, 72),
+                OnEndTurnClicked,
+                emphasizeVisibility: true);
             if (matchManager.Mode == MatchMode.Rated)
             {
                 endTurnButton.gameObject.SetActive(false);
             }
 
-            menuButton = CreateSpriteButton(recruitPanel.transform, "BackButton", new Vector2(420, -760), new Vector2(180, 72), () => SceneNavigator.LoadMainMenu());
+            menuButton = CreateSpriteButton(
+                recruitPanel.transform,
+                "BackButton",
+                new Vector2(420, -760),
+                new Vector2(180, 72),
+                () => SceneNavigator.LoadMainMenu(),
+                emphasizeVisibility: true);
 
             BuildCombatPanel(root);
 
@@ -1083,8 +1110,8 @@ namespace DreamGate.Battlegrounds.UI
             text.fontStyle = FontStyles.Bold;
             text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
-            text.outlineWidth = 0.25f;
-            text.outlineColor = Color.black;
+            text.outlineWidth = 0.5f;
+            text.outlineColor = new Color(0.04f, 0.07f, 0.16f, 1f);
             text.text = string.Empty;
             go.SetActive(false);
             return text;
@@ -1594,7 +1621,8 @@ namespace DreamGate.Battlegrounds.UI
             string resourceName,
             Vector2 pos,
             Vector2 size,
-            UnityEngine.Events.UnityAction onClick)
+            UnityEngine.Events.UnityAction onClick,
+            bool emphasizeVisibility = false)
         {
             var sprite = Resources.Load<Sprite>(resourceName);
             var go = new GameObject(resourceName, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -1618,9 +1646,43 @@ namespace DreamGate.Battlegrounds.UI
                 image.color = new Color(0.15f, 0.2f, 0.35f, 0.92f);
             }
 
+            if (emphasizeVisibility)
+            {
+                ApplyRecruitButtonVisibilityFx(go.transform, sprite, image);
+            }
+
             var button = go.GetComponent<Button>();
             button.onClick.AddListener(onClick);
             return button;
+        }
+
+        private static void ApplyRecruitButtonVisibilityFx(Transform buttonTransform, Sprite sprite, Image buttonImage)
+        {
+            if (sprite != null)
+            {
+                var glowGo = new GameObject("Glow", typeof(RectTransform), typeof(Image));
+                glowGo.transform.SetParent(buttonTransform, false);
+                glowGo.transform.SetAsFirstSibling();
+
+                var glowRect = glowGo.GetComponent<RectTransform>();
+                glowRect.anchorMin = Vector2.zero;
+                glowRect.anchorMax = Vector2.one;
+                glowRect.offsetMin = new Vector2(-8f, -8f);
+                glowRect.offsetMax = new Vector2(8f, 8f);
+
+                var glowImage = glowGo.GetComponent<Image>();
+                glowImage.sprite = sprite;
+                glowImage.color = new Color(0.42f, 0.78f, 1f, 0.42f);
+                glowImage.raycastTarget = false;
+            }
+
+            var shadow = buttonImage.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.78f);
+            shadow.effectDistance = new Vector2(5f, -5f);
+
+            var outline = buttonImage.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0.95f, 0.98f, 1f, 0.92f);
+            outline.effectDistance = new Vector2(3f, 3f);
         }
 
         private static TextMeshProUGUI CreateButtonOverlayLabel(Transform parent, string label)
