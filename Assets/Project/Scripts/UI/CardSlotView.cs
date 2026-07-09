@@ -179,7 +179,7 @@ namespace DreamGate.Battlegrounds.UI
 
             CombatMotion?.ResetVisual();
             RootRect.localScale = Vector3.one;
-            inspectPayload = BuildMinionInspectPayload(card, minion, CardSlotDisplayMode.Board);
+            inspectPayload = BuildMinionInspectPayload(card, minion);
             InspectHandler?.SetInspectable(true);
         }
 
