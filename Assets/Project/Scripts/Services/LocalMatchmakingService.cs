@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using DreamGate.Battlegrounds.Services.Backend;
 using UnityEngine;
 
 namespace DreamGate.Battlegrounds.Services
@@ -116,7 +117,8 @@ namespace DreamGate.Battlegrounds.Services
                 humanCount = humansFound,
                 usedBotFill = true,
                 humanSlotIndex = 0,
-                slots = slots
+                slots = slots,
+                matchServerUrl = BackendSettings.Load()?.ResolvedMatchServerUrl
             };
 
             IsSearching = false;

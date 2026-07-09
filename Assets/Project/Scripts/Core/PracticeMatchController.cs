@@ -3,6 +3,7 @@ using DreamGate.Battlegrounds.Cards;
 using DreamGate.Battlegrounds.Combat;
 using DreamGate.Battlegrounds.Networking;
 using DreamGate.Battlegrounds.Services;
+using DreamGate.Battlegrounds.Services.Backend;
 using DreamGate.Battlegrounds.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -66,11 +67,16 @@ namespace DreamGate.Battlegrounds.Core
 
         private INetworkMatchHost CreateRatedNetworkHost()
         {
-            if (!string.IsNullOrWhiteSpace(MatchSessionContext.MatchServerUrl) &&
-                DreamGateServices.UseCloudBackend)
+            var matchServerUrl = MatchSessionContext.MatchServerUrl;
+            if (string.IsNullOrWhiteSpace(matchServerUrl))
+            {
+                matchServerUrl = BackendSettings.Load()?.ResolvedMatchServerUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(matchServerUrl))
             {
                 var remote = new RemoteMatchClient(
-                    MatchSessionContext.MatchServerUrl,
+                    matchServerUrl,
                     MatchSessionContext.LobbyId,
                     MatchSessionContext.HumanSlotIndex,
                     MatchSessionContext.Slots,

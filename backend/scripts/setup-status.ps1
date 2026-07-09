@@ -59,8 +59,11 @@ if (Test-Path $assetPath) {
         $assetServer = $matches[1].Trim()
     }
 }
-Show-Check "Unity cloud backend enabled" $assetCloud $(if (-not $assetCloud) { "BackendSettings.useCloudBackend = 0" })
+Show-Check "Unity cloud backend enabled" $assetCloud $(if (-not $assetCloud) { "Local auth + matchmaking; rated can still use match server" })
 Show-Check "Unity match server URL" (-not [string]::IsNullOrWhiteSpace($assetServer)) $assetServer
+if (-not [string]::IsNullOrWhiteSpace($assetServer)) {
+    Write-Host "    Rated matches use authoritative server even without cloud backend"
+}
 
 $linked = Test-Path (Join-Path $root ".supabase")
 Show-Check "Supabase project linked" $linked $(if (-not $linked) { "Run .\scripts\link-project.ps1 after login" })

@@ -29,6 +29,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public string ResolvedMatchServerUrl => matchServerWebSocketUrl?.Trim() ?? string.Empty;
 
+        public bool HasMatchServer => !string.IsNullOrWhiteSpace(ResolvedMatchServerUrl);
+
         public bool IsConfigured =>
             useCloudBackend &&
             !string.IsNullOrWhiteSpace(supabaseUrl) &&
