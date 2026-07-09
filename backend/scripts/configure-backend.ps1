@@ -39,6 +39,24 @@ function Write-DotEnv([hashtable]$values, [string]$path) {
     ) -join "`n" | Out-File -FilePath $path -Encoding ascii
 }
 
+function Escape-UnityYamlString([string]$value) {
+    if ([string]::IsNullOrEmpty($value)) {
+        return ""
+    }
+
+    if ($value -match '[:#]' -or $value.Contains('"')) {
+        $escaped = $value.Replace('"', '\"')
+        return """$escaped"""
+    }
+
+    return $value
+}
+
+function Write-UnityTextFile([string]$path, [string]$content) {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
+}
+
 function Update-BackendSettingsAsset(
     [bool]$useCloud,
     [string]$supabaseUrl,
@@ -50,11 +68,15 @@ function Update-BackendSettingsAsset(
     }
 
     $content = Get-Content $assetPath -Raw
+    if ($content.StartsWith([char]0xFEFF)) {
+        $content = $content.Substring(1)
+    }
+
     $content = $content -replace 'useCloudBackend: \d', "useCloudBackend: $(if ($useCloud) { 1 } else { 0 })"
-    $content = $content -replace 'supabaseUrl: .*', "supabaseUrl: $supabaseUrl"
-    $content = $content -replace 'supabaseAnonKey: .*', "supabaseAnonKey: $anonKey"
-    $content = $content -replace 'matchServerWebSocketUrl:.*', "matchServerWebSocketUrl: $matchServerUrl"
-    Set-Content -Path $assetPath -Value $content -Encoding UTF8 -NoNewline
+    $content = $content -replace 'supabaseUrl:.*', "supabaseUrl: $(Escape-UnityYamlString $supabaseUrl)"
+    $content = $content -replace 'supabaseAnonKey:.*', "supabaseAnonKey: $(Escape-UnityYamlString $anonKey)"
+    $content = $content -replace 'matchServerWebSocketUrl:.*', "matchServerWebSocketUrl: $(Escape-UnityYamlString $matchServerUrl)"
+    Write-UnityTextFile $assetPath $content
 }
 
 $envValues = Read-DotEnv $envFile

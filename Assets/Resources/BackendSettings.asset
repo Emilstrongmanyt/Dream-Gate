@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -17,4 +17,4 @@ MonoBehaviour:
   supabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhla2tuenpidWRta3d4dHp4a2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NDgxMTUsImV4cCI6MjA5OTEyNDExNX0.Ahxxv2De9RfeTwhJWARCbyv0HoUc7R1bx6Jv662oraI
   matchmakingFunctionUrl: 
   applyMatchResultFunctionUrl: 
-  matchServerWebSocketUrl: http://66.94.102.236:8787
+  matchServerWebSocketUrl: "http://66.94.102.236:8787"
