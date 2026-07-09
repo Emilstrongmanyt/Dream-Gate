@@ -17,4 +17,4 @@ MonoBehaviour:
   supabaseAnonKey: 
   matchmakingFunctionUrl: 
   applyMatchResultFunctionUrl: 
-  matchServerWebSocketUrl: http://localhost:8787
+  matchServerWebSocketUrl: http://66.94.102.236:8787

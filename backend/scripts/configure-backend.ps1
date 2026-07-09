@@ -59,11 +59,19 @@ function Update-BackendSettingsAsset(
 
 $envValues = Read-DotEnv $envFile
 if ($FromEnv -or (-not $SupabaseUrl -and $envValues.ContainsKey("SUPABASE_URL"))) {
-    $SupabaseUrl = $envValues["SUPABASE_URL"]
-    $AnonKey = $envValues["SUPABASE_ANON_KEY"]
-    $ServiceRoleKey = $envValues["SUPABASE_SERVICE_ROLE_KEY"]
-    $ProjectRef = $envValues["PROJECT_REF"]
-    if ($envValues.ContainsKey("MATCH_SERVER_URL")) {
+    if (-not $PSBoundParameters.ContainsKey("SupabaseUrl") -and $envValues.ContainsKey("SUPABASE_URL")) {
+        $SupabaseUrl = $envValues["SUPABASE_URL"]
+    }
+    if (-not $PSBoundParameters.ContainsKey("AnonKey") -and $envValues.ContainsKey("SUPABASE_ANON_KEY")) {
+        $AnonKey = $envValues["SUPABASE_ANON_KEY"]
+    }
+    if (-not $PSBoundParameters.ContainsKey("ServiceRoleKey") -and $envValues.ContainsKey("SUPABASE_SERVICE_ROLE_KEY")) {
+        $ServiceRoleKey = $envValues["SUPABASE_SERVICE_ROLE_KEY"]
+    }
+    if (-not $PSBoundParameters.ContainsKey("ProjectRef") -and $envValues.ContainsKey("PROJECT_REF")) {
+        $ProjectRef = $envValues["PROJECT_REF"]
+    }
+    if (-not $PSBoundParameters.ContainsKey("MatchServerUrl") -and $envValues.ContainsKey("MATCH_SERVER_URL")) {
         $MatchServerUrl = $envValues["MATCH_SERVER_URL"]
     }
 }
