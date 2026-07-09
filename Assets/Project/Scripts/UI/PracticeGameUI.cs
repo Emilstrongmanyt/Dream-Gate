@@ -1882,6 +1882,8 @@ namespace DreamGate.Battlegrounds.UI
         private RectTransform cardRect;
         private Image frameImage;
         private Image artImage;
+        private TextMeshProUGUI attackText;
+        private TextMeshProUGUI healthText;
         private TextMeshProUGUI titleText;
         private TextMeshProUGUI subtitleText;
         private TextMeshProUGUI bodyText;
@@ -1937,11 +1939,14 @@ namespace DreamGate.Battlegrounds.UI
             artImage.preserveAspect = true;
             artImage.raycastTarget = false;
 
-            titleText = CreateInspectText(cardGo.transform, "Title", new Vector2(0, -18), 30, 0.9f, 0.98f, 34);
-            subtitleText = CreateInspectText(cardGo.transform, "Subtitle", new Vector2(0, -58), 22, 0.82f, 0.9f, 30);
-            bodyText = CreateInspectText(cardGo.transform, "Body", new Vector2(0, 0), 18, 0.04f, 0.3f, 120);
-            bodyText.alignment = TextAlignmentOptions.TopLeft;
-            bodyText.margin = new Vector4(14f, 10f, 14f, 10f);
+            attackText = CreateInspectStatOverlay(artGo.transform, "AttackText", new Vector2(0.12f, 0.11f));
+            healthText = CreateInspectStatOverlay(artGo.transform, "HealthText", new Vector2(0.88f, 0.11f));
+
+            var captionBaseY = -(InspectCardSize.y * InspectShowScale * 0.5f + 18f);
+            titleText = CreateInspectCaption(root.transform, "Title", 30, captionBaseY, 40f);
+            subtitleText = CreateInspectCaption(root.transform, "Subtitle", 22, captionBaseY - 42f, 28f);
+            bodyText = CreateInspectCaption(root.transform, "Body", 18, captionBaseY - 72f, 72f);
+            bodyText.alignment = TextAlignmentOptions.Center;
         }
 
         public void Show(CardInspectPayload payload)
@@ -1952,10 +1957,29 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             titleText.text = payload.title;
-            subtitleText.text = payload.subtitle;
+            titleText.gameObject.SetActive(!string.IsNullOrWhiteSpace(payload.title));
+
+            var hasSubtitle = !string.IsNullOrWhiteSpace(payload.subtitle);
+            subtitleText.text = hasSubtitle ? payload.subtitle : string.Empty;
+            subtitleText.gameObject.SetActive(hasSubtitle);
+
             var hasBody = !string.IsNullOrWhiteSpace(payload.body);
             bodyText.text = hasBody ? payload.body : string.Empty;
             bodyText.gameObject.SetActive(hasBody);
+
+            if (payload.showStats)
+            {
+                attackText.text = payload.attack.ToString();
+                healthText.text = payload.health.ToString();
+                attackText.gameObject.SetActive(true);
+                healthText.gameObject.SetActive(true);
+            }
+            else
+            {
+                attackText.gameObject.SetActive(false);
+                healthText.gameObject.SetActive(false);
+            }
+
             frameImage.color = payload.isGolden ? GoldenFrameColor : DefaultFrameColor;
 
             if (payload.art != null)
@@ -2029,30 +2053,51 @@ namespace DreamGate.Battlegrounds.UI
             animationRoutine = null;
         }
 
-        private static TextMeshProUGUI CreateInspectText(
+        private static TextMeshProUGUI CreateInspectStatOverlay(Transform parent, string name, Vector2 anchor)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(72f, 72f);
+
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.fontSize = 38;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = Color.white;
+            text.outlineWidth = 0.35f;
+            text.outlineColor = Color.black;
+            text.gameObject.SetActive(false);
+            return text;
+        }
+
+        private static TextMeshProUGUI CreateInspectCaption(
             Transform parent,
             string name,
-            Vector2 anchoredPosition,
             int fontSize,
-            float anchorMinY,
-            float anchorMaxY,
+            float anchoredY,
             float height)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
             var rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.05f, anchorMinY);
-            rect.anchorMax = new Vector2(0.95f, anchorMaxY);
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = new Vector2(0f, height);
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, anchoredY);
+            rect.sizeDelta = new Vector2(520f, height);
 
             var text = go.GetComponent<TextMeshProUGUI>();
             text.fontSize = fontSize;
             text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
-            text.text = name;
+            text.outlineWidth = 0.2f;
+            text.outlineColor = Color.black;
+            text.text = string.Empty;
             return text;
         }
     }

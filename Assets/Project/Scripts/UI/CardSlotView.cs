@@ -14,6 +14,9 @@ namespace DreamGate.Battlegrounds.UI
         public string body;
         public Sprite art;
         public bool isGolden;
+        public int attack;
+        public int health;
+        public bool showStats;
 
         public static CardInspectPayload Empty => new CardInspectPayload { hasCard = false };
     }
@@ -252,10 +255,13 @@ namespace DreamGate.Battlegrounds.UI
             {
                 hasCard = true,
                 title = card.displayName,
-                subtitle = $"Tier {card.tier}  •  {card.attack}/{card.health}  •  3 gold",
+                subtitle = $"Tier {card.tier}  •  3 gold",
                 body = string.Empty,
                 art = card.cardArt,
-                isGolden = false
+                isGolden = false,
+                attack = card.attack,
+                health = card.health,
+                showStats = card.cardKind != CardKind.Spell
             };
         }
 
@@ -278,10 +284,13 @@ namespace DreamGate.Battlegrounds.UI
             {
                 hasCard = true,
                 title = $"{prefix}{name}",
-                subtitle = $"{minion.attack}/{minion.health}" + (card != null ? $"  •  Tier {card.tier}" : string.Empty),
+                subtitle = card != null ? $"Tier {card.tier}" : string.Empty,
                 body = action,
                 art = card?.cardArt,
-                isGolden = minion.isGolden
+                isGolden = minion.isGolden,
+                attack = minion.attack,
+                health = minion.health,
+                showStats = card == null || card.cardKind != CardKind.Spell
             };
         }
 
