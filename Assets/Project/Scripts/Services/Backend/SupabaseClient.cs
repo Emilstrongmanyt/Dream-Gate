@@ -39,7 +39,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 if (!success)
                 {
-                    callback(false, NormalizeAuthError(error), false);
+                    callback(false, NormalizeAuthError(error, response), false);
                     return;
                 }
 
@@ -59,7 +59,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     return;
                 }
 
-                callback(false, "Sign up failed.", false);
+                callback(
+                    false,
+                    "Sign up could not start a session. If you already registered, try logging in instead.",
+                    false);
             });
         }
 
@@ -75,7 +78,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 if (!success)
                 {
-                    callback(false, NormalizeAuthError(error));
+                    callback(false, NormalizeAuthError(error, response));
                     return;
                 }
 
@@ -165,12 +168,42 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private void ApplyAuthResponse(string response)
         {
-            AccessToken = ApiJson.TryGetString(response, "access_token");
-            RefreshToken = ApiJson.TryGetString(response, "refresh_token");
+            var sessionJson = ExtractNestedObject(response, "session");
+            var tokenSource = !string.IsNullOrEmpty(sessionJson) ? sessionJson : response;
+
+            AccessToken = ApiJson.TryGetString(tokenSource, "access_token")
+                          ?? ApiJson.TryGetString(response, "access_token");
+            RefreshToken = ApiJson.TryGetString(tokenSource, "refresh_token")
+                           ?? ApiJson.TryGetString(response, "refresh_token");
 
             var userJson = ExtractNestedObject(response, "user");
+            if (string.IsNullOrEmpty(userJson) && !string.IsNullOrEmpty(sessionJson))
+            {
+                userJson = ExtractNestedObject(sessionJson, "user");
+            }
+
             UserId = ApiJson.TryGetString(userJson, "id");
             UserEmail = ApiJson.TryGetString(userJson, "email");
+
+            if (string.IsNullOrEmpty(UserId))
+            {
+                UserId = ApiJson.TryGetString(response, "id");
+            }
+
+            if (string.IsNullOrEmpty(UserEmail))
+            {
+                UserEmail = ApiJson.TryGetString(response, "email");
+            }
+
+            if (string.IsNullOrEmpty(UserId) && !string.IsNullOrEmpty(AccessToken))
+            {
+                UserId = TryGetClaimFromAccessToken(AccessToken, "sub");
+            }
+
+            if (string.IsNullOrEmpty(UserEmail) && !string.IsNullOrEmpty(AccessToken))
+            {
+                UserEmail = TryGetClaimFromAccessToken(AccessToken, "email");
+            }
 
             if (!IsAuthenticated)
             {
@@ -194,11 +227,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
             if (!string.IsNullOrEmpty(settings?.supabaseAnonKey))
             {
                 request.SetRequestHeader("apikey", settings.supabaseAnonKey);
-            }
-
-            if (useAuth)
-            {
-                request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
+                if (useAuth)
+                {
+                    request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
+                }
+                else if (url.Contains("/auth/v1/", StringComparison.Ordinal))
+                {
+                    request.SetRequestHeader("Authorization", $"Bearer {settings.supabaseAnonKey}");
+                }
             }
 
             yield return request.SendWebRequest();
@@ -206,11 +242,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
             var response = request.downloadHandler?.text ?? string.Empty;
             if (request.result != UnityWebRequest.Result.Success)
             {
-                var message = ApiJson.TryGetString(response, "msg")
-                              ?? ApiJson.TryGetString(response, "error_description")
-                              ?? ApiJson.TryGetString(response, "error")
-                              ?? request.error
-                              ?? "Request failed.";
+                var message = NormalizeAuthError(
+                    ApiJson.TryGetString(response, "msg")
+                    ?? ApiJson.TryGetString(response, "error_description")
+                    ?? ApiJson.TryGetString(response, "error")
+                    ?? request.error
+                    ?? "Request failed.",
+                    response);
                 callback(false, message, response);
                 yield break;
             }
@@ -259,20 +297,39 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private static bool HasSignupUserPendingConfirmation(string response)
         {
-            if (!string.IsNullOrEmpty(ApiJson.TryGetString(response, "access_token")))
+            if (!string.IsNullOrEmpty(ApiJson.TryGetString(response, "access_token"))
+                || !string.IsNullOrEmpty(ApiJson.TryGetString(ExtractNestedObject(response, "session"), "access_token")))
             {
                 return false;
             }
 
             var userJson = ExtractNestedObject(response, "user");
-            return !string.IsNullOrEmpty(ApiJson.TryGetString(userJson, "id"));
+            if (!string.IsNullOrEmpty(ApiJson.TryGetString(userJson, "id")))
+            {
+                return true;
+            }
+
+            return !string.IsNullOrEmpty(ApiJson.TryGetString(response, "id"))
+                   && !string.IsNullOrEmpty(ApiJson.TryGetString(response, "email"));
         }
 
-        private static string NormalizeAuthError(string error)
+        private static string NormalizeAuthError(string error, string responseJson = null)
         {
             if (string.IsNullOrWhiteSpace(error))
             {
                 return "Request failed.";
+            }
+
+            var errorCode = ApiJson.TryGetString(responseJson, "error_code");
+            if (errorCode == "user_already_exists"
+                || error.IndexOf("already registered", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "An account with this email already exists. Try logging in instead.";
+            }
+
+            if (errorCode == "weak_password")
+            {
+                return "Password is too weak. Use at least 6 characters.";
             }
 
             if (error.IndexOf("confirm", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -281,6 +338,41 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             return error;
+        }
+
+        private static string TryGetClaimFromAccessToken(string accessToken, string claim)
+        {
+            if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(claim))
+            {
+                return null;
+            }
+
+            var parts = accessToken.Split('.');
+            if (parts.Length < 2)
+            {
+                return null;
+            }
+
+            try
+            {
+                var payload = parts[1].Replace('-', '+').Replace('_', '/');
+                switch (payload.Length % 4)
+                {
+                    case 2:
+                        payload += "==";
+                        break;
+                    case 3:
+                        payload += "=";
+                        break;
+                }
+
+                var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+                return ApiJson.TryGetString(json, claim);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         private static string ExtractNestedObject(string json, string key)

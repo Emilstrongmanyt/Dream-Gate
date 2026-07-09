@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using DreamGate.Battlegrounds.Core;
@@ -145,8 +146,27 @@ namespace DreamGate.Battlegrounds.Services
 
             if (!success)
             {
-                callback(false, message, false);
-                yield break;
+                if (message.IndexOf("could not start a session", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    yield return CloudClient.SignIn(email, password, (loginOk, loginMsg) =>
+                    {
+                        if (loginOk)
+                        {
+                            success = true;
+                            message = $"Welcome back, {displayName}!";
+                        }
+                        else if (!string.IsNullOrWhiteSpace(loginMsg))
+                        {
+                            message = loginMsg;
+                        }
+                    });
+                }
+
+                if (!success)
+                {
+                    callback(false, message, false);
+                    yield break;
+                }
             }
 
             if (requiresEmailConfirmation)
@@ -156,7 +176,7 @@ namespace DreamGate.Battlegrounds.Services
             }
 
             yield return CloudClient.UpdateDisplayName(displayName.Trim(), (_, _) => { });
-            yield return LoadCloudProfileRoutine();
+            yield return WaitForCloudProfileRoutine();
             callback(true, $"Account created. Welcome, {Profile?.displayName ?? displayName}!", false);
         }
 
@@ -290,6 +310,20 @@ namespace DreamGate.Battlegrounds.Services
             {
                 Profile = success ? loadedProfile : null;
             });
+        }
+
+        private static IEnumerator WaitForCloudProfileRoutine()
+        {
+            const int maxAttempts = 4;
+            for (var attempt = 0; attempt < maxAttempts && Profile == null; attempt++)
+            {
+                if (attempt > 0)
+                {
+                    yield return new WaitForSeconds(0.4f);
+                }
+
+                yield return LoadCloudProfileRoutine();
+            }
         }
 
         public static string GetStatusLine()
