@@ -212,7 +212,7 @@ namespace DreamGate.Battlegrounds.Services
         private static IEnumerator CoApplyRatedResult(MatchResult result)
         {
             var settings = BackendSettings.Load();
-            if (settings == null || string.IsNullOrWhiteSpace(settings.applyMatchResultFunctionUrl))
+            if (settings == null || string.IsNullOrWhiteSpace(settings.ResolvedApplyMatchResultUrl))
             {
                 ApplyRatedResultLocal(result);
                 yield break;
@@ -232,7 +232,7 @@ namespace DreamGate.Battlegrounds.Services
 
             var success = false;
             var response = string.Empty;
-            yield return CloudClient.InvokeFunction(settings.applyMatchResultFunctionUrl, payload, (ok, _, raw) =>
+            yield return CloudClient.InvokeFunction(settings.ResolvedApplyMatchResultUrl, payload, (ok, _, raw) =>
             {
                 success = ok;
                 response = raw;

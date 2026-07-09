@@ -79,7 +79,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private IEnumerator CancelRemoteQueue()
         {
             yield return supabaseClient.InvokeFunction(
-                settings.matchmakingFunctionUrl,
+                settings.ResolvedMatchmakingUrl,
                 new Dictionary<string, object> { { "action", "cancel" } },
                 (_, _, _) => { });
         }
@@ -95,7 +95,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             var joined = false;
             yield return supabaseClient.InvokeFunction(
-                settings.matchmakingFunctionUrl,
+                settings.ResolvedMatchmakingUrl,
                 joinPayload,
                 (success, error, _) =>
                 {
@@ -123,7 +123,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 var pollError = string.Empty;
 
                 yield return supabaseClient.InvokeFunction(
-                    settings.matchmakingFunctionUrl,
+                    settings.ResolvedMatchmakingUrl,
                     new Dictionary<string, object> { { "action", "poll" } },
                     (success, error, response) =>
                     {

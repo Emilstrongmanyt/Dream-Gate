@@ -82,7 +82,7 @@ namespace DreamGate.Battlegrounds.Core
             if (string.IsNullOrWhiteSpace(result.matchServerUrl))
             {
                 var settings = BackendSettings.Load();
-                result.matchServerUrl = settings?.matchServerWebSocketUrl;
+                result.matchServerUrl = settings?.ResolvedMatchServerUrl;
             }
 
             MatchSessionContext.BeginRated(result, DreamGateServices.Profile?.mmr ?? PlayerProfile.DefaultMmr);

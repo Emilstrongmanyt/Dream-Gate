@@ -17,10 +17,32 @@ namespace DreamGate.Battlegrounds.Services.Backend
         [Header("Rated Match Server")]
         public string matchServerWebSocketUrl = "";
 
+        public string ResolvedMatchmakingUrl =>
+            !string.IsNullOrWhiteSpace(matchmakingFunctionUrl)
+                ? matchmakingFunctionUrl
+                : BuildFunctionUrl("matchmaking");
+
+        public string ResolvedApplyMatchResultUrl =>
+            !string.IsNullOrWhiteSpace(applyMatchResultFunctionUrl)
+                ? applyMatchResultFunctionUrl
+                : BuildFunctionUrl("apply-match-result");
+
+        public string ResolvedMatchServerUrl => matchServerWebSocketUrl?.Trim() ?? string.Empty;
+
         public bool IsConfigured =>
             useCloudBackend &&
             !string.IsNullOrWhiteSpace(supabaseUrl) &&
             !string.IsNullOrWhiteSpace(supabaseAnonKey);
+
+        private string BuildFunctionUrl(string functionName)
+        {
+            if (string.IsNullOrWhiteSpace(supabaseUrl))
+            {
+                return string.Empty;
+            }
+
+            return $"{supabaseUrl.TrimEnd('/')}/functions/v1/{functionName}";
+        }
 
         private static BackendSettings cached;
 

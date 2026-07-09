@@ -107,3 +107,8 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Dream Gate backend secrets and runtime logs
+backend/.env
+backend/logs/
+backend/tools/
