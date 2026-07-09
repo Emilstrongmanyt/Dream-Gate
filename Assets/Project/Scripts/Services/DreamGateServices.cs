@@ -63,7 +63,7 @@ namespace DreamGate.Battlegrounds.Services
             if (UseCloudBackend)
             {
                 message = "Cloud registration is in progress. Please wait.";
-                CloudCoroutineHost.Instance.Run(CoTryRegister(displayName, email, password, confirmPassword, (_, _) => { }));
+                CloudCoroutineHost.Instance.Run(CoTryRegister(displayName, email, password, confirmPassword, (_, _, _) => { }));
                 return false;
             }
 
@@ -100,56 +100,64 @@ namespace DreamGate.Battlegrounds.Services
             string email,
             string password,
             string confirmPassword,
-            System.Action<bool, string> callback)
+            System.Action<bool, string, bool> callback)
         {
             if (!UseCloudBackend || CloudClient == null)
             {
                 var localSuccess = TryRegister(displayName, email, password, confirmPassword, out var localMessage);
-                callback(localSuccess, localMessage);
+                callback(localSuccess, localMessage, false);
                 yield break;
             }
 
             if (string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length < 2)
             {
-                callback(false, "Display name must be at least 2 characters.");
+                callback(false, "Display name must be at least 2 characters.", false);
                 yield break;
             }
 
             if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
             {
-                callback(false, "Enter a valid email address.");
+                callback(false, "Enter a valid email address.", false);
                 yield break;
             }
 
             if (string.IsNullOrEmpty(password) || password.Length < 6)
             {
-                callback(false, "Password must be at least 6 characters.");
+                callback(false, "Password must be at least 6 characters.", false);
                 yield break;
             }
 
             if (password != confirmPassword)
             {
-                callback(false, "Passwords do not match.");
+                callback(false, "Passwords do not match.", false);
                 yield break;
             }
 
             var success = false;
             var message = string.Empty;
-            yield return CloudClient.SignUp(email, password, displayName.Trim(), (ok, msg) =>
+            var requiresEmailConfirmation = false;
+            yield return CloudClient.SignUp(email, password, displayName.Trim(), (ok, msg, pendingConfirmation) =>
             {
                 success = ok;
                 message = msg;
+                requiresEmailConfirmation = pendingConfirmation;
             });
 
             if (!success)
             {
-                callback(false, message);
+                callback(false, message, false);
+                yield break;
+            }
+
+            if (requiresEmailConfirmation)
+            {
+                callback(true, message, true);
                 yield break;
             }
 
             yield return CloudClient.UpdateDisplayName(displayName.Trim(), (_, _) => { });
             yield return LoadCloudProfileRoutine();
-            callback(true, $"Account created. Welcome, {Profile?.displayName ?? displayName}!");
+            callback(true, $"Account created. Welcome, {Profile?.displayName ?? displayName}!", false);
         }
 
         public static IEnumerator CoTryLogin(string email, string password, System.Action<bool, string> callback)

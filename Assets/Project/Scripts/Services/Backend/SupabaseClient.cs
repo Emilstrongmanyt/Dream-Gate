@@ -26,7 +26,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             RestoreSession();
         }
 
-        public IEnumerator SignUp(string email, string password, string displayName, Action<bool, string> callback)
+        public IEnumerator SignUp(string email, string password, string displayName, Action<bool, string, bool> callback)
         {
             var body =
                 "{" +
@@ -39,12 +39,27 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 if (!success)
                 {
-                    callback(false, error);
+                    callback(false, NormalizeAuthError(error), false);
                     return;
                 }
 
                 ApplyAuthResponse(response);
-                callback(IsAuthenticated, IsAuthenticated ? $"Account created. Welcome, {displayName}!" : "Sign up failed.");
+                if (IsAuthenticated)
+                {
+                    callback(true, $"Account created. Welcome, {displayName}!", false);
+                    return;
+                }
+
+                if (HasSignupUserPendingConfirmation(response))
+                {
+                    callback(
+                        true,
+                        "Account created. Check your email to confirm your account, then log in.",
+                        true);
+                    return;
+                }
+
+                callback(false, "Sign up failed.", false);
             });
         }
 
@@ -60,7 +75,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 if (!success)
                 {
-                    callback(false, error);
+                    callback(false, NormalizeAuthError(error));
                     return;
                 }
 
@@ -240,6 +255,32 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             callback(true, string.Empty, response);
+        }
+
+        private static bool HasSignupUserPendingConfirmation(string response)
+        {
+            if (!string.IsNullOrEmpty(ApiJson.TryGetString(response, "access_token")))
+            {
+                return false;
+            }
+
+            var userJson = ExtractNestedObject(response, "user");
+            return !string.IsNullOrEmpty(ApiJson.TryGetString(userJson, "id"));
+        }
+
+        private static string NormalizeAuthError(string error)
+        {
+            if (string.IsNullOrWhiteSpace(error))
+            {
+                return "Request failed.";
+            }
+
+            if (error.IndexOf("confirm", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Please confirm your email using the link we sent, then log in again.";
+            }
+
+            return error;
         }
 
         private static string ExtractNestedObject(string json, string key)

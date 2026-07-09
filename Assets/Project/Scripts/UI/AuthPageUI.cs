@@ -209,23 +209,29 @@ namespace DreamGate.Battlegrounds.UI
         {
             var success = false;
             var message = string.Empty;
+            var requiresEmailConfirmation = false;
             yield return DreamGateServices.CoTryRegister(
                 displayNameInput.text,
                 emailInput.text,
                 passwordInput.text,
                 confirmPasswordInput.text,
-                (ok, msg) =>
+                (ok, msg, pendingConfirmation) =>
                 {
                     success = ok;
                     message = msg;
+                    requiresEmailConfirmation = pendingConfirmation;
                 });
 
             if (success)
             {
                 statusText.color = new Color(0.55f, 0.95f, 0.65f);
                 statusText.text = message;
-                onSuccess?.Invoke();
-                Hide();
+                if (!requiresEmailConfirmation)
+                {
+                    onSuccess?.Invoke();
+                    Hide();
+                }
+
                 yield break;
             }
 
