@@ -9,9 +9,6 @@ namespace DreamGate.Battlegrounds.UI
     public struct CardInspectPayload
     {
         public bool hasCard;
-        public string title;
-        public string subtitle;
-        public string body;
         public Sprite art;
         public bool isGolden;
         public int attack;
@@ -149,7 +146,7 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             Button.interactable = interactable;
-            inspectPayload = BuildMinionInspectPayload(card, minion, mode);
+            inspectPayload = BuildMinionInspectPayload(card, minion);
             InspectHandler?.SetInspectable(true);
         }
 
@@ -254,9 +251,6 @@ namespace DreamGate.Battlegrounds.UI
             return new CardInspectPayload
             {
                 hasCard = true,
-                title = card.displayName,
-                subtitle = $"Tier {card.tier}  •  3 gold",
-                body = string.Empty,
                 art = card.cardArt,
                 isGolden = false,
                 attack = card.attack,
@@ -267,25 +261,11 @@ namespace DreamGate.Battlegrounds.UI
 
         private static CardInspectPayload BuildMinionInspectPayload(
             MinionCardDefinition card,
-            MinionInstance minion,
-            CardSlotDisplayMode mode)
+            MinionInstance minion)
         {
-            var name = card != null ? card.displayName : minion.cardId;
-            var prefix = minion.isGolden ? "★ Golden " : string.Empty;
-            var action = card != null && card.cardKind == CardKind.Spell
-                ? "Tap to cast this spell."
-                : mode == CardSlotDisplayMode.Hand
-                ? "Tap to play from hand."
-                : mode == CardSlotDisplayMode.Board
-                    ? "Drag to rearrange. Tap to sell for 1 gold."
-                    : string.Empty;
-
             return new CardInspectPayload
             {
                 hasCard = true,
-                title = $"{prefix}{name}",
-                subtitle = card != null ? $"Tier {card.tier}" : string.Empty,
-                body = action,
                 art = card?.cardArt,
                 isGolden = minion.isGolden,
                 attack = minion.attack,

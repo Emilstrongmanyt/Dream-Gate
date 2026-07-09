@@ -1884,9 +1884,6 @@ namespace DreamGate.Battlegrounds.UI
         private Image artImage;
         private TextMeshProUGUI attackText;
         private TextMeshProUGUI healthText;
-        private TextMeshProUGUI titleText;
-        private TextMeshProUGUI subtitleText;
-        private TextMeshProUGUI bodyText;
         private CanvasGroup canvasGroup;
         private Coroutine animationRoutine;
 
@@ -1926,13 +1923,13 @@ namespace DreamGate.Battlegrounds.UI
             cardRect.anchoredPosition = Vector2.zero;
             cardRect.sizeDelta = InspectCardSize;
             frameImage = cardGo.GetComponent<Image>();
-            frameImage.color = DefaultFrameColor;
+            frameImage.color = new Color(0f, 0f, 0f, 0f);
 
             var artGo = new GameObject("Art", typeof(RectTransform), typeof(Image));
             artGo.transform.SetParent(cardGo.transform, false);
             var artRect = artGo.GetComponent<RectTransform>();
-            artRect.anchorMin = new Vector2(0.02f, 0.02f);
-            artRect.anchorMax = new Vector2(0.98f, 0.98f);
+            artRect.anchorMin = Vector2.zero;
+            artRect.anchorMax = Vector2.one;
             artRect.offsetMin = Vector2.zero;
             artRect.offsetMax = Vector2.zero;
             artImage = artGo.GetComponent<Image>();
@@ -1941,12 +1938,6 @@ namespace DreamGate.Battlegrounds.UI
 
             attackText = CreateInspectStatOverlay(artGo.transform, "AttackText", new Vector2(0.12f, 0.11f));
             healthText = CreateInspectStatOverlay(artGo.transform, "HealthText", new Vector2(0.88f, 0.11f));
-
-            var captionBaseY = -(InspectCardSize.y * InspectShowScale * 0.5f + 18f);
-            titleText = CreateInspectCaption(root.transform, "Title", 30, captionBaseY, 40f);
-            subtitleText = CreateInspectCaption(root.transform, "Subtitle", 22, captionBaseY - 42f, 28f);
-            bodyText = CreateInspectCaption(root.transform, "Body", 18, captionBaseY - 72f, 72f);
-            bodyText.alignment = TextAlignmentOptions.Center;
         }
 
         public void Show(CardInspectPayload payload)
@@ -1955,17 +1946,6 @@ namespace DreamGate.Battlegrounds.UI
             {
                 return;
             }
-
-            titleText.text = payload.title;
-            titleText.gameObject.SetActive(!string.IsNullOrWhiteSpace(payload.title));
-
-            var hasSubtitle = !string.IsNullOrWhiteSpace(payload.subtitle);
-            subtitleText.text = hasSubtitle ? payload.subtitle : string.Empty;
-            subtitleText.gameObject.SetActive(hasSubtitle);
-
-            var hasBody = !string.IsNullOrWhiteSpace(payload.body);
-            bodyText.text = hasBody ? payload.body : string.Empty;
-            bodyText.gameObject.SetActive(hasBody);
 
             if (payload.showStats)
             {
@@ -1980,7 +1960,7 @@ namespace DreamGate.Battlegrounds.UI
                 healthText.gameObject.SetActive(false);
             }
 
-            frameImage.color = payload.isGolden ? GoldenFrameColor : DefaultFrameColor;
+            frameImage.color = payload.isGolden ? GoldenFrameColor : new Color(0f, 0f, 0f, 0f);
 
             if (payload.art != null)
             {
@@ -2075,31 +2055,6 @@ namespace DreamGate.Battlegrounds.UI
             return text;
         }
 
-        private static TextMeshProUGUI CreateInspectCaption(
-            Transform parent,
-            string name,
-            int fontSize,
-            float anchoredY,
-            float height)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent, false);
-            var rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, anchoredY);
-            rect.sizeDelta = new Vector2(520f, height);
-
-            var text = go.GetComponent<TextMeshProUGUI>();
-            text.fontSize = fontSize;
-            text.alignment = TextAlignmentOptions.Center;
-            text.color = Color.white;
-            text.outlineWidth = 0.2f;
-            text.outlineColor = Color.black;
-            text.text = string.Empty;
-            return text;
-        }
     }
 
     internal static class UiImageSprites
