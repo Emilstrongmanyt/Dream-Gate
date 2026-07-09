@@ -54,6 +54,8 @@ namespace DreamGate.Battlegrounds.UI
         private TextMeshProUGUI recruitCountdownText;
         private Image playerGoldCoinImage;
         private TextMeshProUGUI playerGoldText;
+        private Image playerHeroHpImage;
+        private TextMeshProUGUI playerHeroHpText;
         private int pendingSpellHandIndex = -1;
         private bool humanCombatPlaybackActive;
         private readonly StringBuilder logBuilder = new();
@@ -61,7 +63,8 @@ namespace DreamGate.Battlegrounds.UI
         private const float RecruitActionButtonY = 610f;
         private static readonly Vector2 RecruitRefreshButtonPos = new(250f, RecruitActionButtonY);
         private static readonly Vector2 RecruitUpgradeButtonPos = new(-250f, RecruitActionButtonY);
-        private static readonly Vector2 RecruitCompassCountdownCenter = new(0f, 0f);
+        private static readonly Vector2 RecruitCompassCountdownCenter = new(0f, -14f);
+        private static readonly Vector2 PlayerResourceOffsetFromHero = new(148f, -24f);
         private const float CardScaleFactor = 1.2f;
         private static readonly Vector2 CardSlotSize = new(132f * CardScaleFactor, 168f * CardScaleFactor);
         private const float ShopSlotSpacing = 128f * CardScaleFactor;
@@ -69,7 +72,7 @@ namespace DreamGate.Battlegrounds.UI
         private const float HandSlotSpacing = 138f * CardScaleFactor;
         private const float RowLabelOffsetY = 95f * CardScaleFactor;
         private static readonly Vector2 RecruitShopkeeperHeroCenter = new(0, 580);
-        private static readonly Vector2 ShopRowCenter = new(0, 150);
+        private static readonly Vector2 ShopRowCenter = new(0, 195);
         private static readonly Vector2 RecruitPlayerBoardCenter = new(0, -320);
         private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -740);
         private static readonly Vector2 HandRowCenter = new(0, -930);
@@ -284,6 +287,7 @@ namespace DreamGate.Battlegrounds.UI
                 RecruitPlayerHeroCenter,
                 new Color(0.2f, 0.35f, 0.65f, 0.55f));
             CreatePlayerGoldDisplay(recruitPanel.transform);
+            CreatePlayerHeroHpDisplay(recruitPanel.transform);
 
             recruitCountdownText = CreateRecruitCountdown(recruitPanel.transform);
 
@@ -883,24 +887,24 @@ namespace DreamGate.Battlegrounds.UI
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
             hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0, -8);
-            hudRect.sizeDelta = new Vector2(980, 188);
+            hudRect.anchoredPosition = Vector2.zero;
+            hudRect.sizeDelta = new Vector2(980, 128);
 
-            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, -20), 22, TextAlignmentOptions.Center);
-            hudText.rectTransform.sizeDelta = new Vector2(940, 72);
+            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, -10), 22, TextAlignmentOptions.Center);
+            hudText.rectTransform.sizeDelta = new Vector2(940, 56);
 
-            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -88), 15, TextAlignmentOptions.Center);
-            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 32);
+            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -44), 15, TextAlignmentOptions.Center);
+            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 28);
             leaderboardText.color = new Color(0.85f, 0.9f, 1f);
 
             compactLogPanel = new GameObject("CompactLog", typeof(RectTransform), typeof(Image));
             compactLogPanel.transform.SetParent(hudPanel.transform, false);
             var compactLogRect = compactLogPanel.GetComponent<RectTransform>();
-            compactLogRect.anchorMin = new Vector2(0.5f, 0f);
-            compactLogRect.anchorMax = new Vector2(0.5f, 0f);
-            compactLogRect.pivot = new Vector2(0.5f, 0f);
-            compactLogRect.anchoredPosition = new Vector2(0, 8);
-            compactLogRect.sizeDelta = new Vector2(920, 52);
+            compactLogRect.anchorMin = new Vector2(0.5f, 1f);
+            compactLogRect.anchorMax = new Vector2(0.5f, 1f);
+            compactLogRect.pivot = new Vector2(0.5f, 1f);
+            compactLogRect.anchoredPosition = new Vector2(0, -72);
+            compactLogRect.sizeDelta = new Vector2(920, 44);
             compactLogPanel.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.08f, 0.42f);
 
             logText = CreateText(compactLogPanel.transform, "Log", Vector2.zero, 12, TextAlignmentOptions.TopLeft);
@@ -941,6 +945,7 @@ namespace DreamGate.Battlegrounds.UI
             leaderboardText.text = matchManager.GetLeaderboardSummary();
             RefreshRecruitHeroes(player);
             RefreshPlayerGold(player);
+            RefreshPlayerHeroHp(player);
             RefreshRecruitCountdown();
 
             var inCombatPlayback = combatPanel != null && combatPanel.activeSelf;
@@ -1019,6 +1024,10 @@ namespace DreamGate.Battlegrounds.UI
         {
             recruitShopkeeperHero?.SetShopkeeper();
             recruitPlayerHero?.SetHero(player.heroName, player.heroId, player.heroHealth);
+            if (recruitPlayerHero != null)
+            {
+                recruitPlayerHero.HpText.gameObject.SetActive(false);
+            }
         }
 
         private void RefreshPlayerGold(PlayerState player)
@@ -1060,7 +1069,7 @@ namespace DreamGate.Battlegrounds.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = RecruitPlayerHeroCenter + new Vector2(148f, -24f);
+            rect.anchoredPosition = RecruitPlayerHeroCenter + PlayerResourceOffsetFromHero;
             rect.sizeDelta = new Vector2(88f, 88f);
 
             var coinGo = new GameObject("Coin", typeof(RectTransform), typeof(Image));
@@ -1091,6 +1100,59 @@ namespace DreamGate.Battlegrounds.UI
             playerGoldText.outlineWidth = 0.35f;
             playerGoldText.outlineColor = Color.black;
             playerGoldText.text = "0";
+        }
+
+        private void CreatePlayerHeroHpDisplay(Transform parent)
+        {
+            var hpSprite = Resources.Load<Sprite>("HeroHP");
+            var go = new GameObject("PlayerHeroHpDisplay", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = RecruitPlayerHeroCenter + new Vector2(-PlayerResourceOffsetFromHero.x, PlayerResourceOffsetFromHero.y);
+            rect.sizeDelta = new Vector2(88f, 88f);
+
+            var hpGo = new GameObject("HeroHP", typeof(RectTransform), typeof(Image));
+            hpGo.transform.SetParent(go.transform, false);
+            var hpRect = hpGo.GetComponent<RectTransform>();
+            hpRect.anchorMin = Vector2.zero;
+            hpRect.anchorMax = Vector2.one;
+            hpRect.offsetMin = Vector2.zero;
+            hpRect.offsetMax = Vector2.zero;
+            playerHeroHpImage = hpGo.GetComponent<Image>();
+            playerHeroHpImage.sprite = hpSprite;
+            playerHeroHpImage.preserveAspect = true;
+            playerHeroHpImage.raycastTarget = false;
+            playerHeroHpImage.color = hpSprite != null ? Color.white : new Color(0.75f, 0.2f, 0.2f, 0.95f);
+
+            var textGo = new GameObject("HeroHpAmount", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(go.transform, false);
+            var textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            playerHeroHpText = textGo.GetComponent<TextMeshProUGUI>();
+            playerHeroHpText.fontSize = 30;
+            playerHeroHpText.fontStyle = FontStyles.Bold;
+            playerHeroHpText.alignment = TextAlignmentOptions.Center;
+            playerHeroHpText.color = Color.white;
+            playerHeroHpText.outlineWidth = 0.35f;
+            playerHeroHpText.outlineColor = Color.black;
+            playerHeroHpText.text = "0";
+        }
+
+        private void RefreshPlayerHeroHp(PlayerState player)
+        {
+            if (playerHeroHpText == null)
+            {
+                return;
+            }
+
+            playerHeroHpText.text = player.heroHealth.ToString();
         }
 
         private static TextMeshProUGUI CreateRecruitCountdown(Transform parent)
