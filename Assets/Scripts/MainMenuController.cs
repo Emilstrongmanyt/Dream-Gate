@@ -1,5 +1,6 @@
 using DreamGate.Battlegrounds.Core;
 using DreamGate.Battlegrounds.Services;
+using DreamGate.Battlegrounds.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,6 +17,7 @@ public class MainMenuController : MonoBehaviour
         }
 
         UiCanvasSetup.ApplyToScene();
+        EnsureFallingCards();
         SetupMenuButtons();
     }
 
@@ -39,6 +41,17 @@ public class MainMenuController : MonoBehaviour
     public void BackToHome()
     {
         SceneNavigator.LoadHome();
+    }
+
+    private void EnsureFallingCards()
+    {
+        var canvas = Object.FindAnyObjectByType<Canvas>();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        HomeFallingCardsSpawner.Create(canvas.transform);
     }
 
     private void SetupMenuButtons()

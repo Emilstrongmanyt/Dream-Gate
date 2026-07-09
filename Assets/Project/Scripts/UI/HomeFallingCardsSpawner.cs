@@ -6,13 +6,13 @@ using UnityEngine.UI;
 namespace DreamGate.Battlegrounds.UI
 {
     /// <summary>
-    /// Decorative falling card sprites for the Home menu background.
-    /// Lives on the Home scene only and is destroyed when leaving the scene.
+    /// Decorative falling card sprites for the Main Menu background.
+    /// Lives on the MainMenu scene only and is destroyed when leaving the scene.
     /// </summary>
     public class HomeFallingCardsSpawner : MonoBehaviour
     {
-        private const float SpawnIntervalMin = 0.35f;
-        private const float SpawnIntervalMax = 1.1f;
+        private const float SpawnIntervalMin = 0.7f;
+        private const float SpawnIntervalMax = 2.2f;
         private const float FallSpeedMin = 95f;
         private const float FallSpeedMax = 210f;
         private const float HorizontalPadding = 72f;
