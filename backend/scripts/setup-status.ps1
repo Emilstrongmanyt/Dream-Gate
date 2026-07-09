@@ -36,9 +36,9 @@ catch {
 }
 Show-Check "Match server" $matchOk $matchDetail
 
-$lanIp = Get-LanIpAddress
-if ($lanIp) {
-    Write-Host "    Device URL (same network): http://${lanIp}:8787"
+$publicIp = Get-PublicIpAddress
+if ($publicIp) {
+    Write-Host "    Public URL (any network): http://${publicIp}:8787"
 }
 
 $envOk = $envValues.ContainsKey("SUPABASE_URL") -and -not [string]::IsNullOrWhiteSpace($envValues["SUPABASE_URL"])

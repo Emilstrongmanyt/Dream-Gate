@@ -38,3 +38,12 @@ function Get-LanIpAddress {
         Select-Object -First 1 -ExpandProperty IPAddress
     return $ip
 }
+
+function Get-PublicIpAddress {
+    try {
+        return (Invoke-RestMethod -Uri "https://api.ipify.org" -TimeoutSec 10).ToString().Trim()
+    }
+    catch {
+        return Get-LanIpAddress
+    }
+}
