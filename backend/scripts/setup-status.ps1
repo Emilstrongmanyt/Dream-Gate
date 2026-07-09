@@ -32,7 +32,7 @@ try {
     $matchDetail = "http://localhost:8787 -> $($health | ConvertTo-Json -Compress)"
 }
 catch {
-    $matchDetail = "Run .\scripts\start-match-server.ps1 -Background"
+    $matchDetail = "Run .\scripts\ensure-match-server.ps1"
 }
 Show-Check "Match server" $matchOk $matchDetail
 
