@@ -63,7 +63,7 @@ namespace DreamGate.Battlegrounds.Services
             if (UseCloudBackend)
             {
                 message = "Cloud registration is in progress. Please wait.";
-                CloudCoroutineHost.Instance.Run(CoTryRegister(displayName, email, password, confirmPassword, (_, msg) => message = msg));
+                CloudCoroutineHost.Instance.Run(CoTryRegister(displayName, email, password, confirmPassword, (_, _) => { }));
                 return false;
             }
 
@@ -82,7 +82,7 @@ namespace DreamGate.Battlegrounds.Services
             if (UseCloudBackend)
             {
                 message = "Cloud login is in progress. Please wait.";
-                CloudCoroutineHost.Instance.Run(CoTryLogin(email, password, (_, msg) => message = msg));
+                CloudCoroutineHost.Instance.Run(CoTryLogin(email, password, (_, _) => { }));
                 return false;
             }
 
