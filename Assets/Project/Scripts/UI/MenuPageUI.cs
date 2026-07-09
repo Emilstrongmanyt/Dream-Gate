@@ -249,6 +249,39 @@ namespace DreamGate.Battlegrounds.UI
             return label;
         }
 
+        public static Button CreateAppleSignInButton(Transform parent, Vector2 pos, Action onClick)
+        {
+            var go = new GameObject("SignInWithApple", typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchoredPosition = pos;
+            rect.sizeDelta = new Vector2(320, 72);
+            go.GetComponent<Image>().color = Color.black;
+
+            var button = go.GetComponent<Button>();
+            if (onClick != null)
+            {
+                button.onClick.AddListener(() => onClick());
+            }
+
+            var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(go.transform, false);
+            var textRect = textGo.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            var text = textGo.GetComponent<TextMeshProUGUI>();
+            text.fontSize = 20;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 16;
+            text.fontSizeMax = 20;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = Color.white;
+            text.text = "Sign in with Apple";
+            return button;
+        }
+
         public static Button CreateActionButton(Transform parent, string label, Vector2 pos, Action onClick)
         {
             var go = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));

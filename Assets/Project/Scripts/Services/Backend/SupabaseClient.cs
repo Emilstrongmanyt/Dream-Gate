@@ -87,6 +87,28 @@ namespace DreamGate.Battlegrounds.Services.Backend
             });
         }
 
+        public IEnumerator SignInWithApple(string idToken, string nonce, Action<bool, string> callback)
+        {
+            var body = ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "provider", "apple" },
+                { "id_token", idToken },
+                { "nonce", nonce }
+            });
+
+            yield return PostJson($"{settings.supabaseUrl}/auth/v1/token?grant_type=id_token", body, false, (success, response, error) =>
+            {
+                if (!success)
+                {
+                    callback(false, NormalizeAuthError(error, response));
+                    return;
+                }
+
+                ApplyAuthResponse(response);
+                callback(IsAuthenticated, IsAuthenticated ? "Welcome!" : "Apple sign in failed.");
+            });
+        }
+
         public void SignOut()
         {
             AccessToken = null;

@@ -207,6 +207,51 @@ namespace DreamGate.Battlegrounds.Services
             callback(true, $"Welcome back, {Profile?.displayName ?? "Dreamer"}!");
         }
 
+        public static IEnumerator CoTryAppleSignIn(System.Action<bool, string> callback)
+        {
+            if (!UseCloudBackend || CloudClient == null)
+            {
+                callback(false, "Cloud sign in is not available.");
+                yield break;
+            }
+
+            if (!AppleSignInService.IsSupported)
+            {
+                callback(false, "Sign in with Apple is only available on iOS.");
+                yield break;
+            }
+
+            AppleSignInRequestResult appleResult = null;
+            yield return AppleSignInService.RequestSignIn(result => appleResult = result);
+            if (appleResult == null || !appleResult.Success)
+            {
+                callback(false, appleResult?.Error ?? "Apple sign in failed.");
+                yield break;
+            }
+
+            var success = false;
+            var message = string.Empty;
+            yield return CloudClient.SignInWithApple(appleResult.IdentityToken, appleResult.Nonce, (ok, msg) =>
+            {
+                success = ok;
+                message = msg;
+            });
+
+            if (!success)
+            {
+                callback(false, message);
+                yield break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(appleResult.DisplayName))
+            {
+                yield return CloudClient.UpdateDisplayName(appleResult.DisplayName.Trim(), (_, _) => { });
+            }
+
+            yield return WaitForCloudProfileRoutine();
+            callback(true, $"Welcome, {Profile?.displayName ?? appleResult.DisplayName ?? "Dreamer"}!");
+        }
+
         public static void Logout()
         {
             if (UseCloudBackend)
