@@ -1,22 +1,34 @@
 #import <Foundation/Foundation.h>
 
+static const int DreamGateHttpPluginRevision = 3;
+
 static BOOL dreamGateHttpDone = NO;
 static NSInteger dreamGateHttpStatusCode = 0;
-static NSData *dreamGateHttpResponseBody = nil;
+static NSString *dreamGateHttpResponseBodyText = nil;
 static NSString *dreamGateHttpTransportError = nil;
 
 static void DreamGateHttpResetState(void)
 {
     dreamGateHttpDone = NO;
     dreamGateHttpStatusCode = 0;
-    dreamGateHttpResponseBody = nil;
+    dreamGateHttpResponseBodyText = nil;
     dreamGateHttpTransportError = nil;
 }
 
 static void DreamGateHttpFinish(NSInteger statusCode, NSData *body, NSString *error)
 {
     dreamGateHttpStatusCode = statusCode;
-    dreamGateHttpResponseBody = body;
+    dreamGateHttpResponseBodyText = nil;
+
+    if (body != nil && body.length > 0)
+    {
+        dreamGateHttpResponseBodyText = [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding];
+        if (dreamGateHttpResponseBodyText == nil)
+        {
+            dreamGateHttpResponseBodyText = [[NSString alloc] initWithData:body encoding:NSISOLatin1StringEncoding];
+        }
+    }
+
     dreamGateHttpTransportError = error;
     dreamGateHttpDone = YES;
 }
@@ -60,8 +72,10 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     request.HTTPMethod = method;
     request.timeoutInterval = 45.0;
+    request.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
+    [request setValue:@"close" forHTTPHeaderField:@"Connection"];
 
     if (apikey.length > 0)
     {
@@ -85,7 +99,12 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
     return request;
 }
 
-static void DreamGateHttpStart(NSString *urlString, NSString *method, NSString *body, NSString *apikey, NSString *authorization)
+static void DreamGateHttpExecute(
+    NSString *urlString,
+    NSString *method,
+    NSString *body,
+    NSString *apikey,
+    NSString *authorization)
 {
     DreamGateHttpResetState();
 
@@ -102,35 +121,56 @@ static void DreamGateHttpStart(NSString *urlString, NSString *method, NSString *
         return;
     }
 
-    NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
-    configuration.timeoutIntervalForRequest = 45.0;
-    configuration.timeoutIntervalForResource = 45.0;
-    configuration.HTTPShouldUsePipelining = NO;
-    configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-    NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        @autoreleasepool
+        {
+            __block NSData *responseData = nil;
+            __block NSHTTPURLResponse *httpResponse = nil;
+            __block NSError *requestError = nil;
+            dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-    NSURLSessionDataTask *task = [session
-        dataTaskWithRequest:request
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+            configuration.timeoutIntervalForRequest = 45.0;
+            configuration.timeoutIntervalForResource = 45.0;
+            configuration.HTTPShouldUsePipelining = NO;
+            configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+            NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
+
+            NSURLSessionDataTask *task = [session
+                dataTaskWithRequest:request
+                completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                    responseData = data;
+                    requestError = error;
+                    if ([response isKindOfClass:[NSHTTPURLResponse class]])
+                    {
+                        httpResponse = (NSHTTPURLResponse *)response;
+                    }
+                    dispatch_semaphore_signal(semaphore);
+                }];
+            [task resume];
+            dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(45 * NSEC_PER_SEC)));
+            [session finishTasksAndInvalidate];
+
+            NSInteger statusCode = httpResponse != nil ? httpResponse.statusCode : 0;
+            NSString *transportError = requestError != nil ? requestError.localizedDescription : nil;
+            NSData *bodyData = responseData;
+
             dispatch_async(dispatch_get_main_queue(), ^{
-                if (error != nil)
+                if (transportError != nil)
                 {
-                    DreamGateHttpFinish(0, nil, error.localizedDescription ?: @"Native HTTP request failed.");
-                    [session finishTasksAndInvalidate];
+                    DreamGateHttpFinish(0, nil, transportError);
                     return;
                 }
 
-                NSInteger statusCode = 0;
-                if ([response isKindOfClass:[NSHTTPURLResponse class]])
-                {
-                    statusCode = [(NSHTTPURLResponse *)response statusCode];
-                }
-
-                DreamGateHttpFinish(statusCode, data, nil);
-                [session finishTasksAndInvalidate];
+                DreamGateHttpFinish(statusCode, bodyData, nil);
             });
-        }];
-    [task resume];
+        }
+    });
+}
+
+extern "C" int DreamGate_Http_GetRevision(void)
+{
+    return DreamGateHttpPluginRevision;
 }
 
 extern "C" void DreamGate_Http_Reset(void)
@@ -146,7 +186,7 @@ extern "C" void DreamGate_Http_StartPost(
 {
     @autoreleasepool
     {
-        DreamGateHttpStart(
+        DreamGateHttpExecute(
             url ? [NSString stringWithUTF8String:url] : @"",
             @"POST",
             body ? [NSString stringWithUTF8String:body] : @"",
@@ -162,7 +202,7 @@ extern "C" void DreamGate_Http_StartGet(
 {
     @autoreleasepool
     {
-        DreamGateHttpStart(
+        DreamGateHttpExecute(
             url ? [NSString stringWithUTF8String:url] : @"",
             @"GET",
             nil,
@@ -183,10 +223,16 @@ extern "C" int DreamGate_Http_GetStatusCode(void)
 
 extern "C" int DreamGate_Http_GetBodySize(void)
 {
-    return dreamGateHttpResponseBody == nil ? 0 : (int)dreamGateHttpResponseBody.length;
+    if (dreamGateHttpResponseBodyText == nil || dreamGateHttpResponseBodyText.length == 0)
+    {
+        return 0;
+    }
+
+    const char *utf8 = [dreamGateHttpResponseBodyText UTF8String];
+    return utf8 == NULL ? 0 : (int)strlen(utf8);
 }
 
-extern "C" void DreamGate_Http_CopyBody(unsigned char *buffer, int bufferSize)
+extern "C" void DreamGate_Http_CopyBody(char *buffer, int bufferSize)
 {
     if (buffer == NULL || bufferSize <= 0)
     {
@@ -194,18 +240,19 @@ extern "C" void DreamGate_Http_CopyBody(unsigned char *buffer, int bufferSize)
     }
 
     buffer[0] = '\0';
-    if (dreamGateHttpResponseBody == nil || dreamGateHttpResponseBody.length == 0)
+    if (dreamGateHttpResponseBodyText == nil || dreamGateHttpResponseBodyText.length == 0)
     {
         return;
     }
 
-    int copyLength = (int)dreamGateHttpResponseBody.length;
-    if (copyLength > bufferSize)
+    const char *utf8 = [dreamGateHttpResponseBodyText UTF8String];
+    if (utf8 == NULL)
     {
-        copyLength = bufferSize;
+        return;
     }
 
-    memcpy(buffer, dreamGateHttpResponseBody.bytes, (size_t)copyLength);
+    strncpy(buffer, utf8, (size_t)bufferSize - 1);
+    buffer[bufferSize - 1] = '\0';
 }
 
 extern "C" void DreamGate_Http_CopyError(char *buffer, int bufferSize)

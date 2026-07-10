@@ -22,6 +22,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
+        internal const string AuthTransportRevision = "v3-sync-native";
+
         public static IEnumerator Post(
             string url,
             string body,
@@ -57,14 +59,21 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
 #if UNITY_IOS && !UNITY_EDITOR
                 yield return PostViaNative(authUrl, body, headers, value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, "native-ios"));
+                attempts.Add(DescribeAttempt(authResult, DescribeNativeTransport()));
                 if (IsUsableAuthResult(authResult))
                 {
                     callback(authResult);
                     yield break;
                 }
-#endif
 
+                callback(authResult ?? new SupabaseHttpResult
+                {
+                    Success = false,
+                    Transport = DescribeNativeTransport(),
+                    Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
+                });
+                yield break;
+#else
                 yield return PostViaHttpClient(authUrl, body, headers, value => authResult = value);
                 attempts.Add(DescribeAttempt(authResult, "httpclient"));
                 if (IsUsableAuthResult(authResult))
@@ -85,9 +94,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 {
                     Success = false,
                     Transport = "all",
-                    Error = BuildAuthFailureMessage(attempts)
+                    Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
                 });
                 yield break;
+#endif
             }
 
             SupabaseHttpResult result = null;
@@ -417,6 +427,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private static extern int DreamGate_Http_GetBodySize();
 
         [DllImport("__Internal")]
+        private static extern int DreamGate_Http_GetRevision();
+
+        [DllImport("__Internal")]
         private static extern void DreamGate_Http_CopyBody(byte[] buffer, int bufferSize);
 
         [DllImport("__Internal")]
@@ -460,13 +473,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             var statusCode = DreamGate_Http_GetStatusCode();
-            var bodyBytes = DreamGate_Http_GetBodySize();
-            var bodyBuffer = new byte[Math.Max(BodyBufferSize, bodyBytes + 1)];
+            var bodyBuffer = new byte[BodyBufferSize];
             DreamGate_Http_CopyBody(bodyBuffer, bodyBuffer.Length);
-
-            var responseBody = bodyBytes > 0
-                ? Encoding.UTF8.GetString(bodyBuffer, 0, bodyBytes)
-                : string.Empty;
+            var responseBody = ReadNullTerminatedUtf8(bodyBuffer);
+            var bodyBytes = string.IsNullOrEmpty(responseBody)
+                ? DreamGate_Http_GetBodySize()
+                : Encoding.UTF8.GetByteCount(responseBody);
 
             var errorBuffer = new byte[ErrorBufferSize];
             DreamGate_Http_CopyError(errorBuffer, errorBuffer.Length);
@@ -550,14 +562,29 @@ namespace DreamGate.Battlegrounds.Services.Backend
             return $"{transport}: HTTP {result.StatusCode}, {result.BodyBytes} bytes";
         }
 
-        private static string BuildAuthFailureMessage(IReadOnlyList<string> attempts)
+        private static string DescribeNativeTransport()
+        {
+            try
+            {
+                var revision = DreamGate_Http_GetRevision();
+                return revision > 0
+                    ? $"native-ios-r{revision}"
+                    : "native-ios-missing";
+            }
+            catch (Exception ex)
+            {
+                return $"native-ios-unavailable ({ex.GetType().Name})";
+            }
+        }
+
+        private static string BuildAuthFailureMessage(IReadOnlyList<string> attempts, string transportRevision)
         {
             if (attempts == null || attempts.Count == 0)
             {
-                return "All auth HTTP transports failed.";
+                return $"Auth HTTP failed ({transportRevision}).";
             }
 
-            return "All auth HTTP transports failed. " + string.Join("; ", attempts);
+            return $"Auth HTTP failed ({transportRevision}). " + string.Join("; ", attempts);
         }
 
         private static bool ShouldRetryEmptyAuthBody(string url, SupabaseHttpResult result)

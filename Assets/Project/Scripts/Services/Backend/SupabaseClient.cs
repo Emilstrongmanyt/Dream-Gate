@@ -325,7 +325,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             if (string.IsNullOrWhiteSpace(response))
             {
-                return "Authentication server returned an empty response (0 bytes). This is not a firewall issue.";
+                return $"Authentication server returned an empty response (0 bytes, {SupabaseHttpTransport.AuthTransportRevision}). This is not a firewall issue.";
             }
 
             if (!SupabaseAuthParser.Parse(response).HasSession)
