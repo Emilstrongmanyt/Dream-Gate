@@ -51,10 +51,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             if (url.Contains("/auth/v1/", StringComparison.Ordinal))
             {
+                var authUrl = PrepareAuthUrl(url, anonKey);
+                var attempts = new List<string>();
                 SupabaseHttpResult authResult = null;
 
 #if UNITY_IOS && !UNITY_EDITOR
-                yield return PostViaNative(url, body, headers, value => authResult = value);
+                yield return PostViaNative(authUrl, body, headers, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "native-ios"));
                 if (IsUsableAuthResult(authResult))
                 {
                     callback(authResult);
@@ -62,18 +65,27 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 }
 #endif
 
-                yield return PostViaHttpClient(url, body, headers, value => authResult = value);
+                yield return PostViaHttpClient(authUrl, body, headers, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "httpclient"));
                 if (IsUsableAuthResult(authResult))
                 {
                     callback(authResult);
                     yield break;
                 }
 
-                yield return PostViaUnityWebRequest(url, body, headers, anonKey, value => authResult = value);
+                yield return PostViaUnityWebRequest(authUrl, body, headers, anonKey, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "unity-webrequest"));
+                if (IsUsableAuthResult(authResult))
+                {
+                    callback(authResult);
+                    yield break;
+                }
+
                 callback(authResult ?? new SupabaseHttpResult
                 {
                     Success = false,
-                    Error = "All auth HTTP transports failed."
+                    Transport = "all",
+                    Error = BuildAuthFailureMessage(attempts)
                 });
                 yield break;
             }
@@ -106,10 +118,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             if (url.Contains("/auth/v1/", StringComparison.Ordinal))
             {
+                var authUrl = PrepareAuthUrl(url, anonKey);
                 SupabaseHttpResult authResult = null;
 
 #if UNITY_IOS && !UNITY_EDITOR
-                yield return GetViaNative(url, headers, value => authResult = value);
+                yield return GetViaNative(authUrl, headers, value => authResult = value);
                 if (IsUsableAuthResult(authResult))
                 {
                     callback(authResult);
@@ -117,12 +130,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 }
 #endif
 
-                yield return GetViaHttpClient(url, headers, value => authResult = value);
+                yield return GetViaHttpClient(authUrl, headers, value => authResult = value);
                 if (IsUsableAuthResult(authResult))
                 {
                     callback(authResult);
                     yield break;
                 }
+
+                url = authUrl;
             }
 
             using var request = UnityWebRequest.Get(url);
@@ -148,10 +163,28 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private static bool IsUsableAuthResult(SupabaseHttpResult result)
         {
+            if (result == null)
+            {
+                return false;
+            }
+
+            if (result.Success && result.BodyBytes > 0)
+            {
+                return true;
+            }
+
+            return !result.Success
+                   && !string.IsNullOrWhiteSpace(result.Error)
+                   && !IsEmptyBodySuccess(result);
+        }
+
+        private static bool IsEmptyBodySuccess(SupabaseHttpResult result)
+        {
             return result != null
-                   && (result.Success
-                       ? result.BodyBytes > 0
-                       : !string.IsNullOrWhiteSpace(result.Error));
+                   && result.Success
+                   && result.BodyBytes == 0
+                   && result.StatusCode >= 200
+                   && result.StatusCode < 300;
         }
 
         private static IEnumerator PostViaUnityWebRequest(
@@ -162,16 +195,27 @@ namespace DreamGate.Battlegrounds.Services.Backend
             Action<SupabaseHttpResult> callback)
         {
             SupabaseHttpResult result = null;
+            var payload = body ?? "{}";
+
             for (var attempt = 0; attempt < 2; attempt++)
             {
+#if UNITY_IOS && !UNITY_EDITOR
+                using var request = UnityWebRequest.Post(url, payload, "application/json");
+                request.timeout = 45;
+                request.useHttpContinue = false;
+                request.SetRequestHeader("Accept", "application/json");
+                request.SetRequestHeader("Accept-Encoding", "identity");
+                WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
+#else
                 using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
-                var bytes = Encoding.UTF8.GetBytes(body ?? string.Empty);
+                var bytes = Encoding.UTF8.GetBytes(payload);
                 WebRequestHelper.ConfigureJsonPost(request, bytes);
                 request.timeout = 45;
                 WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
+#endif
 
                 yield return request.SendWebRequest();
-                yield return WebRequestHelper.WaitForResponseReady();
+                yield return WebRequestHelper.WaitForResponseReady(request);
 
                 result = WebRequestHelper.BuildResult(
                     request,
@@ -188,7 +232,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     break;
                 }
 
-                yield return WebRequestHelper.WaitForResponseReady();
+                yield return WebRequestHelper.WaitForResponseReady(request);
             }
 
             callback(result);
@@ -253,6 +297,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
             using var request = new HttpRequestMessage(method, url);
+            request.Headers.TryAddWithoutValidation("Accept", "application/json");
+            request.Headers.TryAddWithoutValidation("Accept-Encoding", "identity");
+
             if (method == HttpMethod.Post)
             {
                 request.Content = new StringContent(body ?? "{}", Encoding.UTF8, "application/json");
@@ -276,9 +323,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 }
             }
 
-            using var response = await client.SendAsync(request).ConfigureAwait(false);
-            var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false) ?? string.Empty;
-            var bodyBytes = Encoding.UTF8.GetByteCount(responseBody);
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseContentRead).ConfigureAwait(false);
+            var responseBytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false) ?? Array.Empty<byte>();
+            var responseBody = responseBytes.Length > 0
+                ? Encoding.UTF8.GetString(responseBytes)
+                : string.Empty;
             var statusCode = (long)response.StatusCode;
             var httpSucceeded = statusCode >= 200 && statusCode < 300;
 
@@ -287,7 +338,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 Success = httpSucceeded,
                 StatusCode = statusCode,
                 Body = responseBody,
-                BodyBytes = bodyBytes,
+                BodyBytes = responseBytes.Length,
                 Transport = "httpclient",
                 Error = httpSucceeded
                     ? string.Empty
@@ -477,6 +528,36 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             return headers.TryGetValue("apikey", out var anonKey) ? anonKey : string.Empty;
+        }
+
+        private static string PrepareAuthUrl(string url, string anonKey)
+        {
+            return WebRequestHelper.WithApiKeyQuery(url, anonKey);
+        }
+
+        private static string DescribeAttempt(SupabaseHttpResult result, string transport)
+        {
+            if (result == null)
+            {
+                return $"{transport}: no result";
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Error))
+            {
+                return $"{transport}: {result.Error}";
+            }
+
+            return $"{transport}: HTTP {result.StatusCode}, {result.BodyBytes} bytes";
+        }
+
+        private static string BuildAuthFailureMessage(IReadOnlyList<string> attempts)
+        {
+            if (attempts == null || attempts.Count == 0)
+            {
+                return "All auth HTTP transports failed.";
+            }
+
+            return "All auth HTTP transports failed. " + string.Join("; ", attempts);
         }
 
         private static bool ShouldRetryEmptyAuthBody(string url, SupabaseHttpResult result)

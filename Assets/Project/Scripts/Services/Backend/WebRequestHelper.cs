@@ -89,14 +89,28 @@ namespace DreamGate.Battlegrounds.Services.Backend
             request.SetRequestHeader("Content-Length", (body?.Length ?? 0).ToString());
         }
 
-        public static IEnumerator WaitForResponseReady()
+        public static IEnumerator WaitForResponseReady(UnityWebRequest request = null)
         {
 #if UNITY_IOS && !UNITY_EDITOR
-            yield return null;
-            yield return null;
+            const int maxFrames = 60;
+            for (var frame = 0; frame < maxFrames; frame++)
+            {
+                if (request != null && HasResponseBytes(request))
+                {
+                    yield break;
+                }
+
+                yield return null;
+            }
 #else
             yield return null;
 #endif
+        }
+
+        public static bool HasResponseBytes(UnityWebRequest request)
+        {
+            var data = request?.downloadHandler?.data;
+            return data != null && data.Length > 0;
         }
 
         public static SupabaseHttpResult BuildResult(

@@ -21,6 +21,28 @@ static void DreamGateHttpFinish(NSInteger statusCode, NSData *body, NSString *er
     dreamGateHttpDone = YES;
 }
 
+static NSString *DreamGateHttpUrlWithApiKey(NSString *urlString, NSString *apikey)
+{
+    if (urlString.length == 0 || apikey.length == 0)
+    {
+        return urlString;
+    }
+
+    if ([urlString rangeOfString:@"apikey=" options:NSCaseInsensitiveSearch].location != NSNotFound)
+    {
+        return urlString;
+    }
+
+    NSString *encodedKey = [apikey stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+    if (encodedKey.length == 0)
+    {
+        return urlString;
+    }
+
+    NSString *separator = [urlString containsString:@"?"] ? @"&" : @"?";
+    return [NSString stringWithFormat:@"%@%@apikey=%@", urlString, separator, encodedKey];
+}
+
 static NSMutableURLRequest *DreamGateHttpBuildRequest(
     NSString *urlString,
     NSString *method,
@@ -28,7 +50,8 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
     NSString *apikey,
     NSString *authorization)
 {
-    NSURL *url = [NSURL URLWithString:urlString];
+    NSString *resolvedUrlString = DreamGateHttpUrlWithApiKey(urlString, apikey);
+    NSURL *url = [NSURL URLWithString:resolvedUrlString];
     if (url == nil)
     {
         return nil;
@@ -79,13 +102,21 @@ static void DreamGateHttpStart(NSString *urlString, NSString *method, NSString *
         return;
     }
 
-    NSURLSessionDataTask *task = [[NSURLSession sharedSession]
+    NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    configuration.timeoutIntervalForRequest = 45.0;
+    configuration.timeoutIntervalForResource = 45.0;
+    configuration.HTTPShouldUsePipelining = NO;
+    configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
+
+    NSURLSessionDataTask *task = [session
         dataTaskWithRequest:request
         completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (error != nil)
                 {
                     DreamGateHttpFinish(0, nil, error.localizedDescription ?: @"Native HTTP request failed.");
+                    [session finishTasksAndInvalidate];
                     return;
                 }
 
@@ -96,6 +127,7 @@ static void DreamGateHttpStart(NSString *urlString, NSString *method, NSString *
                 }
 
                 DreamGateHttpFinish(statusCode, data, nil);
+                [session finishTasksAndInvalidate];
             });
         }];
     [task resume];

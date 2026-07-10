@@ -375,9 +375,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             if (url.Contains("/auth/v1/", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(response))
             {
+                var detail = string.IsNullOrWhiteSpace(result.Error)
+                    ? $"via {result.Transport} (HTTP {result.StatusCode}, {result.BodyBytes} bytes)"
+                    : result.Error;
                 callback(
                     false,
-                    $"Authentication server returned an empty response via {result.Transport} (HTTP {result.StatusCode}, {result.BodyBytes} bytes).",
+                    $"Authentication server returned an empty response {detail}. This is not a firewall issue.",
                     response);
                 yield break;
             }
