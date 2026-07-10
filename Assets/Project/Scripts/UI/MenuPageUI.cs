@@ -251,12 +251,36 @@ namespace DreamGate.Battlegrounds.UI
 
         public static Button CreateAppleSignInButton(Transform parent, Vector2 pos, Action onClick)
         {
-            var go = new GameObject("SignInWithApple", typeof(RectTransform), typeof(Image), typeof(Button));
+            return CreateSocialSignInButton(parent, "SignInWithApple", "Sign in with Apple", pos, Color.black, Color.white, onClick);
+        }
+
+        public static Button CreateGoogleSignInButton(Transform parent, Vector2 pos, Action onClick)
+        {
+            return CreateSocialSignInButton(
+                parent,
+                "SignInWithGoogle",
+                "Sign in with Google",
+                pos,
+                new Color(0.98f, 0.98f, 0.98f, 1f),
+                new Color(0.2f, 0.2f, 0.2f, 1f),
+                onClick);
+        }
+
+        private static Button CreateSocialSignInButton(
+            Transform parent,
+            string name,
+            string label,
+            Vector2 pos,
+            Color backgroundColor,
+            Color textColor,
+            Action onClick)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
             var rect = go.GetComponent<RectTransform>();
             rect.anchoredPosition = pos;
             rect.sizeDelta = new Vector2(320, 72);
-            go.GetComponent<Image>().color = Color.black;
+            go.GetComponent<Image>().color = backgroundColor;
 
             var button = go.GetComponent<Button>();
             if (onClick != null)
@@ -277,8 +301,8 @@ namespace DreamGate.Battlegrounds.UI
             text.fontSizeMin = 16;
             text.fontSizeMax = 20;
             text.alignment = TextAlignmentOptions.Center;
-            text.color = Color.white;
-            text.text = "Sign in with Apple";
+            text.color = textColor;
+            text.text = label;
             return button;
         }
 

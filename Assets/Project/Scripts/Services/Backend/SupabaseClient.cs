@@ -113,6 +113,54 @@ namespace DreamGate.Battlegrounds.Services.Backend
             });
         }
 
+        public IEnumerator SignInWithOAuthTokens(string accessToken, string refreshToken, Action<bool, string> callback)
+        {
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                callback(false, "Google sign in did not return an access token.");
+                yield break;
+            }
+
+            var response = ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "access_token", accessToken },
+                { "refresh_token", refreshToken ?? string.Empty }
+            });
+
+            ApplyAuthResponse(response);
+            var authenticated = IsAuthenticated;
+            callback(authenticated, authenticated ? "Welcome!" : "Google sign in failed.");
+            yield break;
+        }
+
+        public IEnumerator SignInWithOAuthCode(string authCode, string codeVerifier, Action<bool, string> callback)
+        {
+            if (string.IsNullOrWhiteSpace(authCode))
+            {
+                callback(false, "Google sign in did not return an authorization code.");
+                yield break;
+            }
+
+            var body = ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "auth_code", authCode },
+                { "code_verifier", codeVerifier ?? string.Empty }
+            });
+
+            yield return PostJson($"{settings.supabaseUrl}/auth/v1/token?grant_type=pkce", body, false, (success, response, error) =>
+            {
+                if (!success)
+                {
+                    callback(false, NormalizeAuthError(error, response));
+                    return;
+                }
+
+                ApplyAuthResponse(response);
+                var authenticated = IsAuthenticated;
+                callback(authenticated, authenticated ? "Welcome!" : DescribeMissingSession(response, "Google sign in failed."));
+            });
+        }
+
         public void SignOut()
         {
             AccessToken = null;

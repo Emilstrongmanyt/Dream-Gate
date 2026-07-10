@@ -260,6 +260,75 @@ namespace DreamGate.Battlegrounds.Services
             callback(true, $"Welcome, {Profile?.displayName ?? appleResult.DisplayName ?? "Dreamer"}!");
         }
 
+        public static IEnumerator CoTryGoogleSignIn(System.Action<bool, string> callback)
+        {
+            if (!UseCloudBackend || CloudClient == null)
+            {
+                callback(false, "Cloud sign in is not available.");
+                yield break;
+            }
+
+            if (!GoogleSignInService.IsSupported)
+            {
+                callback(false, "Sign in with Google is only available on iOS.");
+                yield break;
+            }
+
+            var settings = BackendSettings.Load();
+            GoogleSignInRequestResult googleResult = null;
+            yield return GoogleSignInService.RequestSignIn(settings.supabaseUrl, result => googleResult = result);
+            if (googleResult == null || !googleResult.Success)
+            {
+                callback(false, googleResult?.Error ?? "Google sign in failed.");
+                yield break;
+            }
+
+            var success = false;
+            var message = string.Empty;
+            if (!string.IsNullOrWhiteSpace(googleResult.AccessToken))
+            {
+                yield return CloudClient.SignInWithOAuthTokens(
+                    googleResult.AccessToken,
+                    googleResult.RefreshToken,
+                    (ok, msg) =>
+                    {
+                        success = ok;
+                        message = msg;
+                    });
+            }
+            else
+            {
+                yield return CloudClient.SignInWithOAuthCode(
+                    googleResult.AuthCode,
+                    googleResult.CodeVerifier,
+                    (ok, msg) =>
+                    {
+                        success = ok;
+                        message = msg;
+                    });
+            }
+
+            if (!success)
+            {
+                callback(false, message);
+                yield break;
+            }
+
+            var displayName = CloudClient.DisplayNameFromMetadata;
+            if (string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(CloudClient.UserEmail))
+            {
+                displayName = CloudClient.UserEmail.Split('@')[0];
+            }
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                yield return CloudClient.UpdateDisplayName(displayName.Trim(), (_, _) => { });
+            }
+
+            yield return WaitForCloudProfileRoutine();
+            callback(true, $"Welcome, {Profile?.displayName ?? displayName ?? "Dreamer"}!");
+        }
+
         public static void Logout()
         {
             if (UseCloudBackend)

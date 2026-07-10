@@ -50,6 +50,13 @@ namespace DreamGate.Battlegrounds.UI
                 var appleButton = MenuPageUI.CreateAppleSignInButton(root.transform, new Vector2(0, -160), null);
                 appleButton.onClick.AddListener(view.SubmitApple);
             }
+
+            if (DreamGateServices.UseCloudBackend && GoogleSignInService.IsSupported)
+            {
+                var googleButton = MenuPageUI.CreateGoogleSignInButton(root.transform, new Vector2(0, -250), null);
+                googleButton.onClick.AddListener(view.SubmitGoogle);
+            }
+
             MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke());
             root.SetActive(false);
             return view;
@@ -146,6 +153,43 @@ namespace DreamGate.Battlegrounds.UI
             statusText.color = new Color(1f, 0.55f, 0.55f);
             statusText.text = message;
         }
+
+        private void SubmitGoogle()
+        {
+            statusText.color = Color.white;
+            statusText.text = "Signing in with Google...";
+            CloudCoroutineHost.Instance.Run(GoogleSignInRoutine());
+        }
+
+        private IEnumerator GoogleSignInRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            yield return DreamGateServices.CoTryGoogleSignIn((ok, msg) =>
+            {
+                success = ok;
+                message = msg;
+            });
+
+            if (success)
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
+                yield break;
+            }
+
+            if (message.IndexOf("cancelled", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                statusText.color = new Color(0.85f, 0.9f, 1f, 1f);
+                statusText.text = string.Empty;
+                yield break;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
     }
 
     public sealed class CreateAccountPageView
@@ -209,6 +253,12 @@ namespace DreamGate.Battlegrounds.UI
             {
                 var appleButton = MenuPageUI.CreateAppleSignInButton(root.transform, new Vector2(0, -310), null);
                 appleButton.onClick.AddListener(view.SubmitApple);
+            }
+
+            if (DreamGateServices.UseCloudBackend && GoogleSignInService.IsSupported)
+            {
+                var googleButton = MenuPageUI.CreateGoogleSignInButton(root.transform, new Vector2(0, -400), null);
+                googleButton.onClick.AddListener(view.SubmitGoogle);
             }
 
             MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -760f);
@@ -299,6 +349,43 @@ namespace DreamGate.Battlegrounds.UI
             var success = false;
             var message = string.Empty;
             yield return DreamGateServices.CoTryAppleSignIn((ok, msg) =>
+            {
+                success = ok;
+                message = msg;
+            });
+
+            if (success)
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
+                yield break;
+            }
+
+            if (message.IndexOf("cancelled", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                statusText.color = new Color(0.85f, 0.9f, 1f, 1f);
+                statusText.text = string.Empty;
+                yield break;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+
+        private void SubmitGoogle()
+        {
+            statusText.color = Color.white;
+            statusText.text = "Signing in with Google...";
+            CloudCoroutineHost.Instance.Run(GoogleSignInRoutine());
+        }
+
+        private IEnumerator GoogleSignInRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            yield return DreamGateServices.CoTryGoogleSignIn((ok, msg) =>
             {
                 success = ok;
                 message = msg;
