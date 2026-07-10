@@ -155,15 +155,13 @@ static void DreamGateHttpExecute(
             NSString *transportError = requestError != nil ? requestError.localizedDescription : nil;
             NSData *bodyData = responseData;
 
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (transportError != nil)
-                {
-                    DreamGateHttpFinish(0, nil, transportError);
-                    return;
-                }
+            if (transportError != nil)
+            {
+                DreamGateHttpFinish(0, nil, transportError);
+                return;
+            }
 
-                DreamGateHttpFinish(statusCode, bodyData, nil);
-            });
+            DreamGateHttpFinish(statusCode, bodyData, nil);
         }
     });
 }
