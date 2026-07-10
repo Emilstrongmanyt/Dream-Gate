@@ -19,14 +19,8 @@ on:
         description: Run ID to download build-iOS artifact from (sign_only only)
         required: false
         default: '28780309888'
-  push:
-    branches:
-      - main
-    paths:
-      - 'Assets/**'
-      - 'Packages/**'
-      - 'ProjectSettings/**'
-      - '.github/**'
+  # Auto-upload paused until email/Apple auth is verified on device.
+  # Trigger manually from GitHub Actions when ready for TestFlight.
 
 env:
   UNITY_VERSION: 6000.5.2f1

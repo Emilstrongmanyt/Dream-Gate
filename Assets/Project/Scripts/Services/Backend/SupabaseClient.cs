@@ -17,7 +17,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         public string UserId { get; private set; }
         public string UserEmail { get; private set; }
 
-        public bool IsAuthenticated => !string.IsNullOrEmpty(AccessToken) && !string.IsNullOrEmpty(UserId);
+        public bool IsAuthenticated => !string.IsNullOrEmpty(AccessToken);
 
         public string DisplayNameFromMetadata { get; private set; }
 
@@ -37,35 +37,43 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 $"\"data\":{{\"display_name\":\"{ApiJson.Escape(displayName)}\"}}" +
                 "}";
 
+            var signupSuccess = false;
+            var signupResponse = string.Empty;
+            var signupError = string.Empty;
             yield return PostJson($"{settings.supabaseUrl}/auth/v1/signup", body, false, (success, response, error) =>
             {
-                if (!success)
-                {
-                    callback(false, NormalizeAuthError(error, response), false);
-                    return;
-                }
-
-                var parsed = ApplyAuthResponse(response);
-                if (IsAuthenticated)
-                {
-                    callback(true, $"Account created. Welcome, {displayName}!", false);
-                    return;
-                }
-
-                if (parsed.LooksLikePendingEmailConfirmation)
-                {
-                    callback(
-                        true,
-                        "Account created. Check your email to confirm your account, then log in.",
-                        true);
-                    return;
-                }
-
-                callback(
-                    false,
-                    DescribeMissingSession(response, "Sign up could not start a session. If you already registered, try logging in instead."),
-                    false);
+                signupSuccess = success;
+                signupResponse = response;
+                signupError = error;
             });
+
+            if (!signupSuccess)
+            {
+                callback(false, NormalizeAuthError(signupError, signupResponse), false);
+                yield break;
+            }
+
+            var parsed = ApplyAuthResponse(signupResponse);
+            if (IsAuthenticated)
+            {
+                yield return EnsureUserIdentity();
+                callback(true, $"Account created. Welcome, {displayName}!", false);
+                yield break;
+            }
+
+            if (parsed.LooksLikePendingEmailConfirmation)
+            {
+                callback(
+                    true,
+                    "Account created. Check your email to confirm your account, then log in.",
+                    true);
+                yield break;
+            }
+
+            callback(
+                false,
+                DescribeMissingSession(signupResponse, "Sign up could not start a session. If you already registered, try logging in instead."),
+                false);
         }
 
         public IEnumerator SignIn(string email, string password, Action<bool, string> callback)
@@ -76,18 +84,31 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 { "password", password }
             });
 
+            var loginSuccess = false;
+            var loginResponse = string.Empty;
+            var loginError = string.Empty;
             yield return PostJson($"{settings.supabaseUrl}/auth/v1/token?grant_type=password", body, false, (success, response, error) =>
             {
-                if (!success)
-                {
-                    callback(false, NormalizeAuthError(error, response));
-                    return;
-                }
-
-                ApplyAuthResponse(response);
-                var authenticated = IsAuthenticated;
-                callback(authenticated, authenticated ? "Welcome back!" : DescribeMissingSession(response, "Login failed."));
+                loginSuccess = success;
+                loginResponse = response;
+                loginError = error;
             });
+
+            if (!loginSuccess)
+            {
+                callback(false, NormalizeAuthError(loginError, loginResponse));
+                yield break;
+            }
+
+            ApplyAuthResponse(loginResponse);
+            if (!IsAuthenticated)
+            {
+                callback(false, DescribeMissingSession(loginResponse, "Login failed."));
+                yield break;
+            }
+
+            yield return EnsureUserIdentity();
+            callback(true, "Welcome back!");
         }
 
         public IEnumerator SignInWithApple(string idToken, string nonce, Action<bool, string> callback)
@@ -99,18 +120,31 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 { "nonce", nonce }
             });
 
+            var appleSuccess = false;
+            var appleResponse = string.Empty;
+            var appleError = string.Empty;
             yield return PostJson($"{settings.supabaseUrl}/auth/v1/token?grant_type=id_token", body, false, (success, response, error) =>
             {
-                if (!success)
-                {
-                    callback(false, NormalizeAuthError(error, response));
-                    return;
-                }
-
-                ApplyAuthResponse(response);
-                var authenticated = IsAuthenticated;
-                callback(authenticated, authenticated ? "Welcome!" : DescribeMissingSession(response, "Apple sign in failed."));
+                appleSuccess = success;
+                appleResponse = response;
+                appleError = error;
             });
+
+            if (!appleSuccess)
+            {
+                callback(false, NormalizeAuthError(appleError, appleResponse));
+                yield break;
+            }
+
+            ApplyAuthResponse(appleResponse);
+            if (!IsAuthenticated)
+            {
+                callback(false, DescribeMissingSession(appleResponse, "Apple sign in failed."));
+                yield break;
+            }
+
+            yield return EnsureUserIdentity();
+            callback(true, "Welcome!");
         }
 
         public IEnumerator SignInWithOAuthTokens(string accessToken, string refreshToken, Action<bool, string> callback)
@@ -183,6 +217,17 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
+            if (string.IsNullOrEmpty(UserId))
+            {
+                yield return EnsureUserIdentity();
+            }
+
+            if (string.IsNullOrEmpty(UserId))
+            {
+                callback(false, "Signed in, but the user id was missing from the auth response.", null);
+                yield break;
+            }
+
             var url = $"{settings.supabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}&select=*";
             yield return Get(url, (success, response, error) =>
             {
@@ -241,7 +286,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 UserEmail = string.IsNullOrEmpty(UserEmail) ? ApiJson.TryGetJwtClaim(AccessToken, "email") : UserEmail;
             }
 
-            if (string.IsNullOrEmpty(AccessToken) || string.IsNullOrEmpty(UserId))
+            if (string.IsNullOrEmpty(AccessToken))
             {
                 SignOut();
             }
@@ -267,12 +312,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             UserId ??= ApiJson.TryGetJwtClaim(AccessToken, "sub");
             UserEmail ??= ApiJson.TryGetJwtClaim(AccessToken, "email");
-
-            if (string.IsNullOrEmpty(UserId))
-            {
-                Debug.LogWarning("Supabase auth response contained an access token but no user id.");
-                return parsed;
-            }
 
             PlayerPrefs.SetString(SessionAccessTokenKey, AccessToken);
             PlayerPrefs.SetString(SessionRefreshTokenKey, RefreshToken ?? string.Empty);
@@ -312,49 +351,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private IEnumerator PostJson(string url, string body, bool useAuth, Action<bool, string, string> callback)
         {
-            if (url.Contains("/auth/v1/", StringComparison.Ordinal) || WebRequestHelper.ShouldPreferHttpClient)
-            {
-                yield return PostJsonViaHttpClient(url, body, useAuth, callback);
-                yield break;
-            }
-
-            using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
-            var bytes = Encoding.UTF8.GetBytes(body);
-            WebRequestHelper.ConfigureJsonPost(request, bytes);
-            ApplyRequestHeaders(request, useAuth, url);
-            yield return request.SendWebRequest();
-
-            var response = WebRequestHelper.ReadResponseText(request);
-            if (request.result != UnityWebRequest.Result.Success)
-            {
-                var message = NormalizeAuthError(
-                    ApiJson.TryGetString(response, "msg")
-                    ?? ApiJson.TryGetString(response, "error_description")
-                    ?? ApiJson.TryGetString(response, "error")
-                    ?? request.error
-                    ?? $"Request failed (HTTP {request.responseCode}).",
-                    response);
-                callback(false, message, response);
-                yield break;
-            }
-
-            if (url.Contains("/auth/v1/", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(response))
-            {
-                yield return PostJsonViaHttpClient(url, body, useAuth, callback);
-                yield break;
-            }
-
-            callback(true, string.Empty, response);
-        }
-
-        private IEnumerator PostJsonViaHttpClient(string url, string body, bool useAuth, Action<bool, string, string> callback)
-        {
             SupabaseHttpResult result = null;
             yield return SupabaseHttpTransport.Post(url, body, BuildRequestHeaders(useAuth, url), value => result = value);
 
             if (result == null)
             {
-                callback(false, "Authentication request failed.", string.Empty);
+                callback(false, "Request failed to start.", string.Empty);
                 yield break;
             }
 
@@ -369,7 +371,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 callback(
                     false,
-                    $"Authentication server returned an empty response (HTTP {result.StatusCode}). Check your connection and try again.",
+                    $"Authentication server returned an empty response (HTTP {result.StatusCode}, {result.BodyBytes} bytes). Check your connection and try again.",
                     response);
                 yield break;
             }
@@ -377,11 +379,35 @@ namespace DreamGate.Battlegrounds.Services.Backend
             callback(true, string.Empty, response);
         }
 
-        private void ApplyRequestHeaders(UnityWebRequest request, bool useAuth, string url)
+        private IEnumerator EnsureUserIdentity()
         {
-            foreach (var header in BuildRequestHeaders(useAuth, url))
+            if (string.IsNullOrEmpty(AccessToken))
             {
-                request.SetRequestHeader(header.Key, header.Value);
+                yield break;
+            }
+
+            UserId ??= ApiJson.TryGetJwtClaim(AccessToken, "sub");
+            UserEmail ??= ApiJson.TryGetJwtClaim(AccessToken, "email");
+            if (!string.IsNullOrEmpty(UserId))
+            {
+                yield break;
+            }
+
+            var url = $"{settings.supabaseUrl}/auth/v1/user";
+            SupabaseHttpResult result = null;
+            yield return SupabaseHttpTransport.Get(url, BuildRequestHeaders(true, url), value => result = value);
+            if (result == null || !result.Success || string.IsNullOrWhiteSpace(result.Body))
+            {
+                yield break;
+            }
+
+            UserId = ApiJson.TryGetTopLevelString(result.Body, "id");
+            UserEmail ??= ApiJson.TryGetTopLevelString(result.Body, "email");
+            if (!string.IsNullOrEmpty(UserId))
+            {
+                PlayerPrefs.SetString(SessionUserIdKey, UserId);
+                PlayerPrefs.SetString(SessionUserEmailKey, UserEmail ?? string.Empty);
+                PlayerPrefs.Save();
             }
         }
 

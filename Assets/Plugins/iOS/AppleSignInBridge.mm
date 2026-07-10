@@ -6,6 +6,7 @@ extern UIViewController *UnityGetGLViewController(void);
 
 static id dreamGateAppleSignInDelegate = nil;
 static ASAuthorizationController *dreamGateAppleAuthorizationController = nil;
+static NSString *dreamGateApplePendingJson = nil;
 
 @interface DreamGateAppleSignInDelegate : NSObject<ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
 @property (nonatomic, copy) NSString *callbackObject;
@@ -118,10 +119,11 @@ static ASAuthorizationController *dreamGateAppleAuthorizationController = nil;
         json = fallback;
     }
 
+    dreamGateApplePendingJson = json;
     UnitySendMessage(
         [self.callbackObject UTF8String],
         [self.callbackMethod UTF8String],
-        [json UTF8String]);
+        "ready");
 }
 
 - (void)authorizationController:(ASAuthorizationController *)controller
@@ -167,6 +169,30 @@ static ASAuthorizationController *dreamGateAppleAuthorizationController = nil;
 }
 
 @end
+
+extern "C" void DreamGate_AppleSignIn_CopyResult(char *buffer, int bufferSize)
+{
+    if (buffer == NULL || bufferSize <= 0)
+    {
+        return;
+    }
+
+    buffer[0] = '\0';
+    if (dreamGateApplePendingJson == nil || dreamGateApplePendingJson.length == 0)
+    {
+        return;
+    }
+
+    const char *utf8 = [dreamGateApplePendingJson UTF8String];
+    if (utf8 == NULL)
+    {
+        return;
+    }
+
+    strncpy(buffer, utf8, (size_t)bufferSize - 1);
+    buffer[bufferSize - 1] = '\0';
+    dreamGateApplePendingJson = nil;
+}
 
 extern "C" void DreamGate_AppleSignIn_Request(const char *hashedNonce, const char *callbackObject, const char *callbackMethod)
 {

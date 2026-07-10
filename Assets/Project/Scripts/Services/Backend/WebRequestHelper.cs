@@ -1,5 +1,4 @@
 using System.Text;
-using UnityEngine;
 using UnityEngine.Networking;
 
 namespace DreamGate.Battlegrounds.Services.Backend
@@ -14,19 +13,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 return string.Empty;
             }
 
-            var text = handler.text;
-            if (!string.IsNullOrEmpty(text))
-            {
-                return text;
-            }
-
             var data = handler.data;
-            if (data == null || data.Length == 0)
+            if (data != null && data.Length > 0)
             {
-                return string.Empty;
+                return Encoding.UTF8.GetString(data);
             }
 
-            return Encoding.UTF8.GetString(data);
+            return handler.text ?? string.Empty;
         }
 
         public static void ConfigureJsonPost(UnityWebRequest request, byte[] body, bool disposeHandlers = true)
@@ -38,16 +31,29 @@ namespace DreamGate.Battlegrounds.Services.Backend
             request.downloadHandler = new DownloadHandlerBuffer();
             request.disposeUploadHandlerOnDispose = disposeHandlers;
             request.disposeDownloadHandlerOnDispose = disposeHandlers;
+            request.chunkedTransfer = false;
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("Accept-Encoding", "identity");
         }
 
-        public static bool ShouldPreferHttpClient =>
-#if UNITY_IOS && !UNITY_EDITOR
-            true;
-#else
-            Application.platform == RuntimePlatform.IPhonePlayer;
-#endif
+        public static string DescribeTransportError(UnityWebRequest request, string responseBody)
+        {
+            var parsed = ApiJson.TryGetString(responseBody, "msg")
+                         ?? ApiJson.TryGetString(responseBody, "error_description")
+                         ?? ApiJson.TryGetString(responseBody, "error")
+                         ?? ApiJson.TryGetString(responseBody, "message");
+            if (!string.IsNullOrWhiteSpace(parsed))
+            {
+                return parsed;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request?.error))
+            {
+                return request.error;
+            }
+
+            return $"Request failed (HTTP {request?.responseCode ?? 0}).";
+        }
     }
 }

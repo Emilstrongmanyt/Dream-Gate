@@ -25,6 +25,8 @@ namespace DreamGate.Battlegrounds.Services
 
             if (UseCloudBackend)
             {
+                _ = CloudCoroutineHost.Instance;
+                AppleSignInNative.Warmup();
                 CloudClient ??= new SupabaseClient(settings, CloudCoroutineHost.Instance);
                 if (CloudClient.IsAuthenticated)
                 {

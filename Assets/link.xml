@@ -3,9 +3,6 @@
     <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseAuthParser" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseHttpTransport" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.ApiJson" preserve="all" />
-  </assembly>
-  <assembly fullname="System.Net.Http">
-    <type fullname="System.Net.Http.HttpClient" preserve="all" />
-    <type fullname="System.Net.Http.HttpClientHandler" preserve="all" />
+    <type fullname="DreamGate.Battlegrounds.Services.Backend.AppleSignInNative" preserve="all" />
   </assembly>
 </linker>
