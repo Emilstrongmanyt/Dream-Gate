@@ -1,4 +1,6 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -7,6 +9,53 @@ namespace DreamGate.Battlegrounds.Services.Backend
 {
     internal static class WebRequestHelper
     {
+        public static string WithApiKeyQuery(string url, string anonKey)
+        {
+            if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(anonKey))
+            {
+                return url;
+            }
+
+            if (url.IndexOf("apikey=", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return url;
+            }
+
+            var separator = url.Contains("?") ? "&" : "?";
+            return $"{url}{separator}apikey={Uri.EscapeDataString(anonKey.Trim())}";
+        }
+
+        public static void ApplySupabaseHeaders(
+            UnityWebRequest request,
+            IReadOnlyDictionary<string, string> headers,
+            string anonKey)
+        {
+            if (!string.IsNullOrWhiteSpace(anonKey))
+            {
+                request.SetRequestHeader("apikey", anonKey.Trim());
+            }
+
+            if (headers == null)
+            {
+                return;
+            }
+
+            foreach (var header in headers)
+            {
+                if (string.IsNullOrWhiteSpace(header.Key) || header.Value == null)
+                {
+                    continue;
+                }
+
+                if (header.Key.Equals("apikey", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                request.SetRequestHeader(header.Key, header.Value);
+            }
+        }
+
         public static string ReadResponseText(UnityWebRequest request)
         {
             var handler = request?.downloadHandler;

@@ -34,26 +34,26 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
+            var anonKey = TryGetAnonKey(headers);
+            if (string.IsNullOrWhiteSpace(anonKey) && url.Contains("/auth/v1/", StringComparison.Ordinal))
+            {
+                callback(new SupabaseHttpResult
+                {
+                    Success = false,
+                    Error = "Supabase anon key is missing from this build."
+                });
+                yield break;
+            }
+
+            var requestUrl = WebRequestHelper.WithApiKeyQuery(url, anonKey);
             SupabaseHttpResult result = null;
             for (var attempt = 0; attempt < 2; attempt++)
             {
-                using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
+                using var request = new UnityWebRequest(requestUrl, UnityWebRequest.kHttpVerbPOST);
                 var bytes = Encoding.UTF8.GetBytes(body ?? string.Empty);
                 WebRequestHelper.ConfigureJsonPost(request, bytes);
                 request.timeout = 45;
-
-                if (headers != null)
-                {
-                    foreach (var header in headers)
-                    {
-                        if (string.IsNullOrWhiteSpace(header.Key) || header.Value == null)
-                        {
-                            continue;
-                        }
-
-                        request.SetRequestHeader(header.Key, header.Value);
-                    }
-                }
+                WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
 
                 yield return request.SendWebRequest();
                 yield return WebRequestHelper.WaitForResponseReady();
@@ -80,6 +80,16 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 Success = false,
                 Error = "Request failed to complete."
             });
+        }
+
+        private static string TryGetAnonKey(IReadOnlyDictionary<string, string> headers)
+        {
+            if (headers == null)
+            {
+                return string.Empty;
+            }
+
+            return headers.TryGetValue("apikey", out var anonKey) ? anonKey : string.Empty;
         }
 
         private static bool ShouldRetryEmptyAuthBody(string url, SupabaseHttpResult result)
@@ -130,24 +140,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
-            using var request = UnityWebRequest.Get(url);
+            var anonKey = TryGetAnonKey(headers);
+            var requestUrl = WebRequestHelper.WithApiKeyQuery(url, anonKey);
+            using var request = UnityWebRequest.Get(requestUrl);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.timeout = 45;
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("Accept-Encoding", "identity");
-
-            if (headers != null)
-            {
-                foreach (var header in headers)
-                {
-                    if (string.IsNullOrWhiteSpace(header.Key) || header.Value == null)
-                    {
-                        continue;
-                    }
-
-                    request.SetRequestHeader(header.Key, header.Value);
-                }
-            }
+            WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
 
             yield return request.SendWebRequest();
             yield return WebRequestHelper.WaitForResponseReady();

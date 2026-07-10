@@ -414,19 +414,20 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private Dictionary<string, string> BuildRequestHeaders(bool useAuth, string url)
         {
             var headers = new Dictionary<string, string>();
-            if (string.IsNullOrEmpty(settings?.supabaseAnonKey))
+            var anonKey = settings?.supabaseAnonKey?.Trim();
+            if (string.IsNullOrEmpty(anonKey))
             {
                 return headers;
             }
 
-            headers["apikey"] = settings.supabaseAnonKey;
+            headers["apikey"] = anonKey;
             if (useAuth)
             {
                 headers["Authorization"] = $"Bearer {AccessToken}";
             }
             else if (url.Contains("/auth/v1/", StringComparison.Ordinal))
             {
-                headers["Authorization"] = $"Bearer {settings.supabaseAnonKey}";
+                headers["Authorization"] = $"Bearer {anonKey}";
             }
 
             return headers;
@@ -486,6 +487,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
             if (errorCode == "weak_password")
             {
                 return "Password is too weak. Use at least 6 characters.";
+            }
+
+            if (error.IndexOf("No API key found", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Supabase API key was not sent with the request. Reinstall the latest TestFlight build.";
             }
 
             if (error.IndexOf("confirm", StringComparison.OrdinalIgnoreCase) >= 0)
