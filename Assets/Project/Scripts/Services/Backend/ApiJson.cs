@@ -112,6 +112,91 @@ namespace DreamGate.Battlegrounds.Services.Backend
             return bool.TryParse(raw, out var value) ? value : fallback;
         }
 
+        public static string ExtractNestedObject(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(key))
+            {
+                return string.Empty;
+            }
+
+            var pattern = $"\"{key}\":";
+            var index = json.IndexOf(pattern, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return string.Empty;
+            }
+
+            index = json.IndexOf('{', index);
+            if (index < 0)
+            {
+                return string.Empty;
+            }
+
+            var depth = 0;
+            for (var i = index; i < json.Length; i++)
+            {
+                if (json[i] == '{')
+                {
+                    depth++;
+                }
+                else if (json[i] == '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return json.Substring(index, i - index + 1);
+                    }
+                }
+            }
+
+            return string.Empty;
+        }
+
+        public static string TryGetJwtClaim(string accessToken, string claim)
+        {
+            if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(claim))
+            {
+                return null;
+            }
+
+            var parts = accessToken.Split('.');
+            if (parts.Length < 2)
+            {
+                return null;
+            }
+
+            try
+            {
+                var payload = parts[1].Replace('-', '+').Replace('_', '/');
+                switch (payload.Length % 4)
+                {
+                    case 2:
+                        payload += "==";
+                        break;
+                    case 3:
+                        payload += "=";
+                        break;
+                }
+
+                var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+                return TryGetString(json, claim);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public static string NormalizeResponseJson(string rawJson)
+        {
+            if (string.IsNullOrEmpty(rawJson))
+            {
+                return string.Empty;
+            }
+
+            return rawJson.Trim('\uFEFF', ' ', '\n', '\r', '\t');
+        }
+
         public static List<string> ExtractObjectChunks(string arrayJson)
         {
             var results = new List<string>();

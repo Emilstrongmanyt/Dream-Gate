@@ -150,7 +150,7 @@ namespace DreamGate.Battlegrounds.Services
                 {
                     yield return CloudClient.SignIn(email, password, (loginOk, loginMsg) =>
                     {
-                        if (loginOk)
+                        if (loginOk || CloudClient.IsAuthenticated)
                         {
                             success = true;
                             message = $"Welcome back, {displayName}!";
@@ -197,14 +197,14 @@ namespace DreamGate.Battlegrounds.Services
                 message = msg;
             });
 
-            if (!success)
+            if (!success && !CloudClient.IsAuthenticated)
             {
                 callback(false, message);
                 yield break;
             }
 
             yield return LoadCloudProfileRoutine();
-            callback(true, $"Welcome back, {Profile?.displayName ?? "Dreamer"}!");
+            callback(true, $"Welcome back, {Profile?.displayName ?? CloudClient.DisplayNameFromMetadata ?? "Dreamer"}!");
         }
 
         public static IEnumerator CoTryAppleSignIn(System.Action<bool, string> callback)
@@ -353,8 +353,44 @@ namespace DreamGate.Battlegrounds.Services
 
             yield return CloudClient.GetProfile((success, _, loadedProfile) =>
             {
-                Profile = success ? loadedProfile : null;
+                if (success && loadedProfile != null)
+                {
+                    Profile = loadedProfile;
+                    return;
+                }
+
+                if (!CloudClient.IsAuthenticated)
+                {
+                    Profile = null;
+                    return;
+                }
+
+                Profile = BuildFallbackCloudProfile();
             });
+        }
+
+        private static PlayerProfile BuildFallbackCloudProfile()
+        {
+            var email = CloudClient.UserEmail ?? string.Empty;
+            var displayName = CloudClient.DisplayNameFromMetadata;
+            if (string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrEmpty(email))
+            {
+                displayName = email.Split('@')[0];
+            }
+
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                displayName = "Dreamer";
+            }
+
+            return new PlayerProfile
+            {
+                playerId = CloudClient.UserId,
+                email = email,
+                displayName = displayName,
+                mmr = PlayerProfile.DefaultMmr,
+                highestMmr = PlayerProfile.DefaultMmr
+            };
         }
 
         private static IEnumerator WaitForCloudProfileRoutine()
