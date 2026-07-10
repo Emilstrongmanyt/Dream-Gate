@@ -266,9 +266,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
             var bytes = Encoding.UTF8.GetBytes(body);
-            request.uploadHandler = new UploadHandlerRaw(bytes);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
+            WebRequestHelper.ConfigureJsonPost(request, bytes);
             if (!string.IsNullOrEmpty(settings?.supabaseAnonKey))
             {
                 request.SetRequestHeader("apikey", settings.supabaseAnonKey);
@@ -284,7 +282,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             yield return request.SendWebRequest();
 
-            var response = request.downloadHandler?.text ?? string.Empty;
+            var response = WebRequestHelper.ReadResponseText(request);
             if (request.result != UnityWebRequest.Result.Success)
             {
                 var message = NormalizeAuthError(
@@ -292,7 +290,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     ?? ApiJson.TryGetString(response, "error_description")
                     ?? ApiJson.TryGetString(response, "error")
                     ?? request.error
-                    ?? "Request failed.",
+                    ?? $"Request failed (HTTP {request.responseCode}).",
                     response);
                 callback(false, message, response);
                 yield break;
@@ -300,7 +298,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             if (url.Contains("/auth/v1/", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(response))
             {
-                callback(false, "Authentication server returned an empty response.", response);
+                callback(
+                    false,
+                    $"Authentication server returned an empty response (HTTP {request.responseCode}). Check your connection and try again.",
+                    response);
                 yield break;
             }
 
@@ -314,7 +315,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
             yield return request.SendWebRequest();
 
-            var response = request.downloadHandler?.text ?? string.Empty;
+            var response = WebRequestHelper.ReadResponseText(request);
             if (request.result != UnityWebRequest.Result.Success)
             {
                 callback(false, request.error ?? "Request failed.", response);
@@ -328,15 +329,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             using var request = new UnityWebRequest(url, "PATCH");
             var bytes = Encoding.UTF8.GetBytes(body);
-            request.uploadHandler = new UploadHandlerRaw(bytes);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
+            WebRequestHelper.ConfigureJsonPost(request, bytes);
             request.SetRequestHeader("apikey", settings.supabaseAnonKey);
             request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
             request.SetRequestHeader("Prefer", "return=minimal");
             yield return request.SendWebRequest();
 
-            var response = request.downloadHandler?.text ?? string.Empty;
+            var response = WebRequestHelper.ReadResponseText(request);
             if (request.result != UnityWebRequest.Result.Success)
             {
                 callback(false, request.error ?? "Request failed.", response);

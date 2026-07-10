@@ -27,9 +27,19 @@ namespace DreamGate.Battlegrounds.Services.Backend
             AppleSignInCredential credential = null;
 
             AppleSignInNative.RequestAuthorization(hashedNonce, result => credential = result);
-            while (credential == null)
+
+            const float timeoutSeconds = 60f;
+            var elapsed = 0f;
+            while (credential == null && elapsed < timeoutSeconds)
             {
+                elapsed += UnityEngine.Time.unscaledDeltaTime;
                 yield return null;
+            }
+
+            if (credential == null)
+            {
+                callback(AppleSignInRequestResult.Failed("Apple sign in timed out. Try again."));
+                yield break;
             }
 
             if (!credential.Success || string.IsNullOrWhiteSpace(credential.IdentityToken))

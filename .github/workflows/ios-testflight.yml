@@ -177,6 +177,14 @@ jobs:
           fi
           echo "Using Xcode project at $XCODE_DIR"
           export XCODE_DIR
+          ENTITLEMENTS_SRC="Assets/Plugins/iOS/DreamGate.entitlements"
+          ENTITLEMENTS_DST="$XCODE_DIR/DreamGate.entitlements"
+          if [ -f "$ENTITLEMENTS_SRC" ]; then
+            cp "$ENTITLEMENTS_SRC" "$ENTITLEMENTS_DST"
+            echo "Copied Sign in with Apple entitlements to $ENTITLEMENTS_DST"
+          else
+            echo "Warning: entitlements file not found at $ENTITLEMENTS_SRC"
+          fi
           EXPORT_PLIST=$RUNNER_TEMP/ExportOptions.plist
           python3 - <<'PY'
           import os, plistlib
@@ -218,6 +226,12 @@ jobs:
                   'PROVISIONING_PROFILE_SPECIFIER = "$(PROVISIONING_PROFILE_SPECIFIER_APP)";',
                   f'PROVISIONING_PROFILE_SPECIFIER = "{name}";',
               )
+              if "CODE_SIGN_ENTITLEMENTS" not in block and os.path.isfile(os.path.join(os.environ["XCODE_DIR"], "DreamGate.entitlements")):
+                  block = block.replace(
+                      "\t\t\tbuildSettings = {\n",
+                      "\t\t\tbuildSettings = {\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = DreamGate.entitlements;\n",
+                      1,
+                  )
               if "CODE_SIGN_STYLE" not in block:
                   block = block.replace(
                       "\t\t\tbuildSettings = {\n",

@@ -6,6 +6,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 {
     public sealed class AppleSignInNative : MonoBehaviour
     {
+        private const string CallbackHostName = "DreamGateAppleSignIn";
         private static AppleSignInNative instance;
         private static Action<AppleSignInCredential> pendingCallback;
 
@@ -18,11 +19,17 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     return instance;
                 }
 
-                var host = CloudCoroutineHost.Instance;
+                var host = GameObject.Find(CallbackHostName);
+                if (host == null)
+                {
+                    host = new GameObject(CallbackHostName);
+                    DontDestroyOnLoad(host);
+                }
+
                 instance = host.GetComponent<AppleSignInNative>();
                 if (instance == null)
                 {
-                    instance = host.gameObject.AddComponent<AppleSignInNative>();
+                    instance = host.AddComponent<AppleSignInNative>();
                 }
 
                 return instance;

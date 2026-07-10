@@ -7,18 +7,20 @@ static id dreamGateAppleSignInDelegate = nil;
 @interface DreamGateAppleSignInDelegate : NSObject<ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
 @property (nonatomic, copy) NSString *callbackObject;
 @property (nonatomic, copy) NSString *callbackMethod;
+@property (nonatomic, assign) BOOL didSendPayload;
 @end
 
 @implementation DreamGateAppleSignInDelegate
 
-- (ASPresentationAnchor)presentationAnchorForAuthorizationController:(ASAuthorizationController *)controller
+- (UIWindow *)activeWindow
 {
+    UIApplication *application = UIApplication.sharedApplication;
+
     if (@available(iOS 13.0, *))
     {
-        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+        for (UIScene *scene in application.connectedScenes)
         {
-            if (scene.activationState != UISceneActivationStateForegroundActive ||
-                ![scene isKindOfClass:[UIWindowScene class]])
+            if (![scene isKindOfClass:[UIWindowScene class]])
             {
                 continue;
             }
@@ -31,35 +33,71 @@ static id dreamGateAppleSignInDelegate = nil;
                     return window;
                 }
             }
+
+            for (UIWindow *window in windowScene.windows)
+            {
+                if (window.rootViewController != nil)
+                {
+                    return window;
+                }
+            }
         }
     }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    return UIApplication.sharedApplication.keyWindow;
+    if (application.keyWindow != nil)
+    {
+        return application.keyWindow;
+    }
+
+    for (UIWindow *window in application.windows)
+    {
+        if (window.isKeyWindow || window.rootViewController != nil)
+        {
+            return window;
+        }
+    }
 #pragma clang diagnostic pop
+
+    return application.windows.firstObject;
+}
+
+- (ASPresentationAnchor)presentationAnchorForAuthorizationController:(ASAuthorizationController *)controller
+{
+    return [self activeWindow];
 }
 
 - (void)sendPayload:(NSDictionary *)payload
 {
-    NSError *error = nil;
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:&error];
-    if (error != nil || jsonData == nil)
+    if (self.didSendPayload)
     {
         return;
     }
 
-    NSString *json = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-    if (json == nil || self.callbackObject.length == 0 || self.callbackMethod.length == 0)
+    self.didSendPayload = YES;
+    dreamGateAppleSignInDelegate = nil;
+
+    NSString *fallback = @"{\"success\":0,\"error\":\"Apple sign in failed.\"}";
+    if (self.callbackObject.length == 0 || self.callbackMethod.length == 0)
     {
         return;
+    }
+
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:&error];
+    NSString *json = jsonData == nil
+        ? fallback
+        : [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    if (json == nil)
+    {
+        json = fallback;
     }
 
     UnitySendMessage(
         [self.callbackObject UTF8String],
         [self.callbackMethod UTF8String],
         [json UTF8String]);
-    dreamGateAppleSignInDelegate = nil;
 }
 
 - (void)authorizationController:(ASAuthorizationController *)controller
@@ -79,16 +117,14 @@ static id dreamGateAppleSignInDelegate = nil;
         ? @""
         : [[NSString alloc] initWithData:credential.identityToken encoding:NSUTF8StringEncoding];
 
-    NSMutableDictionary *payload = [@{
+    [self sendPayload:@{
         @"success": identityToken.length > 0 ? @1 : @0,
         @"identityToken": identityToken ?: @"",
         @"email": credential.email ?: @"",
         @"givenName": credential.fullName.givenName ?: @"",
         @"familyName": credential.fullName.familyName ?: @"",
         @"error": identityToken.length > 0 ? @"" : @"Apple did not return an identity token."
-    } mutableCopy];
-
-    [self sendPayload:payload];
+    }];
 }
 
 - (void)authorizationController:(ASAuthorizationController *)controller
@@ -116,6 +152,7 @@ extern "C" void DreamGate_AppleSignIn_Request(const char *hashedNonce, const cha
             DreamGateAppleSignInDelegate *delegate = [DreamGateAppleSignInDelegate new];
             delegate.callbackObject = callbackObject ? [NSString stringWithUTF8String:callbackObject] : @"";
             delegate.callbackMethod = callbackMethod ? [NSString stringWithUTF8String:callbackMethod] : @"";
+            delegate.didSendPayload = NO;
             dreamGateAppleSignInDelegate = delegate;
 
             ASAuthorizationAppleIDProvider *provider = [ASAuthorizationAppleIDProvider new];
@@ -136,6 +173,16 @@ extern "C" void DreamGate_AppleSignIn_Request(const char *hashedNonce, const cha
             controller.delegate = delegate;
             controller.presentationContextProvider = delegate;
             [controller performRequests];
+
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(60 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                if (dreamGateAppleSignInDelegate == delegate && !delegate.didSendPayload)
+                {
+                    [delegate sendPayload:@{
+                        @"success": @0,
+                        @"error": @"Apple sign in timed out. Try again."
+                    }];
+                }
+            });
         });
         return;
     }
