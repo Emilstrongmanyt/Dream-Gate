@@ -520,6 +520,21 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             return length > 0 ? Encoding.UTF8.GetString(buffer, 0, length) : string.Empty;
         }
+
+        private static string DescribeNativeTransport()
+        {
+            try
+            {
+                var revision = DreamGate_Http_GetRevision();
+                return revision > 0
+                    ? $"native-ios-r{revision}"
+                    : "native-ios-missing";
+            }
+            catch (Exception ex)
+            {
+                return $"native-ios-unavailable ({ex.GetType().Name})";
+            }
+        }
 #endif
 
         private static string GetHeader(IReadOnlyDictionary<string, string> headers, string key)
@@ -560,21 +575,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             return $"{transport}: HTTP {result.StatusCode}, {result.BodyBytes} bytes";
-        }
-
-        private static string DescribeNativeTransport()
-        {
-            try
-            {
-                var revision = DreamGate_Http_GetRevision();
-                return revision > 0
-                    ? $"native-ios-r{revision}"
-                    : "native-ios-missing";
-            }
-            catch (Exception ex)
-            {
-                return $"native-ios-unavailable ({ex.GetType().Name})";
-            }
         }
 
         private static string BuildAuthFailureMessage(IReadOnlyList<string> attempts, string transportRevision)
