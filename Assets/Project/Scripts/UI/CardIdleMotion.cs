@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace DreamGate.Battlegrounds.UI
 {
@@ -235,6 +236,71 @@ namespace DreamGate.Battlegrounds.UI
         private void Awake()
         {
             rect = GetComponent<RectTransform>();
+        }
+    }
+
+    /// <summary>
+    /// Plays a sprite sequence on a UI Image, then hides it when finished.
+    /// </summary>
+    public class SpriteSequencePlayer : MonoBehaviour
+    {
+        [SerializeField] private float framesPerSecond = 24f;
+
+        private Image image;
+        private Sprite[] frames = System.Array.Empty<Sprite>();
+        private Coroutine activeRoutine;
+
+        public bool IsPlaying => activeRoutine != null;
+
+        public void Configure(Image targetImage, Sprite[] sequence, float fps = 24f)
+        {
+            image = targetImage;
+            frames = sequence ?? System.Array.Empty<Sprite>();
+            framesPerSecond = Mathf.Max(1f, fps);
+        }
+
+        public void Play()
+        {
+            if (image == null || frames.Length == 0)
+            {
+                return;
+            }
+
+            if (activeRoutine != null)
+            {
+                StopCoroutine(activeRoutine);
+            }
+
+            activeRoutine = StartCoroutine(PlayRoutine());
+        }
+
+        public void Stop()
+        {
+            if (activeRoutine != null)
+            {
+                StopCoroutine(activeRoutine);
+                activeRoutine = null;
+            }
+
+            if (image != null)
+            {
+                image.enabled = false;
+            }
+        }
+
+        private IEnumerator PlayRoutine()
+        {
+            image.enabled = true;
+            var frameDelay = 1f / framesPerSecond;
+
+            for (var i = 0; i < frames.Length; i++)
+            {
+                image.sprite = frames[i];
+                yield return new WaitForSeconds(frameDelay);
+            }
+
+            image.enabled = false;
+            activeRoutine = null;
         }
     }
 }

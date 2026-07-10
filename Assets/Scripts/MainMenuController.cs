@@ -51,7 +51,10 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
-        HomeFallingCardsSpawner.Create(canvas.transform);
+        var spawner = HomeFallingCardsSpawner.Create(canvas.transform);
+        var background = canvas.transform.Find("Background");
+        var insertIndex = background != null ? background.GetSiblingIndex() + 1 : 0;
+        spawner.transform.SetSiblingIndex(insertIndex);
     }
 
     private void SetupMenuButtons()

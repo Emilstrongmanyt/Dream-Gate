@@ -63,7 +63,7 @@ namespace DreamGate.Battlegrounds.UI
         private const float RecruitActionButtonY = 610f;
         private static readonly Vector2 RecruitRefreshButtonPos = new(250f, RecruitActionButtonY);
         private static readonly Vector2 RecruitUpgradeButtonPos = new(-250f, RecruitActionButtonY);
-        private static readonly Vector2 RecruitCompassCountdownCenter = new(0f, -14f);
+        private static readonly Vector2 RecruitCompassCountdownCenter = new(0f, -48f);
         private static readonly Vector2 PlayerResourceOffsetFromHero = new(148f, -24f);
         private const float CardScaleFactor = 1.2f;
         private static readonly Vector2 CardSlotSize = new(132f * CardScaleFactor, 168f * CardScaleFactor);
@@ -76,14 +76,15 @@ namespace DreamGate.Battlegrounds.UI
         private static readonly Vector2 RecruitPlayerBoardCenter = new(0, -320);
         private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -740);
         private static readonly Vector2 HandRowCenter = new(0, -930);
+        private const float RecruitSideDividerY = -40f;
         private static readonly Vector2 OpponentHeroCenter = new(0, 580);
-        private static readonly Vector2 OpponentBoardCenter = new(0, 150);
+        private static readonly Vector2 OpponentBoardCenter = new(0, 195);
         private static readonly Vector2 PlayerBoardCenter = new(0, -320);
         private static readonly Vector2 PlayerHeroCenter = new(0, -740);
         private static readonly Vector2 HeroOvalSize = new(156, 172);
         private const int CompactLogMaxLines = 2;
         private const int CompactLogMaxChars = 420;
-        private static readonly Color HudPanelColor = new(0.04f, 0.06f, 0.12f, 0.58f);
+        private static readonly Color HudPanelColor = new(0f, 0f, 0f, 0f);
         private static readonly Color CombatPanelColor = new(0f, 0f, 0f, 0f);
 
         public void Initialize(MatchManager manager, Transform uiRoot)
@@ -285,7 +286,8 @@ namespace DreamGate.Battlegrounds.UI
                 recruitPanel.transform,
                 "RecruitPlayerHero",
                 RecruitPlayerHeroCenter,
-                new Color(0.2f, 0.35f, 0.65f, 0.55f));
+                new Color(0.2f, 0.35f, 0.65f, 0.55f),
+                tierUpEffect: true);
             CreatePlayerGoldDisplay(recruitPanel.transform);
             CreatePlayerHeroHpDisplay(recruitPanel.transform);
 
@@ -330,7 +332,7 @@ namespace DreamGate.Battlegrounds.UI
             endTurnButton = CreateSpriteButton(
                 recruitPanel.transform,
                 "StartCombatButton",
-                new Vector2(420, -620),
+                new Vector2(390, -650),
                 new Vector2(180, 72),
                 OnEndTurnClicked,
                 emphasizeVisibility: true);
@@ -342,7 +344,7 @@ namespace DreamGate.Battlegrounds.UI
             menuButton = CreateSpriteButton(
                 recruitPanel.transform,
                 "BackButton",
-                new Vector2(420, -760),
+                new Vector2(390, -790),
                 new Vector2(180, 72),
                 () => SceneNavigator.LoadMainMenu(),
                 emphasizeVisibility: true);
@@ -379,7 +381,8 @@ namespace DreamGate.Battlegrounds.UI
                 BoardSlotSpacing,
                 CardSlotDisplayMode.Combat,
                 _ => { },
-                includeCombatMotion: true);
+                includeCombatMotion: true,
+                showSectionLabel: false);
 
             CreateSlotRow(
                 combatPanel.transform,
@@ -390,7 +393,8 @@ namespace DreamGate.Battlegrounds.UI
                 BoardSlotSpacing,
                 CardSlotDisplayMode.Combat,
                 _ => { },
-                includeCombatMotion: true);
+                includeCombatMotion: true,
+                showSectionLabel: false);
 
             combatPlayerHero = CreateHeroOvalPortrait(
                 combatPanel.transform,
@@ -446,7 +450,8 @@ namespace DreamGate.Battlegrounds.UI
             string name,
             Vector2 position,
             Color placeholderColor,
-            bool combatHero = false)
+            bool combatHero = false,
+            bool tierUpEffect = false)
         {
             var solidSprite = UiImageSprites.GetSolid();
             var rootGo = new GameObject(name, typeof(RectTransform));
@@ -508,7 +513,26 @@ namespace DreamGate.Battlegrounds.UI
             hpText.color = new Color(0.9f, 0.95f, 1f);
             hpText.text = "— HP";
 
-            return new HeroPortraitSlot(root, portraitImage, nameText, hpText);
+            SpriteSequencePlayer tierUpPlayer = null;
+            if (tierUpEffect)
+            {
+                var effectGo = new GameObject("TierUpEffect", typeof(RectTransform), typeof(Image));
+                effectGo.transform.SetParent(root, false);
+                var effectRect = effectGo.GetComponent<RectTransform>();
+                effectRect.anchorMin = Vector2.zero;
+                effectRect.anchorMax = Vector2.one;
+                effectRect.offsetMin = new Vector2(-18f, -18f);
+                effectRect.offsetMax = new Vector2(18f, 18f);
+                var effectImage = effectGo.GetComponent<Image>();
+                effectImage.preserveAspect = true;
+                effectImage.raycastTarget = false;
+                effectImage.enabled = false;
+
+                tierUpPlayer = effectGo.AddComponent<SpriteSequencePlayer>();
+                tierUpPlayer.Configure(effectImage, UiImageSprites.GetTierUpFrames(), fps: 22f);
+            }
+
+            return new HeroPortraitSlot(root, portraitImage, nameText, hpText, tierUpPlayer);
         }
 
         private void RefreshCombatBoards()
@@ -570,6 +594,11 @@ namespace DreamGate.Battlegrounds.UI
 
         private IEnumerator PlayAttackEvent(CombatEvent combatEvent)
         {
+            if (combatEvent.damageAmount == 0 && combatEvent.boardIndex >= 0 && combatEvent.attackerBoardIndex < 0)
+            {
+                yield break;
+            }
+
             if (combatEvent.attackerBoardIndex < 0)
             {
                 yield break;
@@ -594,7 +623,16 @@ namespace DreamGate.Battlegrounds.UI
                     yield break;
                 }
 
-                striker.health -= damage;
+                var shieldAbsorbed = striker.hasDivineShield;
+                if (shieldAbsorbed)
+                {
+                    striker.hasDivineShield = false;
+                }
+                else
+                {
+                    striker.health -= damage;
+                }
+
                 RefreshCombatSlot(
                     combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots,
                     combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard,
@@ -602,13 +640,17 @@ namespace DreamGate.Battlegrounds.UI
 
                 var strikerSlot = GetCombatSlot(combatEvent.isAttackerBoard, combatEvent.attackerBoardIndex);
                 Coroutine floatRoutine = null;
-                if (strikerSlot?.RootRect != null && combatDamageFloater != null)
+                if (!shieldAbsorbed && strikerSlot?.RootRect != null && combatDamageFloater != null)
                 {
                     floatRoutine = StartCoroutine(
                         combatDamageFloater.Show(strikerSlot.RootRect, damage, CombatDamageStyle.Recoil));
                 }
 
-                if (strikerSlot?.CombatMotion != null)
+                if (shieldAbsorbed && strikerSlot != null)
+                {
+                    yield return strikerSlot.PlayDivineShieldBreak();
+                }
+                else if (strikerSlot?.CombatMotion != null)
                 {
                     yield return strikerSlot.CombatMotion.PlayHitShake();
                 }
@@ -641,7 +683,15 @@ namespace DreamGate.Battlegrounds.UI
                 damage = striker.attack;
             }
 
-            target.health -= damage;
+            var defenderShieldAbsorbed = damage > 0 && target.hasDivineShield;
+            if (defenderShieldAbsorbed)
+            {
+                target.hasDivineShield = false;
+            }
+            else
+            {
+                target.health -= damage;
+            }
 
             RefreshCombatSlot(
                 combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots,
@@ -657,7 +707,7 @@ namespace DreamGate.Battlegrounds.UI
             var lungeDirection = combatEvent.isAttackerBoard ? Vector2.up : Vector2.down;
             var damageStyle = combatEvent.isCleave ? CombatDamageStyle.Cleave : CombatDamageStyle.Incoming;
             Coroutine damageFloatRoutine = null;
-            if (defenderSlot?.RootRect != null && combatDamageFloater != null)
+            if (!defenderShieldAbsorbed && defenderSlot?.RootRect != null && combatDamageFloater != null)
             {
                 damageFloatRoutine = StartCoroutine(
                     combatDamageFloater.Show(defenderSlot.RootRect, damage, damageStyle));
@@ -666,13 +716,28 @@ namespace DreamGate.Battlegrounds.UI
             if (!combatEvent.isCleave && attackerSlot?.CombatMotion != null && defenderSlot?.CombatMotion != null)
             {
                 var lunge = attackerSlot.CombatMotion.PlayAttackLunge(lungeDirection);
-                var hit = defenderSlot.CombatMotion.PlayHitShake();
-                yield return lunge;
-                yield return hit;
+                if (defenderShieldAbsorbed)
+                {
+                    yield return lunge;
+                    yield return defenderSlot.PlayDivineShieldBreak();
+                }
+                else
+                {
+                    var hit = defenderSlot.CombatMotion.PlayHitShake();
+                    yield return lunge;
+                    yield return hit;
+                }
             }
-            else if (combatEvent.isCleave && defenderSlot?.CombatMotion != null)
+            else if (combatEvent.isCleave && defenderSlot != null)
             {
-                yield return defenderSlot.CombatMotion.PlayHitShake();
+                if (defenderShieldAbsorbed)
+                {
+                    yield return defenderSlot.PlayDivineShieldBreak();
+                }
+                else if (defenderSlot.CombatMotion != null)
+                {
+                    yield return defenderSlot.CombatMotion.PlayHitShake();
+                }
             }
             else
             {
@@ -883,17 +948,18 @@ namespace DreamGate.Battlegrounds.UI
         private void CreateHud(Transform root)
         {
             hudPanel = CreatePanel(root, "HudPanel", HudPanelColor);
+            hudPanel.GetComponent<Image>().raycastTarget = false;
             var hudRect = hudPanel.GetComponent<RectTransform>();
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
             hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = Vector2.zero;
+            hudRect.anchoredPosition = new Vector2(0, 22f);
             hudRect.sizeDelta = new Vector2(980, 128);
 
-            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, -10), 22, TextAlignmentOptions.Center);
+            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, 2), 22, TextAlignmentOptions.Center);
             hudText.rectTransform.sizeDelta = new Vector2(940, 56);
 
-            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -44), 15, TextAlignmentOptions.Center);
+            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -28), 15, TextAlignmentOptions.Center);
             leaderboardText.rectTransform.sizeDelta = new Vector2(940, 28);
             leaderboardText.color = new Color(0.85f, 0.9f, 1f);
 
@@ -903,9 +969,10 @@ namespace DreamGate.Battlegrounds.UI
             compactLogRect.anchorMin = new Vector2(0.5f, 1f);
             compactLogRect.anchorMax = new Vector2(0.5f, 1f);
             compactLogRect.pivot = new Vector2(0.5f, 1f);
-            compactLogRect.anchoredPosition = new Vector2(0, -72);
+            compactLogRect.anchoredPosition = new Vector2(0, -52);
             compactLogRect.sizeDelta = new Vector2(920, 44);
-            compactLogPanel.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.08f, 0.42f);
+            compactLogPanel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
+            compactLogPanel.GetComponent<Image>().raycastTarget = false;
 
             logText = CreateText(compactLogPanel.transform, "Log", Vector2.zero, 12, TextAlignmentOptions.TopLeft);
             logText.rectTransform.anchorMin = Vector2.zero;
@@ -1205,8 +1272,6 @@ namespace DreamGate.Battlegrounds.UI
 
         private void OnShopClicked(int index)
         {
-            matchManager.TryBuyFromShop(index, out var message);
-            AppendLog(message);
         }
 
         private void OnBoardClicked(int index)
@@ -1216,11 +1281,7 @@ namespace DreamGate.Battlegrounds.UI
                 matchManager.TryCastSpellFromHand(pendingSpellHandIndex, index, out var castMessage);
                 pendingSpellHandIndex = -1;
                 AppendLog(castMessage);
-                return;
             }
-
-            matchManager.TrySellFromBoard(index, out var message);
-            AppendLog(message);
         }
 
         internal bool CanDragBoardSlot(int index)
@@ -1232,6 +1293,68 @@ namespace DreamGate.Battlegrounds.UI
 
             var player = matchManager.GetHumanPlayer();
             return player != null && index >= 0 && index < player.board.Length && player.board[index] != null;
+        }
+
+        internal bool CanDragShopSlot(int index)
+        {
+            if (matchManager == null || matchManager.Phase != MatchPhase.Recruit)
+            {
+                return false;
+            }
+
+            var player = matchManager.GetHumanPlayer();
+            return player != null &&
+                   index >= 0 &&
+                   index < player.shopCardIds.Count &&
+                   !string.IsNullOrEmpty(player.shopCardIds[index]);
+        }
+
+        internal bool TryGetRecruitLocalPoint(Vector2 screenPosition, Camera eventCamera, out Vector2 localPoint)
+        {
+            localPoint = default;
+            if (recruitPanel == null)
+            {
+                return false;
+            }
+
+            var panelRect = recruitPanel.GetComponent<RectTransform>();
+            return RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                panelRect,
+                screenPosition,
+                eventCamera,
+                out localPoint);
+        }
+
+        internal bool IsOverShopkeeperSide(Vector2 screenPosition, Camera eventCamera)
+        {
+            if (!TryGetRecruitLocalPoint(screenPosition, eventCamera, out var localPoint))
+            {
+                return false;
+            }
+
+            return localPoint.y >= RecruitSideDividerY;
+        }
+
+        internal bool IsOverPlayerSide(Vector2 screenPosition, Camera eventCamera)
+        {
+            if (!TryGetRecruitLocalPoint(screenPosition, eventCamera, out var localPoint))
+            {
+                return false;
+            }
+
+            return localPoint.y < RecruitSideDividerY;
+        }
+
+        internal void TrySellBoardCard(int boardIndex)
+        {
+            matchManager.TrySellFromBoard(boardIndex, out var message);
+            AppendLog(message);
+        }
+
+        internal void TryBuyShopCard(int shopIndex)
+        {
+            matchManager.TryBuyFromShop(shopIndex, out var message);
+            AppendLog(message);
         }
 
         internal int GetBoardDropSlotIndex(Vector2 screenPosition, Camera eventCamera, bool requireEmpty = false)
@@ -1349,7 +1472,11 @@ namespace DreamGate.Battlegrounds.UI
 
         private void OnUpgradeClicked()
         {
-            matchManager.TryUpgradeTavern(out var message);
+            if (matchManager.TryUpgradeTavern(out var message))
+            {
+                recruitPlayerHero?.PlayTierUpEffect();
+            }
+
             AppendLog(message);
         }
 
@@ -1499,6 +1626,11 @@ namespace DreamGate.Battlegrounds.UI
                     var dragHandler = slot.RootRect.GetComponent<BoardCardDragHandler>();
                     dragHandler.Configure(index, this);
                 }
+                else if (mode == CardSlotDisplayMode.Shop)
+                {
+                    var shopDragHandler = slot.RootRect.GetComponent<ShopCardDragHandler>();
+                    shopDragHandler.Configure(index, this);
+                }
                 else if (mode == CardSlotDisplayMode.Hand)
                 {
                     var handDragHandler = slot.RootRect.GetComponent<HandCardDragHandler>();
@@ -1541,6 +1673,19 @@ namespace DreamGate.Battlegrounds.UI
             artImage.raycastTarget = false;
             artImage.enabled = false;
 
+            var shieldGo = new GameObject("DivineShieldEffect", typeof(RectTransform), typeof(Image));
+            shieldGo.transform.SetParent(artGo.transform, false);
+            var shieldRect = shieldGo.GetComponent<RectTransform>();
+            shieldRect.anchorMin = Vector2.zero;
+            shieldRect.anchorMax = Vector2.one;
+            shieldRect.offsetMin = Vector2.zero;
+            shieldRect.offsetMax = Vector2.zero;
+            var divineShieldImage = shieldGo.GetComponent<Image>();
+            divineShieldImage.sprite = UiImageSprites.GetDivineShieldEffect();
+            divineShieldImage.preserveAspect = true;
+            divineShieldImage.raycastTarget = false;
+            divineShieldImage.enabled = false;
+
             CardIdleMotion idleMotion = null;
             if (mode == CardSlotDisplayMode.Board || mode == CardSlotDisplayMode.Combat)
             {
@@ -1557,6 +1702,11 @@ namespace DreamGate.Battlegrounds.UI
             if (mode == CardSlotDisplayMode.Board)
             {
                 rootGo.AddComponent<BoardCardDragHandler>();
+            }
+
+            if (mode == CardSlotDisplayMode.Shop)
+            {
+                rootGo.AddComponent<ShopCardDragHandler>();
             }
 
             CombatMinionMotion combatMotion = null;
@@ -1600,6 +1750,7 @@ namespace DreamGate.Battlegrounds.UI
                 button,
                 frameImage,
                 artImage,
+                divineShieldImage,
                 statsText,
                 attackText,
                 healthText,
@@ -2184,6 +2335,8 @@ namespace DreamGate.Battlegrounds.UI
     internal static class UiImageSprites
     {
         private static Sprite solidUiSprite;
+        private static Sprite divineShieldEffectSprite;
+        private static Sprite[] tierUpFrames;
 
         public static Sprite GetSolid()
         {
@@ -2198,6 +2351,51 @@ namespace DreamGate.Battlegrounds.UI
             solidUiSprite = Sprite.Create(texture, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
             return solidUiSprite;
         }
+
+        public static Sprite GetDivineShieldEffect()
+        {
+            if (divineShieldEffectSprite == null)
+            {
+                divineShieldEffectSprite = Resources.Load<Sprite>("DivineShieldEffect");
+            }
+
+            return divineShieldEffectSprite;
+        }
+
+        public static Sprite[] GetTierUpFrames()
+        {
+            if (tierUpFrames != null)
+            {
+                return tierUpFrames;
+            }
+
+            var frames = new Sprite[21];
+            var loaded = 0;
+            for (var i = 0; i <= 20; i++)
+            {
+                var frame = Resources.Load<Sprite>($"TierUp/LevelUp.{i}");
+                if (frame != null)
+                {
+                    frames[loaded++] = frame;
+                }
+            }
+
+            if (loaded == 0)
+            {
+                tierUpFrames = System.Array.Empty<Sprite>();
+                return tierUpFrames;
+            }
+
+            if (loaded == frames.Length)
+            {
+                tierUpFrames = frames;
+                return tierUpFrames;
+            }
+
+            tierUpFrames = new Sprite[loaded];
+            System.Array.Copy(frames, tierUpFrames, loaded);
+            return tierUpFrames;
+        }
     }
 
     internal sealed class HeroPortraitSlot
@@ -2206,17 +2404,25 @@ namespace DreamGate.Battlegrounds.UI
         public Image PortraitImage { get; }
         public TextMeshProUGUI NameText { get; }
         public TextMeshProUGUI HpText { get; }
+        private readonly SpriteSequencePlayer tierUpPlayer;
 
         public HeroPortraitSlot(
             RectTransform root,
             Image portraitImage,
             TextMeshProUGUI nameText,
-            TextMeshProUGUI hpText)
+            TextMeshProUGUI hpText,
+            SpriteSequencePlayer tierUpSequencePlayer = null)
         {
             Root = root;
             PortraitImage = portraitImage;
             NameText = nameText;
             HpText = hpText;
+            tierUpPlayer = tierUpSequencePlayer;
+        }
+
+        public void PlayTierUpEffect()
+        {
+            tierUpPlayer?.Play();
         }
 
         public void SetShopkeeper()
@@ -2359,10 +2565,164 @@ namespace DreamGate.Battlegrounds.UI
 
             dragging = false;
             var dragged = Vector2.Distance(eventData.pressPosition, eventData.position) >= DragSuppressDistance;
-            var dropIndex = ui.GetBoardDropSlotIndex(eventData.position, eventData.pressEventCamera);
-            if (dropIndex >= 0 && dropIndex != slotIndex)
+            if (dragged && ui.IsOverShopkeeperSide(eventData.position, eventData.pressEventCamera))
             {
-                ui.TryBoardReorder(slotIndex, dropIndex);
+                ui.TrySellBoardCard(slotIndex);
+                inspectHandler?.SuppressNextClick();
+            }
+            else
+            {
+                var dropIndex = ui.GetBoardDropSlotIndex(eventData.position, eventData.pressEventCamera);
+                if (dropIndex >= 0 && dropIndex != slotIndex)
+                {
+                    ui.TryBoardReorder(slotIndex, dropIndex);
+                    inspectHandler?.SuppressNextClick();
+                }
+                else if (dragged)
+                {
+                    inspectHandler?.SuppressNextClick();
+                }
+            }
+
+            rect.SetParent(originalParent, false);
+            rect.SetSiblingIndex(originalSiblingIndex);
+            rect.anchoredPosition = basePosition;
+            rect.localScale = baseScale;
+            canvasGroup.alpha = 1f;
+            canvasGroup.blocksRaycasts = true;
+            idleMotion?.SetActiveMotion(true);
+        }
+
+        private void OnDisable()
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            dragging = false;
+            if (originalParent != null)
+            {
+                rect.SetParent(originalParent, false);
+                rect.SetSiblingIndex(originalSiblingIndex);
+            }
+
+            rect.anchoredPosition = basePosition;
+            rect.localScale = baseScale;
+            canvasGroup.alpha = 1f;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        private void CacheBase()
+        {
+            if (rect == null)
+            {
+                rect = GetComponent<RectTransform>();
+            }
+
+            basePosition = rect.anchoredPosition;
+            baseScale = rect.localScale;
+        }
+    }
+
+    /// <summary>
+    /// Drag shop cards to the player's side of the board to purchase them.
+    /// </summary>
+    public class ShopCardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        private const float DragScale = 1.08f;
+        private const float DragAlpha = 0.72f;
+        private const float DragSuppressDistance = 12f;
+
+        private PracticeGameUI ui;
+        private CardInspectHandler inspectHandler;
+        private CanvasGroup canvasGroup;
+        private RectTransform rect;
+        private Transform dragLayer;
+        private Transform originalParent;
+        private Vector2 basePosition;
+        private Vector2 dragOffset;
+        private Vector3 baseScale;
+        private int originalSiblingIndex;
+        private int slotIndex;
+        private bool dragging;
+
+        public void Configure(int index, PracticeGameUI owner)
+        {
+            slotIndex = index;
+            ui = owner;
+            inspectHandler = GetComponent<CardInspectHandler>();
+            rect = GetComponent<RectTransform>();
+            canvasGroup = GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+
+            dragLayer = owner.GetBoardDragLayer();
+            CacheBase();
+        }
+
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            if (ui == null || !ui.CanDragShopSlot(slotIndex))
+            {
+                return;
+            }
+
+            dragging = true;
+            inspectHandler?.CancelInspect();
+
+            originalParent = rect.parent;
+            originalSiblingIndex = rect.GetSiblingIndex();
+            basePosition = rect.anchoredPosition;
+            baseScale = rect.localScale;
+
+            rect.SetParent(dragLayer, true);
+            rect.SetAsLastSibling();
+            rect.localScale = baseScale * DragScale;
+            canvasGroup.alpha = DragAlpha;
+            canvasGroup.blocksRaycasts = false;
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    rect.parent as RectTransform,
+                    eventData.position,
+                    eventData.pressEventCamera,
+                    out var localPoint))
+            {
+                dragOffset = rect.anchoredPosition - localPoint;
+            }
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    rect.parent as RectTransform,
+                    eventData.position,
+                    eventData.pressEventCamera,
+                    out var localPoint))
+            {
+                rect.anchoredPosition = localPoint + dragOffset;
+            }
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            dragging = false;
+            var dragged = Vector2.Distance(eventData.pressPosition, eventData.position) >= DragSuppressDistance;
+            if (dragged && ui.IsOverPlayerSide(eventData.position, eventData.pressEventCamera))
+            {
+                ui.TryBuyShopCard(slotIndex);
                 inspectHandler?.SuppressNextClick();
             }
             else if (dragged)
@@ -2376,7 +2736,6 @@ namespace DreamGate.Battlegrounds.UI
             rect.localScale = baseScale;
             canvasGroup.alpha = 1f;
             canvasGroup.blocksRaycasts = true;
-            idleMotion?.SetActiveMotion(true);
         }
 
         private void OnDisable()

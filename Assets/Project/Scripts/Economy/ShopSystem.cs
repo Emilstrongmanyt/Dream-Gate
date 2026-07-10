@@ -121,17 +121,18 @@ namespace DreamGate.Battlegrounds.Economy
                 return false;
             }
 
-            if (player.gold < MatchConfig.TavernUpgradeCost)
+            var upgradeCost = MatchConfig.GetTavernUpgradeCost(player.tavernTier);
+            if (player.gold < upgradeCost)
             {
                 message = "Not enough gold to upgrade.";
                 return false;
             }
 
-            player.gold -= MatchConfig.TavernUpgradeCost;
+            player.gold -= upgradeCost;
             player.tavernTier++;
             RefreshShop(player);
             GameSfxPlayer.PlayRecruit(player, GameSfxPlayer.PlayTierUp);
-            message = $"Tavern upgraded to tier {player.tavernTier}.";
+            message = $"Tavern upgraded to tier {player.tavernTier} (-{upgradeCost} gold).";
             return true;
         }
 

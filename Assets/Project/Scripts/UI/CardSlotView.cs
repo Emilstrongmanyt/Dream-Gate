@@ -1,3 +1,4 @@
+using System.Collections;
 using DreamGate.Battlegrounds.Cards;
 using DreamGate.Battlegrounds.Players;
 using TMPro;
@@ -31,6 +32,7 @@ namespace DreamGate.Battlegrounds.UI
         public Button Button { get; }
         public Image FrameImage { get; }
         public Image ArtImage { get; }
+        public Image DivineShieldImage { get; }
         public TextMeshProUGUI StatsText { get; }
         public TextMeshProUGUI AttackText { get; }
         public TextMeshProUGUI HealthText { get; }
@@ -47,6 +49,7 @@ namespace DreamGate.Battlegrounds.UI
             Button button,
             Image frameImage,
             Image artImage,
+            Image divineShieldImage,
             TextMeshProUGUI statsText,
             TextMeshProUGUI attackText,
             TextMeshProUGUI healthText,
@@ -58,6 +61,7 @@ namespace DreamGate.Battlegrounds.UI
             Button = button;
             FrameImage = frameImage;
             ArtImage = artImage;
+            DivineShieldImage = divineShieldImage;
             StatsText = statsText;
             AttackText = attackText;
             HealthText = healthText;
@@ -82,6 +86,7 @@ namespace DreamGate.Battlegrounds.UI
             ClearArt();
             SetTransparentFrame();
             HideStatOverlays();
+            SetDivineShieldVisible(false);
             IdleMotion?.SetActiveMotion(false);
             Button.interactable = interactable;
         }
@@ -96,6 +101,7 @@ namespace DreamGate.Battlegrounds.UI
 
             var cardKey = $"shop:{card.cardId}";
             ApplyArt(card, cardKey);
+            SetDivineShieldVisible(card.abilityType == AbilityType.DivineShield);
             StatsText.gameObject.SetActive(false);
             if (card.cardKind == CardKind.Spell)
             {
@@ -120,9 +126,12 @@ namespace DreamGate.Battlegrounds.UI
                 return;
             }
 
-            var cardKey = $"{mode}:{minion.instanceId}:{minion.cardId}:{minion.attack}:{minion.health}:{minion.isGolden}";
+            var shieldActive = IsDivineShieldActive(card, minion);
+            var cardKey =
+                $"{mode}:{minion.instanceId}:{minion.cardId}:{minion.attack}:{minion.health}:{minion.isGolden}:{shieldActive}";
 
             ApplyArt(card, cardKey);
+            SetDivineShieldVisible(shieldActive);
             StatsText.gameObject.SetActive(false);
             if (card != null && card.cardKind == CardKind.Spell)
             {
@@ -159,9 +168,11 @@ namespace DreamGate.Battlegrounds.UI
                 return;
             }
 
-            var cardKey = $"combat:{minion.instanceId}:{minion.cardId}:{minion.attack}:{minion.health}:{minion.isGolden}";
+            var cardKey =
+                $"combat:{minion.instanceId}:{minion.cardId}:{minion.attack}:{minion.health}:{minion.isGolden}:{minion.hasDivineShield}";
 
             ApplyArt(card, cardKey);
+            SetDivineShieldVisible(minion.hasDivineShield);
             StatsText.gameObject.SetActive(false);
             SetStatOverlays(minion.attack, minion.health);
             SetTransparentFrame();
@@ -190,6 +201,7 @@ namespace DreamGate.Battlegrounds.UI
             IdleMotion?.SetActiveMotion(false);
             SetTransparentFrame();
             HideStatOverlays();
+            SetDivineShieldVisible(false);
             if (hasArt)
             {
                 ArtImage.color = new Color(0.45f, 0.45f, 0.45f, 0.45f);
@@ -244,6 +256,55 @@ namespace DreamGate.Battlegrounds.UI
             HealthText.text = string.Empty;
             AttackText.gameObject.SetActive(false);
             HealthText.gameObject.SetActive(false);
+        }
+
+        public void SetDivineShieldVisible(bool visible)
+        {
+            if (DivineShieldImage == null)
+            {
+                return;
+            }
+
+            DivineShieldImage.enabled = visible;
+            if (visible)
+            {
+                DivineShieldImage.color = Color.white;
+                DivineShieldImage.rectTransform.localScale = Vector3.one;
+            }
+        }
+
+        public IEnumerator PlayDivineShieldBreak()
+        {
+            if (DivineShieldImage == null || !DivineShieldImage.enabled)
+            {
+                yield break;
+            }
+
+            var shieldRect = DivineShieldImage.rectTransform;
+            const float duration = 0.24f;
+            var elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                var t = Mathf.Clamp01(elapsed / duration);
+                var pulse = 1f + 0.3f * Mathf.Sin(t * Mathf.PI);
+                shieldRect.localScale = Vector3.one * pulse;
+                DivineShieldImage.color = new Color(1f, 1f, 1f, 1f - t);
+                yield return null;
+            }
+
+            SetDivineShieldVisible(false);
+        }
+
+        private static bool IsDivineShieldActive(MinionCardDefinition card, MinionInstance minion)
+        {
+            if (minion.hasDivineShield)
+            {
+                return true;
+            }
+
+            return card != null && card.abilityType == AbilityType.DivineShield;
         }
 
         private CardInspectPayload BuildShopInspectPayload(MinionCardDefinition card)

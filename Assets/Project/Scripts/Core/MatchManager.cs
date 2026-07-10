@@ -35,7 +35,7 @@ namespace DreamGate.Battlegrounds.Core
 
         public const int MinionCost = 3;
         public const int SellValue = 1;
-        public const int TavernUpgradeCost = 4;
+        public static int GetTavernUpgradeCost(int currentTier) => 2 * (currentTier + 1);
         public const int ShopRefreshCost = 1;
         public const int TripleGoldReward = 3;
 
@@ -118,12 +118,21 @@ namespace DreamGate.Battlegrounds.Core
                 {
                     playerId = i,
                     displayName = displayName,
-                    heroId = $"hero_{i}",
                     heroName = HeroRegistry.GetHeroName(i),
                     isHuman = isHuman,
                     heroHealth = MatchConfig.StartingHeroHealth,
                     tavernTier = MatchConfig.StartingTavernTier
                 };
+
+                if (!isHuman)
+                {
+                    HeroRegistry.AssignRandomBotPortrait(player, matchRandom);
+                }
+                else
+                {
+                    player.heroId = $"hero_{i}";
+                }
+
                 players.Add(player);
 
                 if (isLocalHuman)

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using DreamGate.Battlegrounds.Players;
 #if !SERVER_BUILD
 using UnityEngine;
 #endif
@@ -21,9 +23,19 @@ namespace DreamGate.Battlegrounds.Heroes
 
         private static readonly string[] PortraitAssets =
         {
-            "Warrior",
+            "Ayan",
+            "Evan",
+            "Garnox",
+            "GrandmaYeonHero",
+            "Grendel",
+            "HeenaHero",
+            "KentaHero",
+            "Luke the Security Guard",
             "Magician",
-            "Evan"
+            "Marco",
+            "Olaf",
+            "RudiHero",
+            "Warrior"
         };
 
 #if !SERVER_BUILD
@@ -35,6 +47,22 @@ namespace DreamGate.Battlegrounds.Heroes
         public static string GetHeroName(int playerId)
         {
             return DefaultHeroes[playerId % DefaultHeroes.Length];
+        }
+
+        public static void AssignRandomBotPortrait(PlayerState player, System.Random random)
+        {
+            if (player == null || random == null || PortraitAssets.Length == 0)
+            {
+                return;
+            }
+
+            var asset = PortraitAssets[random.Next(PortraitAssets.Length)];
+            player.heroId = BuildPortraitHeroId(asset);
+        }
+
+        public static string BuildPortraitHeroId(string assetName)
+        {
+            return $"hero_art_{assetName}";
         }
 
 #if !SERVER_BUILD
@@ -107,17 +135,24 @@ namespace DreamGate.Battlegrounds.Heroes
                 return "Magician";
             }
 
+            const string artPrefix = "hero_art_";
+            if (heroId.StartsWith(artPrefix, StringComparison.Ordinal))
+            {
+                return heroId.Substring(artPrefix.Length);
+            }
+
             if (!heroId.StartsWith("hero_") || !int.TryParse(heroId.Substring(5), out var heroIndex))
             {
                 return null;
             }
 
-            if (heroIndex < 0 || heroIndex >= PortraitAssets.Length)
+            if (PortraitAssets.Length == 0)
             {
                 return null;
             }
 
-            return PortraitAssets[heroIndex];
+            var normalizedIndex = ((heroIndex % PortraitAssets.Length) + PortraitAssets.Length) % PortraitAssets.Length;
+            return PortraitAssets[normalizedIndex];
         }
     }
 }

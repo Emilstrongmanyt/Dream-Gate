@@ -44,7 +44,7 @@ namespace DreamGate.Battlegrounds.Players
             PlayMinionsFromHand(bot);
 
             if (bot.tavernTier < MatchConfig.MaxTavernTier &&
-                bot.gold >= MatchConfig.TavernUpgradeCost &&
+                bot.gold >= MatchConfig.GetTavernUpgradeCost(bot.tavernTier) &&
                 random.NextDouble() < 0.35)
             {
                 ShopSystem.TryUpgradeTavern(bot, out _);
