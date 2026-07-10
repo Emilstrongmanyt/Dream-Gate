@@ -377,7 +377,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 callback(
                     false,
-                    $"Authentication server returned an empty response (HTTP {result.StatusCode}, {result.BodyBytes} bytes). This is not a firewall issue. Install the latest TestFlight build.",
+                    $"Authentication server returned an empty response via {result.Transport} (HTTP {result.StatusCode}, {result.BodyBytes} bytes).",
                     response);
                 yield break;
             }

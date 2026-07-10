@@ -99,7 +99,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
 #endif
         }
 
-        public static SupabaseHttpResult BuildResult(UnityWebRequest request, System.Func<bool, string> buildError)
+        public static SupabaseHttpResult BuildResult(
+            UnityWebRequest request,
+            System.Func<bool, string> buildError,
+            string transport = "unity-webrequest")
         {
             var responseBody = ReadResponseText(request);
             var bodyByteCount = request.downloadHandler?.data?.Length ?? 0;
@@ -115,6 +118,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     StatusCode = statusCode,
                     Body = responseBody ?? string.Empty,
                     BodyBytes = bodyByteCount,
+                    Transport = transport,
                     Error = DescribeTransportError(request, responseBody)
                 };
             }
@@ -125,6 +129,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 StatusCode = statusCode,
                 Body = responseBody ?? string.Empty,
                 BodyBytes = bodyByteCount,
+                Transport = transport,
                 Error = buildError(httpSucceeded)
             };
         }

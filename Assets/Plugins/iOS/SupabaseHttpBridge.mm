@@ -29,6 +29,11 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
     NSString *authorization)
 {
     NSURL *url = [NSURL URLWithString:urlString];
+    if (url == nil)
+    {
+        return nil;
+    }
+
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     request.HTTPMethod = method;
     request.timeoutInterval = 45.0;
@@ -68,6 +73,12 @@ static void DreamGateHttpStart(NSString *urlString, NSString *method, NSString *
     }
 
     NSMutableURLRequest *request = DreamGateHttpBuildRequest(urlString, method, body, apikey, authorization);
+    if (request == nil)
+    {
+        DreamGateHttpFinish(0, nil, @"Invalid request URL.");
+        return;
+    }
+
     NSURLSessionDataTask *task = [[NSURLSession sharedSession]
         dataTaskWithRequest:request
         completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
