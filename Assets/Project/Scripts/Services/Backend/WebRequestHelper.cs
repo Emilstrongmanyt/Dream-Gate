@@ -1,4 +1,5 @@
 using System.Text;
+using UnityEngine;
 using UnityEngine.Networking;
 
 namespace DreamGate.Battlegrounds.Services.Backend
@@ -39,6 +40,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
             request.disposeDownloadHandlerOnDispose = disposeHandlers;
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Accept", "application/json");
+            request.SetRequestHeader("Accept-Encoding", "identity");
         }
+
+        public static bool ShouldPreferHttpClient =>
+#if UNITY_IOS && !UNITY_EDITOR
+            true;
+#else
+            Application.platform == RuntimePlatform.IPhonePlayer;
+#endif
     }
 }

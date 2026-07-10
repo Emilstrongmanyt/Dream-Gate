@@ -48,7 +48,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             pendingCallback = callback;
 #if UNITY_IOS && !UNITY_EDITOR
-            DreamGate_AppleSignIn_Request(hashedNonce, Instance.gameObject.name, nameof(OnNativeCallback));
+            _ = Instance;
+            DreamGate_AppleSignIn_Request(hashedNonce, CallbackHostName, nameof(OnNativeCallback));
 #else
             InvokeFallback("Sign in with Apple is only available on iOS devices.");
 #endif

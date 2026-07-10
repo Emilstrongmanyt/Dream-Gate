@@ -51,12 +51,6 @@ namespace DreamGate.Battlegrounds.UI
                 appleButton.onClick.AddListener(view.SubmitApple);
             }
 
-            if (DreamGateServices.UseCloudBackend && GoogleSignInService.IsSupported)
-            {
-                var googleButton = MenuPageUI.CreateGoogleSignInButton(root.transform, new Vector2(0, -250), null);
-                googleButton.onClick.AddListener(view.SubmitGoogle);
-            }
-
             MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke());
             root.SetActive(false);
             return view;
@@ -253,12 +247,6 @@ namespace DreamGate.Battlegrounds.UI
             {
                 var appleButton = MenuPageUI.CreateAppleSignInButton(root.transform, new Vector2(0, -310), null);
                 appleButton.onClick.AddListener(view.SubmitApple);
-            }
-
-            if (DreamGateServices.UseCloudBackend && GoogleSignInService.IsSupported)
-            {
-                var googleButton = MenuPageUI.CreateGoogleSignInButton(root.transform, new Vector2(0, -400), null);
-                googleButton.onClick.AddListener(view.SubmitGoogle);
             }
 
             MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -760f);

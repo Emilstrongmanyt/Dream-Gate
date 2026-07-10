@@ -2,7 +2,10 @@
 #import <AuthenticationServices/AuthenticationServices.h>
 #import <UIKit/UIKit.h>
 
+extern UIViewController *UnityGetGLViewController(void);
+
 static id dreamGateAppleSignInDelegate = nil;
+static ASAuthorizationController *dreamGateAppleAuthorizationController = nil;
 
 @interface DreamGateAppleSignInDelegate : NSObject<ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
 @property (nonatomic, copy) NSString *callbackObject;
@@ -65,7 +68,27 @@ static id dreamGateAppleSignInDelegate = nil;
 
 - (ASPresentationAnchor)presentationAnchorForAuthorizationController:(ASAuthorizationController *)controller
 {
-    return [self activeWindow];
+    UIViewController *unityController = UnityGetGLViewController();
+    if (unityController != nil)
+    {
+        if (unityController.view.window != nil)
+        {
+            return unityController.view.window;
+        }
+
+        if (unityController.view != nil)
+        {
+            return unityController.view;
+        }
+    }
+
+    UIWindow *window = [self activeWindow];
+    if (window != nil)
+    {
+        return window;
+    }
+
+    return UIApplication.sharedApplication.windows.firstObject;
 }
 
 - (void)sendPayload:(NSDictionary *)payload
@@ -77,6 +100,7 @@ static id dreamGateAppleSignInDelegate = nil;
 
     self.didSendPayload = YES;
     dreamGateAppleSignInDelegate = nil;
+    dreamGateAppleAuthorizationController = nil;
 
     NSString *fallback = @"{\"success\":0,\"error\":\"Apple sign in failed.\"}";
     if (self.callbackObject.length == 0 || self.callbackMethod.length == 0)
@@ -172,6 +196,7 @@ extern "C" void DreamGate_AppleSignIn_Request(const char *hashedNonce, const cha
                 [[ASAuthorizationController alloc] initWithAuthorizationRequests:@[request]];
             controller.delegate = delegate;
             controller.presentationContextProvider = delegate;
+            dreamGateAppleAuthorizationController = controller;
             [controller performRequests];
 
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(60 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{

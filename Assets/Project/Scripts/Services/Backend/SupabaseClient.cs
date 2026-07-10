@@ -312,22 +312,16 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private IEnumerator PostJson(string url, string body, bool useAuth, Action<bool, string, string> callback)
         {
+            if (url.Contains("/auth/v1/", StringComparison.Ordinal) || WebRequestHelper.ShouldPreferHttpClient)
+            {
+                yield return PostJsonViaHttpClient(url, body, useAuth, callback);
+                yield break;
+            }
+
             using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
             var bytes = Encoding.UTF8.GetBytes(body);
             WebRequestHelper.ConfigureJsonPost(request, bytes);
-            if (!string.IsNullOrEmpty(settings?.supabaseAnonKey))
-            {
-                request.SetRequestHeader("apikey", settings.supabaseAnonKey);
-                if (useAuth)
-                {
-                    request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
-                }
-                else if (url.Contains("/auth/v1/", StringComparison.Ordinal))
-                {
-                    request.SetRequestHeader("Authorization", $"Bearer {settings.supabaseAnonKey}");
-                }
-            }
-
+            ApplyRequestHeaders(request, useAuth, url);
             yield return request.SendWebRequest();
 
             var response = WebRequestHelper.ReadResponseText(request);
@@ -346,14 +340,70 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             if (url.Contains("/auth/v1/", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(response))
             {
+                yield return PostJsonViaHttpClient(url, body, useAuth, callback);
+                yield break;
+            }
+
+            callback(true, string.Empty, response);
+        }
+
+        private IEnumerator PostJsonViaHttpClient(string url, string body, bool useAuth, Action<bool, string, string> callback)
+        {
+            SupabaseHttpResult result = null;
+            yield return SupabaseHttpTransport.Post(url, body, BuildRequestHeaders(useAuth, url), value => result = value);
+
+            if (result == null)
+            {
+                callback(false, "Authentication request failed.", string.Empty);
+                yield break;
+            }
+
+            var response = result.Body ?? string.Empty;
+            if (!result.Success)
+            {
+                callback(false, NormalizeAuthError(result.Error, response), response);
+                yield break;
+            }
+
+            if (url.Contains("/auth/v1/", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(response))
+            {
                 callback(
                     false,
-                    $"Authentication server returned an empty response (HTTP {request.responseCode}). Check your connection and try again.",
+                    $"Authentication server returned an empty response (HTTP {result.StatusCode}). Check your connection and try again.",
                     response);
                 yield break;
             }
 
             callback(true, string.Empty, response);
+        }
+
+        private void ApplyRequestHeaders(UnityWebRequest request, bool useAuth, string url)
+        {
+            foreach (var header in BuildRequestHeaders(useAuth, url))
+            {
+                request.SetRequestHeader(header.Key, header.Value);
+            }
+        }
+
+        private Dictionary<string, string> BuildRequestHeaders(bool useAuth, string url)
+        {
+            var headers = new Dictionary<string, string>();
+            if (string.IsNullOrEmpty(settings?.supabaseAnonKey))
+            {
+                return headers;
+            }
+
+            headers["apikey"] = settings.supabaseAnonKey;
+            if (useAuth)
+            {
+                headers["Authorization"] = $"Bearer {AccessToken}";
+            }
+            else if (url.Contains("/auth/v1/", StringComparison.Ordinal))
+            {
+                headers["Authorization"] = $"Bearer {settings.supabaseAnonKey}";
+            }
+
+            return headers;
         }
 
         private IEnumerator Get(string url, Action<bool, string, string> callback)
