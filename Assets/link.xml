@@ -1,0 +1,5 @@
+<linker>
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseAuthParser" preserve="all" />
+  </assembly>
+</linker>

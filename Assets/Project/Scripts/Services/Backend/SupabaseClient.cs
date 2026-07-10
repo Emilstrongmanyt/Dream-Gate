@@ -46,7 +46,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 }
 
                 var parsed = ApplyAuthResponse(response);
-                if (parsed.HasSession && IsAuthenticated)
+                if (IsAuthenticated)
                 {
                     callback(true, $"Account created. Welcome, {displayName}!", false);
                     return;
@@ -63,7 +63,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
                 callback(
                     false,
-                    "Sign up could not start a session. If you already registered, try logging in instead.",
+                    DescribeMissingSession(response, "Sign up could not start a session. If you already registered, try logging in instead."),
                     false);
             });
         }
@@ -84,9 +84,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     return;
                 }
 
-                var parsed = ApplyAuthResponse(response);
-                var authenticated = parsed.HasSession && IsAuthenticated;
-                callback(authenticated, authenticated ? "Welcome back!" : "Login failed.");
+                ApplyAuthResponse(response);
+                var authenticated = IsAuthenticated;
+                callback(authenticated, authenticated ? "Welcome back!" : DescribeMissingSession(response, "Login failed."));
             });
         }
 
@@ -107,9 +107,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     return;
                 }
 
-                var parsed = ApplyAuthResponse(response);
-                var authenticated = parsed.HasSession && IsAuthenticated;
-                callback(authenticated, authenticated ? "Welcome!" : "Apple sign in failed.");
+                ApplyAuthResponse(response);
+                var authenticated = IsAuthenticated;
+                callback(authenticated, authenticated ? "Welcome!" : DescribeMissingSession(response, "Apple sign in failed."));
             });
         }
 
@@ -187,6 +187,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
             UserId = PlayerPrefs.GetString(SessionUserIdKey, string.Empty);
             UserEmail = PlayerPrefs.GetString(SessionUserEmailKey, string.Empty);
 
+            if (!string.IsNullOrEmpty(AccessToken))
+            {
+                UserId = string.IsNullOrEmpty(UserId) ? ApiJson.TryGetJwtClaim(AccessToken, "sub") : UserId;
+                UserEmail = string.IsNullOrEmpty(UserEmail) ? ApiJson.TryGetJwtClaim(AccessToken, "email") : UserEmail;
+            }
+
             if (string.IsNullOrEmpty(AccessToken) || string.IsNullOrEmpty(UserId))
             {
                 SignOut();
@@ -211,23 +217,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 return parsed;
             }
 
+            UserId ??= ApiJson.TryGetJwtClaim(AccessToken, "sub");
+            UserEmail ??= ApiJson.TryGetJwtClaim(AccessToken, "email");
+
             if (string.IsNullOrEmpty(UserId))
             {
-                UserId = ApiJson.TryGetJwtClaim(AccessToken, "sub");
-            }
-
-            if (string.IsNullOrEmpty(UserEmail))
-            {
-                UserEmail = ApiJson.TryGetJwtClaim(AccessToken, "email");
-            }
-
-            if (!IsAuthenticated)
-            {
-                AccessToken = null;
-                RefreshToken = null;
-                UserId = null;
-                UserEmail = null;
-                DisplayNameFromMetadata = null;
+                Debug.LogWarning("Supabase auth response contained an access token but no user id.");
                 return parsed;
             }
 
@@ -237,6 +232,22 @@ namespace DreamGate.Battlegrounds.Services.Backend
             PlayerPrefs.SetString(SessionUserEmailKey, UserEmail ?? string.Empty);
             PlayerPrefs.Save();
             return parsed;
+        }
+
+        private static string DescribeMissingSession(string response, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                return "Authentication server returned an empty response. Check your connection and try again.";
+            }
+
+            var errorCode = ApiJson.TryGetString(response, "error_code");
+            if (errorCode == "email_not_confirmed")
+            {
+                return "Please confirm your email using the link we sent, then log in again.";
+            }
+
+            return fallback;
         }
 
         private static string ReadDisplayNameFromResponse(string response)
@@ -284,6 +295,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     ?? "Request failed.",
                     response);
                 callback(false, message, response);
+                yield break;
+            }
+
+            if (url.Contains("/auth/v1/", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(response))
+            {
+                callback(false, "Authentication server returned an empty response.", response);
                 yield break;
             }
 

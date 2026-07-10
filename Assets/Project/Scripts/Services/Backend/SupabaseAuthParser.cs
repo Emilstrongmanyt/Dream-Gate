@@ -53,10 +53,22 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 return result;
             }
 
-            TryParseWithJsonUtility(json, result);
             ApplyManualFallback(json, result);
+            TryParseWithJsonUtility(json, result);
             ApplyJwtFallback(result);
+            FinalizeParsedResponse(result);
             return result;
+        }
+
+        private static void FinalizeParsedResponse(ParsedAuthResponse result)
+        {
+            if (string.IsNullOrEmpty(result.AccessToken))
+            {
+                return;
+            }
+
+            result.UserId ??= ApiJson.TryGetJwtClaim(result.AccessToken, "sub");
+            result.UserEmail ??= ApiJson.TryGetJwtClaim(result.AccessToken, "email");
         }
 
         private static void TryParseWithJsonUtility(string json, ParsedAuthResponse result)
@@ -98,30 +110,27 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private static void ApplyManualFallback(string json, ParsedAuthResponse result)
         {
-            if (!result.HasSession)
+            var sessionJson = ApiJson.ExtractNestedObject(json, "session");
+            var tokenSource = !string.IsNullOrEmpty(sessionJson) ? sessionJson : json;
+            result.AccessToken ??= ApiJson.TryGetTopLevelString(tokenSource, "access_token")
+                                   ?? ApiJson.TryGetTopLevelString(json, "access_token");
+            result.RefreshToken ??= ApiJson.TryGetTopLevelString(tokenSource, "refresh_token")
+                                    ?? ApiJson.TryGetTopLevelString(json, "refresh_token");
+
+            var userJson = ApiJson.ExtractNestedObject(json, "user");
+            if (string.IsNullOrEmpty(userJson))
             {
-                var sessionJson = ApiJson.ExtractNestedObject(json, "session");
-                var tokenSource = !string.IsNullOrEmpty(sessionJson) ? sessionJson : json;
-                result.AccessToken = ApiJson.TryGetString(tokenSource, "access_token")
-                                     ?? ApiJson.TryGetString(json, "access_token");
-                result.RefreshToken = ApiJson.TryGetString(tokenSource, "refresh_token")
-                                      ?? ApiJson.TryGetString(json, "refresh_token");
+                userJson = ApiJson.ExtractNestedObject(sessionJson, "user");
             }
 
-            if (string.IsNullOrEmpty(result.UserId) || string.IsNullOrEmpty(result.UserEmail))
+            if (!string.IsNullOrEmpty(userJson))
             {
-                var userJson = ApiJson.ExtractNestedObject(json, "user");
-                if (string.IsNullOrEmpty(userJson))
-                {
-                    var sessionJson = ApiJson.ExtractNestedObject(json, "session");
-                    userJson = ApiJson.ExtractNestedObject(sessionJson, "user");
-                }
-
-                result.UserId ??= ApiJson.TryGetString(userJson, "id")
-                                  ?? ApiJson.TryGetString(json, "id");
-                result.UserEmail ??= ApiJson.TryGetString(userJson, "email")
-                                     ?? ApiJson.TryGetString(json, "email");
+                result.UserId ??= ApiJson.TryGetTopLevelString(userJson, "id");
+                result.UserEmail ??= ApiJson.TryGetTopLevelString(userJson, "email");
             }
+
+            result.UserId ??= ApiJson.TryGetTopLevelString(json, "id");
+            result.UserEmail ??= ApiJson.TryGetTopLevelString(json, "email");
         }
 
         private static void ApplyJwtFallback(ParsedAuthResponse result)

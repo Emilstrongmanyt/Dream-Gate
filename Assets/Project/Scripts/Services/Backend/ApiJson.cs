@@ -154,7 +154,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public static string TryGetJwtClaim(string accessToken, string claim)
         {
-            if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(claim))
+            var payloadJson = TryDecodeJwtPayloadJson(accessToken);
+            return string.IsNullOrEmpty(payloadJson) ? null : TryGetString(payloadJson, claim);
+        }
+
+        public static string TryDecodeJwtPayloadJson(string accessToken)
+        {
+            if (string.IsNullOrEmpty(accessToken))
             {
                 return null;
             }
@@ -178,13 +184,103 @@ namespace DreamGate.Battlegrounds.Services.Backend
                         break;
                 }
 
-                var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-                return TryGetString(json, claim);
+                return Encoding.UTF8.GetString(Convert.FromBase64String(payload));
             }
             catch (Exception)
             {
                 return null;
             }
+        }
+
+        public static string TryGetTopLevelString(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(key))
+            {
+                return null;
+            }
+
+            var pattern = $"\"{key}\":";
+            var searchFrom = 0;
+            while (searchFrom < json.Length)
+            {
+                var index = json.IndexOf(pattern, searchFrom, StringComparison.Ordinal);
+                if (index < 0)
+                {
+                    return null;
+                }
+
+                if (IsTopLevelJsonKey(json, index))
+                {
+                    return ReadJsonStringValue(json, index + pattern.Length);
+                }
+
+                searchFrom = index + pattern.Length;
+            }
+
+            return null;
+        }
+
+        private static bool IsTopLevelJsonKey(string json, int keyStart)
+        {
+            var depth = 0;
+            var inString = false;
+            for (var i = 0; i < keyStart; i++)
+            {
+                var ch = json[i];
+                if (ch == '"')
+                {
+                    if (i == 0 || json[i - 1] != '\\')
+                    {
+                        inString = !inString;
+                    }
+
+                    continue;
+                }
+
+                if (inString)
+                {
+                    continue;
+                }
+
+                if (ch == '{')
+                {
+                    depth++;
+                }
+                else if (ch == '}')
+                {
+                    depth--;
+                }
+            }
+
+            return depth == 1;
+        }
+
+        private static string ReadJsonStringValue(string json, int startIndex)
+        {
+            var index = startIndex;
+            while (index < json.Length && char.IsWhiteSpace(json[index]))
+            {
+                index++;
+            }
+
+            if (index >= json.Length || json[index] != '"')
+            {
+                return null;
+            }
+
+            index++;
+            var end = index;
+            while (end < json.Length)
+            {
+                if (json[end] == '"' && json[end - 1] != '\\')
+                {
+                    break;
+                }
+
+                end++;
+            }
+
+            return end > index ? json.Substring(index, end - index) : null;
         }
 
         public static string NormalizeResponseJson(string rawJson)

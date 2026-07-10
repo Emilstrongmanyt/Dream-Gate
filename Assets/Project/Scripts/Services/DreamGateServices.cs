@@ -146,7 +146,9 @@ namespace DreamGate.Battlegrounds.Services
 
             if (!success)
             {
-                if (message.IndexOf("could not start a session", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (message.IndexOf("could not start a session", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("already exists", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("already registered", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     yield return CloudClient.SignIn(email, password, (loginOk, loginMsg) =>
                     {
@@ -164,6 +166,12 @@ namespace DreamGate.Battlegrounds.Services
 
                 if (!success)
                 {
+                    if (message.IndexOf("Login failed", StringComparison.OrdinalIgnoreCase) >= 0
+                        || message.IndexOf("could not start a session", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        message = "Account may have been created. Try logging in from the Log In screen.";
+                    }
+
                     callback(false, message, false);
                     yield break;
                 }
