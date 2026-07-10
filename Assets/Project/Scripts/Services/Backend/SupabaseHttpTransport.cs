@@ -46,6 +46,15 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             var requestUrl = WebRequestHelper.WithApiKeyQuery(url, anonKey);
+
+#if UNITY_IOS && !UNITY_EDITOR
+            if (url.Contains("/auth/v1/", StringComparison.Ordinal))
+            {
+                yield return SupabaseNativeHttp.Post(requestUrl, body, headers, callback);
+                yield break;
+            }
+#endif
+
             SupabaseHttpResult result = null;
             for (var attempt = 0; attempt < 2; attempt++)
             {
@@ -142,6 +151,15 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             var anonKey = TryGetAnonKey(headers);
             var requestUrl = WebRequestHelper.WithApiKeyQuery(url, anonKey);
+
+#if UNITY_IOS && !UNITY_EDITOR
+            if (url.Contains("/auth/v1/", StringComparison.Ordinal))
+            {
+                yield return SupabaseNativeHttp.Get(requestUrl, headers, callback);
+                yield break;
+            }
+#endif
+
             using var request = UnityWebRequest.Get(requestUrl);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.timeout = 45;

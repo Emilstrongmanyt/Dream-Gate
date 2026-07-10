@@ -2,6 +2,7 @@
   <assembly fullname="Assembly-CSharp">
     <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseAuthParser" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseHttpTransport" preserve="all" />
+    <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseNativeHttp" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.ApiJson" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.AppleSignInNative" preserve="all" />
   </assembly>
