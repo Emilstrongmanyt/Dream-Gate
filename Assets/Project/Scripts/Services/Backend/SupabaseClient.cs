@@ -40,7 +40,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             var signupSuccess = false;
             var signupResponse = string.Empty;
             var signupError = string.Empty;
-            yield return PostJson($"{settings.supabaseUrl}/auth/v1/signup", body, false, (success, response, error) =>
+            yield return PostJson($"{settings.EffectiveSupabaseUrl}/auth/v1/signup", body, false, (success, response, error) =>
             {
                 signupSuccess = success;
                 signupResponse = response;
@@ -87,7 +87,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             var loginSuccess = false;
             var loginResponse = string.Empty;
             var loginError = string.Empty;
-            yield return PostJson($"{settings.supabaseUrl}/auth/v1/token?grant_type=password", body, false, (success, response, error) =>
+            yield return PostJson($"{settings.EffectiveSupabaseUrl}/auth/v1/token?grant_type=password", body, false, (success, response, error) =>
             {
                 loginSuccess = success;
                 loginResponse = response;
@@ -123,7 +123,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             var appleSuccess = false;
             var appleResponse = string.Empty;
             var appleError = string.Empty;
-            yield return PostJson($"{settings.supabaseUrl}/auth/v1/token?grant_type=id_token", body, false, (success, response, error) =>
+            yield return PostJson($"{settings.EffectiveSupabaseUrl}/auth/v1/token?grant_type=id_token", body, false, (success, response, error) =>
             {
                 appleSuccess = success;
                 appleResponse = response;
@@ -181,7 +181,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 { "code_verifier", codeVerifier ?? string.Empty }
             });
 
-            yield return PostJson($"{settings.supabaseUrl}/auth/v1/token?grant_type=pkce", body, false, (success, response, error) =>
+            yield return PostJson($"{settings.EffectiveSupabaseUrl}/auth/v1/token?grant_type=pkce", body, false, (success, response, error) =>
             {
                 if (!success)
                 {
@@ -228,7 +228,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
-            var url = $"{settings.supabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}&select=*";
+            var url = $"{settings.EffectiveSupabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}&select=*";
             yield return Get(url, (success, response, error) =>
             {
                 if (!success)
@@ -257,7 +257,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             var body = ApiJson.BuildObject(new Dictionary<string, object> { { "display_name", displayName } });
-            var url = $"{settings.supabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}";
+            var url = $"{settings.EffectiveSupabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}";
             yield return Patch(url, body, (success, _, error) => callback(success, success ? string.Empty : error));
         }
 
@@ -325,7 +325,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             if (string.IsNullOrWhiteSpace(response))
             {
-                return "Authentication server returned an empty response. Check your connection and try again.";
+                return "Authentication server returned an empty response (0 bytes). This is not a firewall issue.";
+            }
+
+            if (!SupabaseAuthParser.Parse(response).HasSession)
+            {
+                var preview = response.Length > 120 ? response.Substring(0, 120) + "..." : response;
+                return $"Authentication response did not include a session token. Server said: {preview}";
             }
 
             var errorCode = ApiJson.TryGetString(response, "error_code");
@@ -393,7 +399,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
-            var url = $"{settings.supabaseUrl}/auth/v1/user";
+            var url = $"{settings.EffectiveSupabaseUrl}/auth/v1/user";
             SupabaseHttpResult result = null;
             yield return SupabaseHttpTransport.Get(url, BuildRequestHeaders(true, url), value => result = value);
             if (result == null || !result.Success || string.IsNullOrWhiteSpace(result.Body))
@@ -414,7 +420,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private Dictionary<string, string> BuildRequestHeaders(bool useAuth, string url)
         {
             var headers = new Dictionary<string, string>();
-            var anonKey = settings?.supabaseAnonKey?.Trim();
+            var anonKey = settings?.EffectiveAnonKey;
             if (string.IsNullOrEmpty(anonKey))
             {
                 return headers;
@@ -436,7 +442,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private IEnumerator Get(string url, Action<bool, string, string> callback)
         {
             using var request = UnityWebRequest.Get(url);
-            request.SetRequestHeader("apikey", settings.supabaseAnonKey);
+            request.SetRequestHeader("apikey", settings.EffectiveAnonKey);
             request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
             yield return request.SendWebRequest();
 
@@ -455,7 +461,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             using var request = new UnityWebRequest(url, "PATCH");
             var bytes = Encoding.UTF8.GetBytes(body);
             WebRequestHelper.ConfigureJsonPost(request, bytes);
-            request.SetRequestHeader("apikey", settings.supabaseAnonKey);
+            request.SetRequestHeader("apikey", settings.EffectiveAnonKey);
             request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
             request.SetRequestHeader("Prefer", "return=minimal");
             yield return request.SendWebRequest();

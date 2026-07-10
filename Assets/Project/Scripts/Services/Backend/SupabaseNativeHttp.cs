@@ -103,10 +103,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
             DreamGate_Http_Reset();
             startRequest();
 
-            var elapsed = 0f;
-            while (DreamGate_Http_IsDone() == 0 && elapsed < TimeoutSeconds)
+            var deadline = AuthCoroutineTimeouts.CreateDeadline(TimeoutSeconds);
+            while (DreamGate_Http_IsDone() == 0 && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {
-                elapsed += Time.unscaledDeltaTime;
                 yield return null;
             }
 

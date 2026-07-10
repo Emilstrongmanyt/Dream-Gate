@@ -30,7 +30,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
         }
 
-        public Coroutine Run(IEnumerator routine) => StartCoroutine(routine);
+        public Coroutine Run(IEnumerator routine)
+        {
+            gameObject.SetActive(true);
+            return StartCoroutine(routine);
+        }
 
         private void OnDestroy()
         {

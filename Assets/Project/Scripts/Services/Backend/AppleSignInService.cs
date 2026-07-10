@@ -29,8 +29,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
             AppleSignInNative.RequestAuthorization(hashedNonce, result => credential = result);
 
             const float timeoutSeconds = 90f;
-            var elapsed = 0f;
-            while (credential == null && elapsed < timeoutSeconds)
+            var deadline = AuthCoroutineTimeouts.CreateDeadline(timeoutSeconds);
+            while (credential == null && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {
                 if (AppleSignInNative.TryConsumePendingResult(out var polled))
                 {
@@ -38,7 +38,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     break;
                 }
 
-                elapsed += UnityEngine.Time.unscaledDeltaTime;
                 yield return null;
             }
 

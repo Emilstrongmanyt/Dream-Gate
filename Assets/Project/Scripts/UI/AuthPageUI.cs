@@ -92,11 +92,21 @@ namespace DreamGate.Battlegrounds.UI
         {
             var success = false;
             var message = string.Empty;
-            yield return DreamGateServices.CoTryLogin(emailInput.text, passwordInput.text, (ok, msg) =>
-            {
-                success = ok;
-                message = msg;
-            });
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryLogin(emailInput.text, passwordInput.text, (ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                90f,
+                "Sign in timed out. Try again.",
+                (timedOutMessage) =>
+                {
+                    message = timedOutMessage;
+                });
 
             if (success)
             {
@@ -122,11 +132,21 @@ namespace DreamGate.Battlegrounds.UI
         {
             var success = false;
             var message = string.Empty;
-            yield return DreamGateServices.CoTryAppleSignIn((ok, msg) =>
-            {
-                success = ok;
-                message = msg;
-            });
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryAppleSignIn((ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                120f,
+                "Apple sign in timed out. Close the Apple sheet and try again.",
+                (timedOutMessage) =>
+                {
+                    message = timedOutMessage;
+                });
 
             if (success)
             {
@@ -296,16 +316,26 @@ namespace DreamGate.Battlegrounds.UI
             var success = false;
             var message = string.Empty;
             var requiresEmailConfirmation = false;
-            yield return DreamGateServices.CoTryRegister(
-                displayNameInput.text,
-                emailInput.text,
-                passwordInput.text,
-                confirmPasswordInput.text,
-                (ok, msg, pendingConfirmation) =>
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryRegister(
+                    displayNameInput.text,
+                    emailInput.text,
+                    passwordInput.text,
+                    confirmPasswordInput.text,
+                    (ok, msg, pendingConfirmation) =>
+                    {
+                        success = ok;
+                        message = msg;
+                        requiresEmailConfirmation = pendingConfirmation;
+                        finished = true;
+                    }),
+                () => finished,
+                90f,
+                "Create account timed out. Try again.",
+                (timedOutMessage) =>
                 {
-                    success = ok;
-                    message = msg;
-                    requiresEmailConfirmation = pendingConfirmation;
+                    message = timedOutMessage;
                 });
 
             if (success)
@@ -336,11 +366,21 @@ namespace DreamGate.Battlegrounds.UI
         {
             var success = false;
             var message = string.Empty;
-            yield return DreamGateServices.CoTryAppleSignIn((ok, msg) =>
-            {
-                success = ok;
-                message = msg;
-            });
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryAppleSignIn((ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                120f,
+                "Apple sign in timed out. Close the Apple sheet and try again.",
+                (timedOutMessage) =>
+                {
+                    message = timedOutMessage;
+                });
 
             if (success)
             {

@@ -50,8 +50,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
 #if UNITY_IOS && !UNITY_EDITOR
             if (url.Contains("/auth/v1/", StringComparison.Ordinal))
             {
-                yield return SupabaseNativeHttp.Post(requestUrl, body, headers, callback);
-                yield break;
+                SupabaseHttpResult nativeResult = null;
+                yield return SupabaseNativeHttp.Post(requestUrl, body, headers, value => nativeResult = value);
+                if (nativeResult != null && !(nativeResult.Success && nativeResult.BodyBytes == 0))
+                {
+                    callback(nativeResult);
+                    yield break;
+                }
             }
 #endif
 

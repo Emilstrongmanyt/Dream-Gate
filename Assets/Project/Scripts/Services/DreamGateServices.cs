@@ -207,9 +207,9 @@ namespace DreamGate.Battlegrounds.Services
                 message = msg;
             });
 
-            if (!success && !CloudClient.IsAuthenticated)
+            if (!success)
             {
-                callback(false, message);
+                callback(false, string.IsNullOrWhiteSpace(message) ? "Login failed." : message);
                 yield break;
             }
 

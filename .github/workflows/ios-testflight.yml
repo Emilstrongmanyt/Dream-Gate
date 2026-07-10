@@ -8,9 +8,8 @@ permissions:
   actions: read
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    # TestFlight is manual-only until email + Apple auth are verified on device.
     inputs:
       sign_only:
         description: Skip Unity build and reuse build-iOS artifact from a prior run

@@ -5,10 +5,20 @@ namespace DreamGate.Battlegrounds.Services.Backend
     [CreateAssetMenu(fileName = "BackendSettings", menuName = "Dream Gate/Backend Settings")]
     public class BackendSettings : ScriptableObject
     {
+        private const string FallbackSupabaseUrl = "https://hekknzzbudmkwxtzxkdi.supabase.co";
+        private const string FallbackAnonKey =
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhla2tuenpidWRta3d4dHp4a2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NDgxMTUsImV4cCI6MjA5OTEyNDExNX0.Ahxxv2De9RfeTwhJWARCbyv0HoUc7R1bx6Jv662oraI";
+
         [Header("Supabase")]
         public bool useCloudBackend = false;
         public string supabaseUrl = "";
         public string supabaseAnonKey = "";
+
+        public string EffectiveSupabaseUrl =>
+            string.IsNullOrWhiteSpace(supabaseUrl) ? FallbackSupabaseUrl : supabaseUrl.Trim().TrimEnd('/');
+
+        public string EffectiveAnonKey =>
+            string.IsNullOrWhiteSpace(supabaseAnonKey) ? FallbackAnonKey : supabaseAnonKey.Trim();
 
         [Header("Edge Functions")]
         public string matchmakingFunctionUrl = "";
@@ -33,17 +43,17 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public bool IsConfigured =>
             useCloudBackend &&
-            !string.IsNullOrWhiteSpace(supabaseUrl) &&
-            !string.IsNullOrWhiteSpace(supabaseAnonKey);
+            !string.IsNullOrWhiteSpace(EffectiveSupabaseUrl) &&
+            !string.IsNullOrWhiteSpace(EffectiveAnonKey);
 
         private string BuildFunctionUrl(string functionName)
         {
-            if (string.IsNullOrWhiteSpace(supabaseUrl))
+            if (string.IsNullOrWhiteSpace(EffectiveSupabaseUrl))
             {
                 return string.Empty;
             }
 
-            return $"{supabaseUrl.TrimEnd('/')}/functions/v1/{functionName}";
+            return $"{EffectiveSupabaseUrl}/functions/v1/{functionName}";
         }
 
         private static BackendSettings cached;
