@@ -170,6 +170,11 @@ static NSString *dreamGateApplePendingJson = nil;
 
 @end
 
+extern "C" int DreamGate_AppleSignIn_IsReady(void)
+{
+    return (dreamGateApplePendingJson != nil && dreamGateApplePendingJson.length > 0) ? 1 : 0;
+}
+
 extern "C" void DreamGate_AppleSignIn_CopyResult(char *buffer, int bufferSize)
 {
     if (buffer == NULL || bufferSize <= 0)

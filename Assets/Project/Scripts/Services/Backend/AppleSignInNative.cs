@@ -53,6 +53,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string callbackMethod);
 
         [DllImport("__Internal")]
+        private static extern int DreamGate_AppleSignIn_IsReady();
+
+        [DllImport("__Internal")]
         private static extern void DreamGate_AppleSignIn_CopyResult(byte[] buffer, int bufferSize);
 #endif
 
@@ -67,18 +70,44 @@ namespace DreamGate.Battlegrounds.Services.Backend
 #endif
         }
 
+        public static bool TryConsumePendingResult(out AppleSignInCredential credential)
+        {
+#if UNITY_IOS && !UNITY_EDITOR
+            if (DreamGate_AppleSignIn_IsReady() == 0)
+            {
+                credential = null;
+                return false;
+            }
+
+            var json = ReadNativeResult(clearPending: true);
+            credential = AppleSignInCredential.FromJson(json);
+            return true;
+#else
+            credential = null;
+            return false;
+#endif
+        }
+
         public void OnNativeCallback(string signal)
         {
-            var json = ReadNativeResult();
-            var credential = AppleSignInCredential.FromJson(json);
+            if (!TryConsumePendingResult(out var credential))
+            {
+                return;
+            }
+
             var callback = pendingCallback;
             pendingCallback = null;
             callback?.Invoke(credential);
         }
 
-        private static string ReadNativeResult()
+        private static string ReadNativeResult(bool clearPending)
         {
 #if UNITY_IOS && !UNITY_EDITOR
+            if (!clearPending && DreamGate_AppleSignIn_IsReady() == 0)
+            {
+                return string.Empty;
+            }
+
             var buffer = new byte[ResultBufferSize];
             DreamGate_AppleSignIn_CopyResult(buffer, buffer.Length);
             var length = Array.IndexOf(buffer, (byte)0);

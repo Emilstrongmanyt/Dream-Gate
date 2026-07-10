@@ -34,54 +34,61 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
-            using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
-            var bytes = Encoding.UTF8.GetBytes(body ?? string.Empty);
-            WebRequestHelper.ConfigureJsonPost(request, bytes);
-
-            if (headers != null)
+            SupabaseHttpResult result = null;
+            for (var attempt = 0; attempt < 2; attempt++)
             {
-                foreach (var header in headers)
+                using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
+                var bytes = Encoding.UTF8.GetBytes(body ?? string.Empty);
+                WebRequestHelper.ConfigureJsonPost(request, bytes);
+                request.timeout = 45;
+
+                if (headers != null)
                 {
-                    if (string.IsNullOrWhiteSpace(header.Key) || header.Value == null)
+                    foreach (var header in headers)
                     {
-                        continue;
+                        if (string.IsNullOrWhiteSpace(header.Key) || header.Value == null)
+                        {
+                            continue;
+                        }
+
+                        request.SetRequestHeader(header.Key, header.Value);
                     }
-
-                    request.SetRequestHeader(header.Key, header.Value);
                 }
-            }
 
-            yield return request.SendWebRequest();
+                yield return request.SendWebRequest();
+                yield return WebRequestHelper.WaitForResponseReady();
 
-            var responseBody = WebRequestHelper.ReadResponseText(request);
-            var bodyByteCount = request.downloadHandler?.data?.Length ?? 0;
-            var statusCode = request.responseCode;
-            var transportSucceeded = request.result == UnityWebRequest.Result.Success;
-            var httpSucceeded = statusCode >= 200 && statusCode < 300;
+                result = WebRequestHelper.BuildResult(
+                    request,
+                    httpSucceeded => httpSucceeded
+                        ? string.Empty
+                        : ExtractHttpError(
+                            WebRequestHelper.ReadResponseText(request),
+                            request.error,
+                            request.responseCode));
 
-            if (!transportSucceeded && !httpSucceeded)
-            {
-                callback(new SupabaseHttpResult
+                if (!ShouldRetryEmptyAuthBody(url, result) || attempt == 1)
                 {
-                    Success = false,
-                    StatusCode = statusCode,
-                    Body = responseBody ?? string.Empty,
-                    BodyBytes = bodyByteCount,
-                    Error = WebRequestHelper.DescribeTransportError(request, responseBody)
-                });
-                yield break;
+                    break;
+                }
+
+                yield return WebRequestHelper.WaitForResponseReady();
             }
 
-            callback(new SupabaseHttpResult
+            callback(result ?? new SupabaseHttpResult
             {
-                Success = httpSucceeded,
-                StatusCode = statusCode,
-                Body = responseBody ?? string.Empty,
-                BodyBytes = bodyByteCount,
-                Error = httpSucceeded
-                    ? string.Empty
-                    : ExtractHttpError(responseBody, request.error, statusCode)
+                Success = false,
+                Error = "Request failed to complete."
             });
+        }
+
+        private static bool ShouldRetryEmptyAuthBody(string url, SupabaseHttpResult result)
+        {
+            return url.Contains("/auth/v1/", StringComparison.Ordinal)
+                   && result != null
+                   && result.StatusCode >= 200
+                   && result.StatusCode < 300
+                   && result.BodyBytes == 0;
         }
 
         private static string ExtractHttpError(string body, string transportError, long statusCode)
@@ -125,6 +132,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             using var request = UnityWebRequest.Get(url);
             request.downloadHandler = new DownloadHandlerBuffer();
+            request.timeout = 45;
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("Accept-Encoding", "identity");
 
@@ -142,36 +150,16 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             yield return request.SendWebRequest();
+            yield return WebRequestHelper.WaitForResponseReady();
 
-            var responseBody = WebRequestHelper.ReadResponseText(request);
-            var bodyByteCount = request.downloadHandler?.data?.Length ?? 0;
-            var statusCode = request.responseCode;
-            var transportSucceeded = request.result == UnityWebRequest.Result.Success;
-            var httpSucceeded = statusCode >= 200 && statusCode < 300;
-
-            if (!transportSucceeded && !httpSucceeded)
-            {
-                callback(new SupabaseHttpResult
-                {
-                    Success = false,
-                    StatusCode = statusCode,
-                    Body = responseBody ?? string.Empty,
-                    BodyBytes = bodyByteCount,
-                    Error = WebRequestHelper.DescribeTransportError(request, responseBody)
-                });
-                yield break;
-            }
-
-            callback(new SupabaseHttpResult
-            {
-                Success = httpSucceeded,
-                StatusCode = statusCode,
-                Body = responseBody ?? string.Empty,
-                BodyBytes = bodyByteCount,
-                Error = httpSucceeded
+            callback(WebRequestHelper.BuildResult(
+                request,
+                httpSucceeded => httpSucceeded
                     ? string.Empty
-                    : ExtractHttpError(responseBody, request.error, statusCode)
-            });
+                    : ExtractHttpError(
+                        WebRequestHelper.ReadResponseText(request),
+                        request.error,
+                        request.responseCode)));
         }
     }
 }

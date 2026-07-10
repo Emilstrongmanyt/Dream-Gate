@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Text;
+using UnityEngine;
 using UnityEngine.Networking;
 
 namespace DreamGate.Battlegrounds.Services.Backend
@@ -32,9 +34,51 @@ namespace DreamGate.Battlegrounds.Services.Backend
             request.disposeUploadHandlerOnDispose = disposeHandlers;
             request.disposeDownloadHandlerOnDispose = disposeHandlers;
             request.chunkedTransfer = false;
+            request.useHttpContinue = false;
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("Accept-Encoding", "identity");
+            request.SetRequestHeader("Content-Length", (body?.Length ?? 0).ToString());
+        }
+
+        public static IEnumerator WaitForResponseReady()
+        {
+#if UNITY_IOS && !UNITY_EDITOR
+            yield return null;
+            yield return null;
+#else
+            yield return null;
+#endif
+        }
+
+        public static SupabaseHttpResult BuildResult(UnityWebRequest request, System.Func<bool, string> buildError)
+        {
+            var responseBody = ReadResponseText(request);
+            var bodyByteCount = request.downloadHandler?.data?.Length ?? 0;
+            var statusCode = request.responseCode;
+            var transportSucceeded = request.result == UnityWebRequest.Result.Success;
+            var httpSucceeded = statusCode >= 200 && statusCode < 300;
+
+            if (!transportSucceeded && !httpSucceeded)
+            {
+                return new SupabaseHttpResult
+                {
+                    Success = false,
+                    StatusCode = statusCode,
+                    Body = responseBody ?? string.Empty,
+                    BodyBytes = bodyByteCount,
+                    Error = DescribeTransportError(request, responseBody)
+                };
+            }
+
+            return new SupabaseHttpResult
+            {
+                Success = httpSucceeded,
+                StatusCode = statusCode,
+                Body = responseBody ?? string.Empty,
+                BodyBytes = bodyByteCount,
+                Error = buildError(httpSucceeded)
+            };
         }
 
         public static string DescribeTransportError(UnityWebRequest request, string responseBody)
