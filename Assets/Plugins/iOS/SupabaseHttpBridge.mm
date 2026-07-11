@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 5;
+static const int DreamGateHttpPluginRevision = 6;
 static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
 
 static os_unfair_lock dreamGateHttpLock = OS_UNFAIR_LOCK_INIT;
@@ -409,4 +409,153 @@ extern "C" void DreamGate_Http_CopyError(char *buffer, int bufferSize)
 
     strncpy(buffer, utf8, (size_t)bufferSize - 1);
     buffer[bufferSize - 1] = '\0';
+}
+
+static void DreamGateAuthHttpSendMessage(
+    const char *callbackObject,
+    const char *callbackMethod,
+    NSDictionary *payload)
+{
+    if (callbackObject == NULL || callbackMethod == NULL)
+    {
+        return;
+    }
+
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:&error];
+    NSString *fallback = @"{\"ok\":0,\"status\":0,\"error\":\"Native auth callback failed.\"}";
+    NSString *json = jsonData == nil
+        ? fallback
+        : [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    if (json == nil)
+    {
+        json = fallback;
+    }
+
+    UnitySendMessage(callbackObject, callbackMethod, [json UTF8String]);
+}
+
+static void DreamGateAuthHttpExecutePost(
+    NSString *urlString,
+    NSString *body,
+    NSString *apikey,
+    NSString *authorization,
+    const char *callbackObject,
+    const char *callbackMethod)
+{
+    if (urlString.length == 0)
+    {
+        DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+            @"ok": @0,
+            @"status": @0,
+            @"error": @"Request URL is missing."
+        });
+        return;
+    }
+
+    NSMutableURLRequest *request = DreamGateHttpBuildRequest(urlString, @"POST", body, apikey, authorization);
+    if (request == nil)
+    {
+        DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+            @"ok": @0,
+            @"status": @0,
+            @"error": @"Invalid request URL."
+        });
+        return;
+    }
+
+    NSInteger statusCode = 0;
+    NSString *transportError = nil;
+    NSData *responseData = DreamGateHttpSendSynchronously(request, &statusCode);
+
+    if (responseData == nil || responseData.length == 0)
+    {
+        __block NSData *sessionData = nil;
+        __block NSHTTPURLResponse *httpResponse = nil;
+        __block NSError *requestError = nil;
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+
+        NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+        configuration.timeoutIntervalForRequest = 45.0;
+        configuration.timeoutIntervalForResource = 45.0;
+        configuration.HTTPShouldUsePipelining = NO;
+        configuration.waitsForConnectivity = YES;
+        configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+        NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
+
+        NSURLSessionDataTask *task = [session
+            dataTaskWithRequest:request
+            completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                sessionData = data;
+                requestError = error;
+                if ([response isKindOfClass:[NSHTTPURLResponse class]])
+                {
+                    httpResponse = (NSHTTPURLResponse *)response;
+                }
+                dispatch_semaphore_signal(semaphore);
+            }];
+        [task resume];
+        dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(45 * NSEC_PER_SEC)));
+        [session finishTasksAndInvalidate];
+
+        if (requestError != nil)
+        {
+            transportError = requestError.localizedDescription;
+        }
+        else
+        {
+            responseData = sessionData;
+            if (httpResponse != nil)
+            {
+                statusCode = httpResponse.statusCode;
+            }
+        }
+    }
+
+    if (transportError != nil)
+    {
+        DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+            @"ok": @0,
+            @"status": @0,
+            @"error": transportError
+        });
+        return;
+    }
+
+    NSString *bodyB64 = @"";
+    if (responseData != nil && responseData.length > 0)
+    {
+        bodyB64 = [responseData base64EncodedStringWithOptions:0];
+    }
+
+    DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+        @"ok": @1,
+        @"status": @(statusCode),
+        @"bodyB64": bodyB64 ?: @""
+    });
+}
+
+extern "C" void DreamGate_AuthHttp_StartPost(
+    const char *url,
+    const char *body,
+    const char *apikey,
+    const char *authorization,
+    const char *callbackObject,
+    const char *callbackMethod)
+{
+    @autoreleasepool
+    {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            @autoreleasepool
+            {
+                DreamGateAuthHttpExecutePost(
+                    url ? [NSString stringWithUTF8String:url] : @"",
+                    body ? [NSString stringWithUTF8String:body] : @"",
+                    apikey ? [NSString stringWithUTF8String:apikey] : @"",
+                    authorization ? [NSString stringWithUTF8String:authorization] : @"",
+                    callbackObject,
+                    callbackMethod);
+            }
+        });
+    }
 }

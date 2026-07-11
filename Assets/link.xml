@@ -5,6 +5,7 @@
 
     <type fullname="DreamGate.Battlegrounds.Services.Backend.ApiJson" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.AppleSignInNative" preserve="all" />
+    <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseAuthNative" preserve="all" />
   </assembly>
   <assembly fullname="System.Net.Http" preserve="all" />
 </linker>
