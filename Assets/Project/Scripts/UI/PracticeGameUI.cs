@@ -23,6 +23,9 @@ namespace DreamGate.Battlegrounds.UI
         private readonly List<CardSlotView> handSlots = new();
         private readonly List<CardSlotView> playerCombatSlots = new();
         private readonly List<CardSlotView> opponentCombatSlots = new();
+        private readonly List<Vector2> shopSlotPositions = new();
+        private readonly List<Vector2> boardSlotPositions = new();
+        private readonly List<Vector2> handSlotPositions = new();
 
         private TextMeshProUGUI hudText;
         private TextMeshProUGUI leaderboardText;
@@ -60,7 +63,8 @@ namespace DreamGate.Battlegrounds.UI
         private bool humanCombatPlaybackActive;
         private readonly StringBuilder logBuilder = new();
         private const int RecruitCountdownStartSeconds = 20;
-        private const float RecruitActionButtonY = 610f;
+        private const float RecruitHubOffsetY = 15f;
+        private const float RecruitActionButtonY = 610f + RecruitHubOffsetY;
         private static readonly Vector2 RecruitRefreshButtonPos = new(250f, RecruitActionButtonY);
         private static readonly Vector2 RecruitUpgradeButtonPos = new(-250f, RecruitActionButtonY);
         private static readonly Vector2 RecruitCompassCountdownCenter = new(0f, -48f);
@@ -71,13 +75,13 @@ namespace DreamGate.Battlegrounds.UI
         private const float BoardSlotSpacing = 128f * CardScaleFactor;
         private const float HandSlotSpacing = 138f * CardScaleFactor;
         private const float RowLabelOffsetY = 95f * CardScaleFactor;
-        private static readonly Vector2 RecruitShopkeeperHeroCenter = new(0, 580);
+        private static readonly Vector2 RecruitShopkeeperHeroCenter = new(0, 580 + RecruitHubOffsetY);
         private static readonly Vector2 ShopRowCenter = new(0, 195);
         private static readonly Vector2 RecruitPlayerBoardCenter = new(0, -320);
         private static readonly Vector2 RecruitPlayerHeroCenter = new(0, -740);
         private static readonly Vector2 HandRowCenter = new(0, -930);
         private const float RecruitSideDividerY = -40f;
-        private static readonly Vector2 OpponentHeroCenter = new(0, 580);
+        private static readonly Vector2 OpponentHeroCenter = new(0, 580 + RecruitHubOffsetY);
         private static readonly Vector2 OpponentBoardCenter = new(0, 195);
         private static readonly Vector2 PlayerBoardCenter = new(0, -320);
         private static readonly Vector2 PlayerHeroCenter = new(0, -740);
@@ -852,30 +856,55 @@ namespace DreamGate.Battlegrounds.UI
 
         private void ApplyCombatStatDelta(CombatEvent combatEvent)
         {
-            if (combatEvent.boardIndex < 0)
-            {
-                RefreshCombatBoards();
-                return;
-            }
-
             var board = combatEvent.isAttackerBoard ? combatPlayerBoard : combatOpponentBoard;
             var slots = combatEvent.isAttackerBoard ? playerCombatSlots : opponentCombatSlots;
-            if (board == null || combatEvent.boardIndex < 0 || combatEvent.boardIndex >= board.Length ||
-                board[combatEvent.boardIndex] == null)
+            if (board == null)
             {
                 return;
             }
 
-            var minion = board[combatEvent.boardIndex];
+            if (combatEvent.boardIndex < 0)
+            {
+                for (var i = 0; i < board.Length; i++)
+                {
+                    var minion = board[i];
+                    if (minion == null || minion.isDead || minion.health <= 0)
+                    {
+                        continue;
+                    }
+
+                    if (combatEvent.attackDelta != 0)
+                    {
+                        minion.attack += combatEvent.attackDelta;
+                    }
+
+                    if (combatEvent.healthDelta != 0)
+                    {
+                        minion.health += combatEvent.healthDelta;
+                        minion.maxHealth += combatEvent.healthDelta;
+                    }
+
+                    RefreshCombatSlot(slots, board, i);
+                }
+
+                return;
+            }
+
+            if (combatEvent.boardIndex >= board.Length || board[combatEvent.boardIndex] == null)
+            {
+                return;
+            }
+
+            var target = board[combatEvent.boardIndex];
             if (combatEvent.attackDelta != 0)
             {
-                minion.attack += combatEvent.attackDelta;
+                target.attack += combatEvent.attackDelta;
             }
 
             if (combatEvent.healthDelta != 0)
             {
-                minion.health += combatEvent.healthDelta;
-                minion.maxHealth += combatEvent.healthDelta;
+                target.health += combatEvent.healthDelta;
+                target.maxHealth += combatEvent.healthDelta;
             }
 
             RefreshCombatSlot(slots, board, combatEvent.boardIndex);
@@ -953,14 +982,14 @@ namespace DreamGate.Battlegrounds.UI
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
             hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0, 22f);
+            hudRect.anchoredPosition = new Vector2(0, 22f + RecruitHubOffsetY);
             hudRect.sizeDelta = new Vector2(980, 128);
 
-            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, 2), 22, TextAlignmentOptions.Center);
-            hudText.rectTransform.sizeDelta = new Vector2(940, 56);
+            hudText = CreateText(hudPanel.transform, "HUD", new Vector2(0, 4), 22, TextAlignmentOptions.Center);
+            hudText.rectTransform.sizeDelta = new Vector2(940, 52);
 
-            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -28), 15, TextAlignmentOptions.Center);
-            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 28);
+            leaderboardText = CreateText(hudPanel.transform, "Leaderboard", new Vector2(0, -34), 15, TextAlignmentOptions.Center);
+            leaderboardText.rectTransform.sizeDelta = new Vector2(940, 24);
             leaderboardText.color = new Color(0.85f, 0.9f, 1f);
 
             compactLogPanel = new GameObject("CompactLog", typeof(RectTransform), typeof(Image));
@@ -969,7 +998,7 @@ namespace DreamGate.Battlegrounds.UI
             compactLogRect.anchorMin = new Vector2(0.5f, 1f);
             compactLogRect.anchorMax = new Vector2(0.5f, 1f);
             compactLogRect.pivot = new Vector2(0.5f, 1f);
-            compactLogRect.anchoredPosition = new Vector2(0, -52);
+            compactLogRect.anchoredPosition = new Vector2(0, -58);
             compactLogRect.sizeDelta = new Vector2(920, 44);
             compactLogPanel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
             compactLogPanel.GetComponent<Image>().raycastTarget = false;
@@ -1021,6 +1050,7 @@ namespace DreamGate.Battlegrounds.UI
                 RefreshShop(player);
                 RefreshBoard(player);
                 RefreshHand(player);
+                SnapRecruitCardSlots();
             }
 
             var canAct = matchManager.Phase == MatchPhase.Recruit && !inCombatPlayback;
@@ -1422,6 +1452,51 @@ namespace DreamGate.Battlegrounds.UI
             {
                 RefreshHand(player);
             }
+
+            SnapRecruitCardSlots();
+        }
+
+        internal void SnapRecruitCardSlots()
+        {
+            if (recruitPanel == null)
+            {
+                return;
+            }
+
+            var parent = recruitPanel.transform;
+            SnapSlotRow(shopSlots, shopSlotPositions, parent);
+            SnapSlotRow(boardSlots, boardSlotPositions, parent);
+            SnapSlotRow(handSlots, handSlotPositions, parent);
+        }
+
+        private static void SnapSlotRow(
+            IReadOnlyList<CardSlotView> slots,
+            IReadOnlyList<Vector2> positions,
+            Transform parent)
+        {
+            if (slots == null || positions == null || parent == null)
+            {
+                return;
+            }
+
+            var count = Mathf.Min(slots.Count, positions.Count);
+            for (var i = 0; i < count; i++)
+            {
+                var slot = slots[i];
+                if (slot?.RootRect == null)
+                {
+                    continue;
+                }
+
+                var rect = slot.RootRect;
+                rect.SetParent(parent, false);
+                rect.anchoredPosition = positions[i];
+                rect.localScale = Vector3.one;
+
+                var handLift = rect.GetComponent<HandCardLift>();
+                handLift?.RecacheBase();
+                handLift?.ResetLift();
+            }
         }
 
         internal void TryBoardReorder(int fromIndex, int toIndex)
@@ -1601,6 +1676,19 @@ namespace DreamGate.Battlegrounds.UI
             bool showSectionLabel = true)
         {
             slots.Clear();
+            if (mode == CardSlotDisplayMode.Shop)
+            {
+                shopSlotPositions.Clear();
+            }
+            else if (mode == CardSlotDisplayMode.Board)
+            {
+                boardSlotPositions.Clear();
+            }
+            else if (mode == CardSlotDisplayMode.Hand)
+            {
+                handSlotPositions.Clear();
+            }
+
             var totalWidth = (count - 1) * spacing;
             var startX = center.x - totalWidth * 0.5f;
 
@@ -1613,6 +1701,19 @@ namespace DreamGate.Battlegrounds.UI
             {
                 var index = i;
                 var position = new Vector2(startX + i * spacing, center.y);
+                if (mode == CardSlotDisplayMode.Shop)
+                {
+                    shopSlotPositions.Add(position);
+                }
+                else if (mode == CardSlotDisplayMode.Board)
+                {
+                    boardSlotPositions.Add(position);
+                }
+                else if (mode == CardSlotDisplayMode.Hand)
+                {
+                    handSlotPositions.Add(position);
+                }
+
                 var slot = CreateCardSlot(
                     parent,
                     $"{label}{i + 1}",
@@ -1660,6 +1761,10 @@ namespace DreamGate.Battlegrounds.UI
             var frameImage = rootGo.GetComponent<Image>();
             frameImage.color = new Color(0f, 0f, 0f, 0f);
             frameImage.raycastTarget = true;
+            var goldenOutline = rootGo.AddComponent<Outline>();
+            goldenOutline.effectColor = new Color(1f, 0.82f, 0.18f, 0.98f);
+            goldenOutline.effectDistance = new Vector2(4f, -4f);
+            goldenOutline.enabled = false;
 
             var artGo = new GameObject("Art", typeof(RectTransform), typeof(Image));
             artGo.transform.SetParent(rootGo.transform, false);
@@ -1749,6 +1854,7 @@ namespace DreamGate.Battlegrounds.UI
             slotView = new CardSlotView(
                 button,
                 frameImage,
+                goldenOutline,
                 artImage,
                 divineShieldImage,
                 statsText,
@@ -2720,9 +2826,11 @@ namespace DreamGate.Battlegrounds.UI
 
             dragging = false;
             var dragged = Vector2.Distance(eventData.pressPosition, eventData.position) >= DragSuppressDistance;
+            var purchased = false;
             if (dragged && ui.IsOverPlayerSide(eventData.position, eventData.pressEventCamera))
             {
                 ui.TryBuyShopCard(slotIndex);
+                purchased = true;
                 inspectHandler?.SuppressNextClick();
             }
             else if (dragged)
@@ -2736,6 +2844,11 @@ namespace DreamGate.Battlegrounds.UI
             rect.localScale = baseScale;
             canvasGroup.alpha = 1f;
             canvasGroup.blocksRaycasts = true;
+
+            if (purchased)
+            {
+                ui.ForceRefreshHand();
+            }
         }
 
         private void OnDisable()
@@ -2885,6 +2998,7 @@ namespace DreamGate.Battlegrounds.UI
 
             rect.SetParent(originalParent, false);
             rect.SetSiblingIndex(originalSiblingIndex);
+            rect.anchoredPosition = basePosition;
             rect.localScale = baseScale;
             canvasGroup.alpha = 1f;
             canvasGroup.blocksRaycasts = true;
@@ -2929,6 +3043,11 @@ namespace DreamGate.Battlegrounds.UI
 
         private void CacheBase()
         {
+            if (rect == null)
+            {
+                rect = GetComponent<RectTransform>();
+            }
+
             basePosition = rect.anchoredPosition;
             baseScale = rect.localScale;
         }

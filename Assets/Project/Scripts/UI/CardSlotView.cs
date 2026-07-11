@@ -31,6 +31,7 @@ namespace DreamGate.Battlegrounds.UI
     {
         public Button Button { get; }
         public Image FrameImage { get; }
+        private readonly Outline goldenOutline;
         public Image ArtImage { get; }
         public Image DivineShieldImage { get; }
         public TextMeshProUGUI StatsText { get; }
@@ -45,9 +46,13 @@ namespace DreamGate.Battlegrounds.UI
         private bool hasArt;
         private CardInspectPayload inspectPayload = CardInspectPayload.Empty;
 
+        private static readonly Color GoldenFrameColor = new(0.62f, 0.48f, 0.08f, 0.92f);
+        private static readonly Color GoldenOutlineColor = new(1f, 0.84f, 0.2f, 0.98f);
+
         public CardSlotView(
             Button button,
             Image frameImage,
+            Outline frameOutline,
             Image artImage,
             Image divineShieldImage,
             TextMeshProUGUI statsText,
@@ -60,6 +65,7 @@ namespace DreamGate.Battlegrounds.UI
         {
             Button = button;
             FrameImage = frameImage;
+            goldenOutline = frameOutline;
             ArtImage = artImage;
             DivineShieldImage = divineShieldImage;
             StatsText = statsText;
@@ -84,7 +90,7 @@ namespace DreamGate.Battlegrounds.UI
             StatsText.text = string.Empty;
             StatsText.gameObject.SetActive(false);
             ClearArt();
-            SetTransparentFrame();
+            ApplyGoldenPresentation(false);
             HideStatOverlays();
             SetDivineShieldVisible(false);
             IdleMotion?.SetActiveMotion(false);
@@ -111,7 +117,7 @@ namespace DreamGate.Battlegrounds.UI
             {
                 SetStatOverlays(card.attack, card.health);
             }
-            SetTransparentFrame();
+            ApplyGoldenPresentation(false);
             IdleMotion?.SetActiveMotion(false);
             Button.interactable = interactable;
             inspectPayload = BuildShopInspectPayload(card);
@@ -142,7 +148,7 @@ namespace DreamGate.Battlegrounds.UI
                 SetStatOverlays(minion.attack, minion.health);
             }
 
-            SetTransparentFrame();
+            ApplyGoldenPresentation(minion.isGolden);
 
             if (IdleMotion != null)
             {
@@ -175,7 +181,7 @@ namespace DreamGate.Battlegrounds.UI
             SetDivineShieldVisible(minion.hasDivineShield);
             StatsText.gameObject.SetActive(false);
             SetStatOverlays(minion.attack, minion.health);
-            SetTransparentFrame();
+            ApplyGoldenPresentation(minion.isGolden);
             Button.interactable = false;
 
             if (IdleMotion != null)
@@ -199,7 +205,7 @@ namespace DreamGate.Battlegrounds.UI
             inspectPayload = CardInspectPayload.Empty;
             InspectHandler?.SetInspectable(false);
             IdleMotion?.SetActiveMotion(false);
-            SetTransparentFrame();
+            ApplyGoldenPresentation(false);
             HideStatOverlays();
             SetDivineShieldVisible(false);
             if (hasArt)
@@ -237,9 +243,25 @@ namespace DreamGate.Battlegrounds.UI
             hasArt = false;
         }
 
-        private void SetTransparentFrame()
+        private void ApplyGoldenPresentation(bool isGolden)
         {
+            if (isGolden)
+            {
+                FrameImage.color = GoldenFrameColor;
+                if (goldenOutline != null)
+                {
+                    goldenOutline.effectColor = GoldenOutlineColor;
+                    goldenOutline.enabled = true;
+                }
+
+                return;
+            }
+
             FrameImage.color = new Color(0f, 0f, 0f, 0f);
+            if (goldenOutline != null)
+            {
+                goldenOutline.enabled = false;
+            }
         }
 
         private void SetStatOverlays(int attack, int health)
