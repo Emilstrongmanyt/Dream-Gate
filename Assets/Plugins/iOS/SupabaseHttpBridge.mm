@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 12;
+static const int DreamGateHttpPluginRevision = 13;
 static const NSTimeInterval DreamGateHttpTimeoutSeconds = 45.0;
 static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
 static NSString *const DreamGateAuthCallbackBodyFileName = @"dreamgate_auth_callback_response.bin";
@@ -14,6 +14,33 @@ static NSString *dreamGateHttpResponseFilePath = nil;
 static NSString *dreamGateHttpTransportError = nil;
 static int dreamGateHttpNativeByteCount = 0;
 static int dreamGateHttpGeneration = 0;
+
+static os_unfair_lock dreamGateAuthCallbackLock = OS_UNFAIR_LOCK_INIT;
+static NSData *dreamGateAuthCallbackBodyData = nil;
+
+static BOOL DreamGateHttpIsAuthUrl(NSString *urlString)
+{
+    return urlString.length > 0
+        && [urlString rangeOfString:@"/auth/v1/" options:NSCaseInsensitiveSearch].location != NSNotFound;
+}
+
+static BOOL DreamGateHttpBodyLooksLikeAuthSession(NSData *body)
+{
+    if (body == nil || body.length < 32)
+    {
+        return NO;
+    }
+
+    NSString *text = [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding];
+    return text != nil && [text rangeOfString:@"access_token" options:NSCaseInsensitiveSearch].location != NSNotFound;
+}
+
+static void DreamGateAuthStoreCallbackBody(NSData *body)
+{
+    os_unfair_lock_lock(&dreamGateAuthCallbackLock);
+    dreamGateAuthCallbackBodyData = body != nil ? [body copy] : nil;
+    os_unfair_lock_unlock(&dreamGateAuthCallbackLock);
+}
 
 static void DreamGateHttpResetStateLocked(void)
 {
@@ -219,6 +246,22 @@ static void DreamGateHttpExecute(
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         @autoreleasepool
         {
+            BOOL isAuthUrl = DreamGateHttpIsAuthUrl(urlString);
+            NSInteger statusCode = 0;
+            NSData *bodyData = DreamGateHttpSendSynchronously(request, &statusCode);
+
+            if (bodyData != nil && bodyData.length > 0)
+            {
+                os_unfair_lock_lock(&dreamGateHttpLock);
+                BOOL stale = generation != dreamGateHttpGeneration;
+                os_unfair_lock_unlock(&dreamGateHttpLock);
+                if (!stale)
+                {
+                    DreamGateHttpFinish(statusCode > 0 ? statusCode : 200, bodyData, nil);
+                    return;
+                }
+            }
+
             __block NSData *responseData = nil;
             __block NSHTTPURLResponse *httpResponse = nil;
             __block NSError *requestError = nil;
@@ -255,9 +298,9 @@ static void DreamGateHttpExecute(
                 return;
             }
 
-            NSInteger statusCode = httpResponse != nil ? httpResponse.statusCode : 0;
+            statusCode = httpResponse != nil ? httpResponse.statusCode : statusCode;
             NSString *transportError = requestError != nil ? requestError.localizedDescription : nil;
-            NSData *bodyData = responseData;
+            bodyData = responseData;
 
             if (transportError != nil)
             {
@@ -265,7 +308,23 @@ static void DreamGateHttpExecute(
                 return;
             }
 
-            if ((bodyData == nil || bodyData.length == 0) && statusCode >= 200 && statusCode < 300)
+            if (isAuthUrl
+                && statusCode >= 200
+                && statusCode < 300
+                && !DreamGateHttpBodyLooksLikeAuthSession(bodyData))
+            {
+                NSInteger syncStatusCode = 0;
+                NSData *syncData = DreamGateHttpSendSynchronously(request, &syncStatusCode);
+                if (syncData != nil && syncData.length > 0)
+                {
+                    bodyData = syncData;
+                    if (syncStatusCode > 0)
+                    {
+                        statusCode = syncStatusCode;
+                    }
+                }
+            }
+            else if ((bodyData == nil || bodyData.length == 0) && statusCode >= 200 && statusCode < 300)
             {
                 NSInteger syncStatusCode = 0;
                 NSData *syncData = DreamGateHttpSendSynchronously(request, &syncStatusCode);
@@ -652,6 +711,8 @@ static void DreamGateAuthHttpExecutePost(
         return;
     }
 
+    DreamGateAuthStoreCallbackBody(bodyData);
+
     NSString *bodyPath = DreamGateAuthWriteCallbackBodyFile(bodyData);
     if (bodyPath == nil || bodyPath.length == 0)
     {
@@ -666,8 +727,44 @@ static void DreamGateAuthHttpExecutePost(
     sendPayload(@{
         @"ok": @1,
         @"status": @(statusCode),
-        @"bodyPath": bodyPath
+        @"bodyPath": bodyPath,
+        @"bodyBytes": @((int)bodyData.length)
     });
+}
+
+extern "C" int DreamGate_AuthHttp_GetBodyByteCount(void)
+{
+    os_unfair_lock_lock(&dreamGateAuthCallbackLock);
+    int byteCount = dreamGateAuthCallbackBodyData != nil ? (int)dreamGateAuthCallbackBodyData.length : 0;
+    os_unfair_lock_unlock(&dreamGateAuthCallbackLock);
+    return byteCount;
+}
+
+extern "C" int DreamGate_AuthHttp_CopyBody(unsigned char *buffer, int bufferSize)
+{
+    if (buffer == NULL || bufferSize <= 0)
+    {
+        return 0;
+    }
+
+    os_unfair_lock_lock(&dreamGateAuthCallbackLock);
+    NSData *bodyData = dreamGateAuthCallbackBodyData;
+    NSUInteger length = bodyData != nil ? bodyData.length : 0;
+    if (length == 0)
+    {
+        os_unfair_lock_unlock(&dreamGateAuthCallbackLock);
+        return 0;
+    }
+
+    NSUInteger copyLength = length;
+    if (copyLength > (NSUInteger)bufferSize)
+    {
+        copyLength = (NSUInteger)bufferSize;
+    }
+
+    memcpy(buffer, bodyData.bytes, copyLength);
+    os_unfair_lock_unlock(&dreamGateAuthCallbackLock);
+    return (int)copyLength;
 }
 
 extern "C" void DreamGate_AuthHttp_StartPost(

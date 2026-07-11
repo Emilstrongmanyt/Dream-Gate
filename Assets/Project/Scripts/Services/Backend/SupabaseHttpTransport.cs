@@ -23,7 +23,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v13-authfile";
+        internal const string AuthTransportRevision = "v14-syncfirst";
 
         internal static string LastAuthAttemptDetails = string.Empty;
 
@@ -71,16 +71,16 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 SupabaseHttpResult authResult = null;
 
 #if UNITY_IOS && !UNITY_EDITOR
-                yield return PostViaAuthMessage(url, body, headers, contentType, 20f, value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, "native-message"));
+                yield return PostViaNative(url, body, headers, contentType, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "native-ios"));
                 if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);
                     yield break;
                 }
 
-                yield return PostViaNative(url, body, headers, contentType, value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, "native-ios"));
+                yield return PostViaAuthMessage(url, body, headers, contentType, 45f, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "native-message"));
                 if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);

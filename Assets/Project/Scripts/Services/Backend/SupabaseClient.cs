@@ -511,7 +511,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             if (string.IsNullOrWhiteSpace(response))
             {
-                return $"Authentication server returned an empty response (0 bytes, {SupabaseHttpTransport.AuthTransportRevision}). This is not a firewall issue.";
+                var detail = $"Authentication server returned an empty response (0 bytes, {SupabaseHttpTransport.AuthTransportRevision}). This is not a firewall issue.";
+                if (!string.IsNullOrWhiteSpace(SupabaseHttpTransport.LastAuthAttemptDetails))
+                {
+                    detail = $"{detail} {SupabaseHttpTransport.LastAuthAttemptDetails}";
+                }
+
+                return detail;
             }
 
             if (!SupabaseAuthParser.Parse(response).HasSession)
@@ -618,6 +624,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 && !AllowsEmptyAuthBody(url))
             {
                 callback(false, DescribeEmptyAuthBody(result), response);
+                yield break;
+            }
+
+            if (url.Contains("/auth/v1/token", StringComparison.Ordinal)
+                && !SupabaseAuthParser.Parse(response).HasSession)
+            {
+                callback(false, DescribeInvalidAuthBody(result, response), response);
                 yield break;
             }
 

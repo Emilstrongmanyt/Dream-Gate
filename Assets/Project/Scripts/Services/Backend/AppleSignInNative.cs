@@ -323,6 +323,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string contentType,
             string callbackObject,
             string callbackMethod);
+
+        [DllImport("__Internal")]
+        private static extern int DreamGate_AuthHttp_GetBodyByteCount();
+
+        [DllImport("__Internal")]
+        private static extern int DreamGate_AuthHttp_CopyBody(byte[] buffer, int bufferSize);
 #endif
 
         public static IEnumerator Post(
@@ -434,6 +440,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private static string DecodeBody(string json)
         {
+            var expectedBytes = ApiJson.TryGetInt(json, "bodyBytes", 0);
             var bodyPath = ApiJson.TryGetString(json, "bodyPath");
             if (!string.IsNullOrWhiteSpace(bodyPath))
             {
@@ -442,17 +449,25 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     if (File.Exists(bodyPath))
                     {
                         var bytes = File.ReadAllBytes(bodyPath);
-                        return bytes.Length > 0 ? Encoding.UTF8.GetString(bytes) : string.Empty;
+                        if (bytes.Length > 0)
+                        {
+                            return Encoding.UTF8.GetString(bytes);
+                        }
                     }
                 }
                 catch
                 {
-                    // Fall through to legacy inline body fields.
+                    // Fall through to native buffer / legacy inline body fields.
                 }
                 finally
                 {
                     TryDeleteBodyFile(bodyPath);
                 }
+            }
+
+            if (TryReadAuthBodyFromNativeBuffer(expectedBytes, out var nativeBody))
+            {
+                return nativeBody;
             }
 
             var bodyB64 = ApiJson.TryGetString(json, "bodyB64");
@@ -470,6 +485,42 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             return ApiJson.TryGetString(json, "body") ?? string.Empty;
+        }
+
+        private static bool TryReadAuthBodyFromNativeBuffer(int expectedBytes, out string body)
+        {
+            body = string.Empty;
+#if UNITY_IOS && !UNITY_EDITOR
+            try
+            {
+                var nativeByteCount = DreamGate_AuthHttp_GetBodyByteCount();
+                if (nativeByteCount <= 0)
+                {
+                    return false;
+                }
+
+                if (expectedBytes > 0 && nativeByteCount < expectedBytes)
+                {
+                    return false;
+                }
+
+                var buffer = new byte[Math.Min(nativeByteCount, 262144)];
+                var copiedBytes = DreamGate_AuthHttp_CopyBody(buffer, buffer.Length);
+                if (copiedBytes <= 0)
+                {
+                    return false;
+                }
+
+                body = Encoding.UTF8.GetString(buffer, 0, copiedBytes);
+                return !string.IsNullOrEmpty(body);
+            }
+            catch
+            {
+                return false;
+            }
+#else
+            return false;
+#endif
         }
 
         private static void TryDeleteBodyFile(string path)
