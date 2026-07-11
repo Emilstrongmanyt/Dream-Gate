@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
@@ -433,6 +434,27 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private static string DecodeBody(string json)
         {
+            var bodyPath = ApiJson.TryGetString(json, "bodyPath");
+            if (!string.IsNullOrWhiteSpace(bodyPath))
+            {
+                try
+                {
+                    if (File.Exists(bodyPath))
+                    {
+                        var bytes = File.ReadAllBytes(bodyPath);
+                        return bytes.Length > 0 ? Encoding.UTF8.GetString(bytes) : string.Empty;
+                    }
+                }
+                catch
+                {
+                    // Fall through to legacy inline body fields.
+                }
+                finally
+                {
+                    TryDeleteBodyFile(bodyPath);
+                }
+            }
+
             var bodyB64 = ApiJson.TryGetString(json, "bodyB64");
             if (!string.IsNullOrWhiteSpace(bodyB64))
             {
@@ -448,6 +470,26 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             return ApiJson.TryGetString(json, "body") ?? string.Empty;
+        }
+
+        private static void TryDeleteBodyFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
+                // Best effort cleanup.
+            }
         }
 
         private static string GetHeader(IReadOnlyDictionary<string, string> headers, string key)

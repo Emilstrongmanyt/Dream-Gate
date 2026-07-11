@@ -1,9 +1,10 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 11;
+static const int DreamGateHttpPluginRevision = 12;
 static const NSTimeInterval DreamGateHttpTimeoutSeconds = 45.0;
 static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
+static NSString *const DreamGateAuthCallbackBodyFileName = @"dreamgate_auth_callback_response.bin";
 
 static os_unfair_lock dreamGateHttpLock = OS_UNFAIR_LOCK_INIT;
 static BOOL dreamGateHttpDone = NO;
@@ -469,6 +470,27 @@ extern "C" void DreamGate_Http_CopyError(char *buffer, int bufferSize)
     buffer[bufferSize - 1] = '\0';
 }
 
+static NSString *DreamGateAuthCallbackBodyFilePath(void)
+{
+    return [NSTemporaryDirectory() stringByAppendingPathComponent:DreamGateAuthCallbackBodyFileName];
+}
+
+static NSString *DreamGateAuthWriteCallbackBodyFile(NSData *body)
+{
+    if (body == nil || body.length == 0)
+    {
+        return nil;
+    }
+
+    NSString *path = DreamGateAuthCallbackBodyFilePath();
+    if (![body writeToFile:path atomically:YES])
+    {
+        return nil;
+    }
+
+    return path;
+}
+
 static void DreamGateAuthHttpSendMessage(
     const char *callbackObject,
     const char *callbackMethod,
@@ -490,7 +512,9 @@ static void DreamGateAuthHttpSendMessage(
         json = fallback;
     }
 
-    UnitySendMessage(callbackObject, callbackMethod, [json UTF8String]);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UnitySendMessage(callbackObject, callbackMethod, [json UTF8String]);
+    });
 }
 
 static void DreamGateAuthHttpExecutePost(
@@ -503,9 +527,7 @@ static void DreamGateAuthHttpExecutePost(
     const char *callbackMethod)
 {
     void (^sendPayload)(NSDictionary *) = ^(NSDictionary *payload) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, payload);
-        });
+        DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, payload);
     };
 
     if (urlString.length == 0)
@@ -536,65 +558,81 @@ static void DreamGateAuthHttpExecutePost(
         return;
     }
 
-    __block NSData *responseData = nil;
-    __block NSHTTPURLResponse *httpResponse = nil;
-    __block NSError *requestError = nil;
-    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    NSInteger statusCode = 0;
+    NSData *bodyData = DreamGateHttpSendSynchronously(request, &statusCode);
 
-    NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
-    configuration.timeoutIntervalForRequest = DreamGateHttpTimeoutSeconds;
-    configuration.timeoutIntervalForResource = DreamGateHttpTimeoutSeconds;
-    configuration.HTTPShouldUsePipelining = NO;
-    configuration.waitsForConnectivity = NO;
-    configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-    NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
-
-    NSURLSessionDataTask *task = [session
-        dataTaskWithRequest:request
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            responseData = data;
-            requestError = error;
-            if ([response isKindOfClass:[NSHTTPURLResponse class]])
-            {
-                httpResponse = (NSHTTPURLResponse *)response;
-            }
-            dispatch_semaphore_signal(semaphore);
-        }];
-    [task resume];
-    dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(DreamGateHttpTimeoutSeconds * NSEC_PER_SEC)));
-    [session finishTasksAndInvalidate];
-
-    if (requestError != nil)
+    if (bodyData == nil || bodyData.length == 0)
     {
-        sendPayload(@{
-            @"ok": @0,
-            @"status": @0,
-            @"error": requestError.localizedDescription
-        });
-        return;
-    }
+        __block NSData *responseData = nil;
+        __block NSHTTPURLResponse *httpResponse = nil;
+        __block NSError *requestError = nil;
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-    NSInteger statusCode = httpResponse != nil ? httpResponse.statusCode : 0;
-    NSData *bodyData = responseData;
+        NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+        configuration.timeoutIntervalForRequest = DreamGateHttpTimeoutSeconds;
+        configuration.timeoutIntervalForResource = DreamGateHttpTimeoutSeconds;
+        configuration.HTTPShouldUsePipelining = NO;
+        configuration.waitsForConnectivity = NO;
+        configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+        NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
 
-    if ((bodyData == nil || bodyData.length == 0) && statusCode >= 200 && statusCode < 300)
-    {
-        NSInteger syncStatusCode = 0;
-        NSData *syncData = DreamGateHttpSendSynchronously(request, &syncStatusCode);
-        if (syncData != nil && syncData.length > 0)
+        NSURLSessionDataTask *task = [session
+            dataTaskWithRequest:request
+            completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                responseData = data;
+                requestError = error;
+                if ([response isKindOfClass:[NSHTTPURLResponse class]])
+                {
+                    httpResponse = (NSHTTPURLResponse *)response;
+                }
+                dispatch_semaphore_signal(semaphore);
+            }];
+        [task resume];
+        dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(DreamGateHttpTimeoutSeconds * NSEC_PER_SEC)));
+        [session finishTasksAndInvalidate];
+
+        if (requestError != nil)
         {
-            bodyData = syncData;
-            if (syncStatusCode > 0)
+            sendPayload(@{
+                @"ok": @0,
+                @"status": @0,
+                @"error": requestError.localizedDescription
+            });
+            return;
+        }
+
+        statusCode = httpResponse != nil ? httpResponse.statusCode : statusCode;
+        bodyData = responseData;
+
+        if ((bodyData == nil || bodyData.length == 0) && statusCode >= 200 && statusCode < 300)
+        {
+            NSInteger syncStatusCode = 0;
+            NSData *syncData = DreamGateHttpSendSynchronously(request, &syncStatusCode);
+            if (syncData != nil && syncData.length > 0)
             {
-                statusCode = syncStatusCode;
+                bodyData = syncData;
+                if (syncStatusCode > 0)
+                {
+                    statusCode = syncStatusCode;
+                }
             }
         }
     }
 
-    if (statusCode >= 400 || requestError != nil)
+    if (statusCode >= 400)
     {
-        NSString *transportError = requestError != nil
-            ? requestError.localizedDescription
+        NSString *bodyPreview = @"";
+        if (bodyData != nil && bodyData.length > 0)
+        {
+            bodyPreview = [[NSString alloc] initWithData:bodyData encoding:NSUTF8StringEncoding] ?: @"";
+            if (bodyPreview.length > 160)
+            {
+                bodyPreview = [[bodyPreview substringToIndex:160] stringByAppendingString:@"..."];
+            }
+        }
+
+        NSString *transportError = bodyPreview.length > 0
+            ? bodyPreview
             : [NSString stringWithFormat:@"Request failed (HTTP %ld).", (long)statusCode];
         sendPayload(@{
             @"ok": @0,
@@ -614,12 +652,21 @@ static void DreamGateAuthHttpExecutePost(
         return;
     }
 
-    NSString *bodyB64 = [bodyData base64EncodedStringWithOptions:0] ?: @"";
+    NSString *bodyPath = DreamGateAuthWriteCallbackBodyFile(bodyData);
+    if (bodyPath == nil || bodyPath.length == 0)
+    {
+        sendPayload(@{
+            @"ok": @0,
+            @"status": @(statusCode),
+            @"error": @"Native auth HTTP could not write the response body."
+        });
+        return;
+    }
 
     sendPayload(@{
         @"ok": @1,
         @"status": @(statusCode),
-        @"bodyB64": bodyB64
+        @"bodyPath": bodyPath
     });
 }
 

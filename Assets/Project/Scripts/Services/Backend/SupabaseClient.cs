@@ -831,7 +831,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             if (string.IsNullOrWhiteSpace(error))
             {
-                return "Request failed.";
+                return string.IsNullOrWhiteSpace(SupabaseHttpTransport.LastAuthAttemptDetails)
+                    ? "Request failed."
+                    : SupabaseHttpTransport.LastAuthAttemptDetails;
             }
 
             if (error.Equals("invalid_request", StringComparison.OrdinalIgnoreCase)

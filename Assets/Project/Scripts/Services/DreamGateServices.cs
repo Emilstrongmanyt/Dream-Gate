@@ -24,6 +24,13 @@ namespace DreamGate.Battlegrounds.Services
             var settings = BackendSettings.Load();
             UseCloudBackend = settings != null && settings.IsConfigured;
 
+#if UNITY_IOS && !UNITY_EDITOR
+            if (UseCloudBackend)
+            {
+                SupabaseAuthNative.Warmup();
+            }
+#endif
+
             if (UseCloudBackend)
             {
                 _ = CloudCoroutineHost.Instance;
