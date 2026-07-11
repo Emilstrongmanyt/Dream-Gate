@@ -37,6 +37,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 ? applyMatchResultFunctionUrl
                 : BuildFunctionUrl("apply-match-result");
 
+        public string ResolvedUgsSessionUrl => BuildFunctionUrl("ugs-session");
+
         public string ResolvedMatchServerUrl => matchServerWebSocketUrl?.Trim() ?? string.Empty;
 
         public bool HasMatchServer => !string.IsNullOrWhiteSpace(ResolvedMatchServerUrl);

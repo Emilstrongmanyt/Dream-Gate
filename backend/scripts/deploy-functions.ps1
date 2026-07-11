@@ -24,9 +24,20 @@ if ($env:MATCH_SERVER_URL) {
     supabase secrets set "MATCH_SERVER_URL=$($env:MATCH_SERVER_URL)"
 }
 
+if ($env:UGS_BRIDGE_SECRET) {
+    Write-Host "Setting UGS_BRIDGE_SECRET secret..."
+    supabase secrets set "UGS_BRIDGE_SECRET=$($env:UGS_BRIDGE_SECRET)"
+}
+
+if ($env:UNITY_PROJECT_ID) {
+    Write-Host "Setting UNITY_PROJECT_ID secret..."
+    supabase secrets set "UNITY_PROJECT_ID=$($env:UNITY_PROJECT_ID)"
+}
+
 Write-Host "Deploying edge functions..."
 supabase functions deploy matchmaking --no-verify-jwt
 supabase functions deploy apply-match-result --no-verify-jwt
+supabase functions deploy ugs-session --no-verify-jwt
 
 Write-Host "Functions deployed."
 Pop-Location

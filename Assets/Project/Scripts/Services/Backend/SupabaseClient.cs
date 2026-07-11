@@ -153,6 +153,61 @@ namespace DreamGate.Battlegrounds.Services.Backend
             callback(true, "Welcome!");
         }
 
+        public IEnumerator SignInWithUgsBridge(
+            string ugsPlayerId,
+            string ugsIdToken,
+            string displayName,
+            Action<bool, string> callback)
+        {
+            if (string.IsNullOrWhiteSpace(ugsPlayerId) || string.IsNullOrWhiteSpace(ugsIdToken))
+            {
+                callback(false, "Unity sign in did not return a valid session.");
+                yield break;
+            }
+
+            var functionUrl = settings.ResolvedUgsSessionUrl;
+            if (string.IsNullOrWhiteSpace(functionUrl))
+            {
+                callback(false, "Cloud session bridge is not configured.");
+                yield break;
+            }
+
+            var body = ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "ugsPlayerId", ugsPlayerId.Trim() },
+                { "displayName", string.IsNullOrWhiteSpace(displayName) ? "Dreamer" : displayName.Trim() }
+            });
+
+            var headers = new Dictionary<string, string>
+            {
+                { "apikey", settings.EffectiveAnonKey },
+                { "Authorization", $"Bearer {ugsIdToken}" }
+            };
+
+            SupabaseHttpResult bridgeResult = null;
+            yield return SupabaseHttpTransport.Post(functionUrl, body, headers, value => bridgeResult = value);
+
+            if (bridgeResult == null || !bridgeResult.Success)
+            {
+                callback(
+                    false,
+                    NormalizeAuthError(bridgeResult?.Error, bridgeResult?.Body));
+                yield break;
+            }
+
+            var bridgeResponse = bridgeResult.Body ?? string.Empty;
+
+            ApplyAuthResponse(bridgeResponse);
+            if (!IsAuthenticated)
+            {
+                callback(false, DescribeMissingSession(bridgeResponse, "Cloud session bridge failed."));
+                yield break;
+            }
+
+            yield return EnsureUserIdentity();
+            callback(true, "Welcome!");
+        }
+
         public IEnumerator SignInWithOAuthTokens(string accessToken, string refreshToken, Action<bool, string> callback)
         {
             if (string.IsNullOrWhiteSpace(accessToken))

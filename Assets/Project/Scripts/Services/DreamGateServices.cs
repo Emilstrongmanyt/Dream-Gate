@@ -42,6 +42,7 @@ namespace DreamGate.Battlegrounds.Services
                 else
                 {
                     Profile = null;
+                    CloudCoroutineHost.Instance.Run(CoRestoreBridgedCloudSession());
                 }
             }
             else
@@ -107,14 +108,14 @@ namespace DreamGate.Battlegrounds.Services
 
         public static IEnumerator CoTryRegister(
             string displayName,
-            string email,
+            string username,
             string password,
             string confirmPassword,
             System.Action<bool, string, bool> callback)
         {
             if (!UseCloudBackend || CloudClient == null)
             {
-                var localSuccess = TryRegister(displayName, email, password, confirmPassword, out var localMessage);
+                var localSuccess = TryRegister(displayName, username, password, confirmPassword, out var localMessage);
                 callback(localSuccess, localMessage, false);
                 yield break;
             }
@@ -125,15 +126,15 @@ namespace DreamGate.Battlegrounds.Services
                 yield break;
             }
 
-            if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
+            if (!UgsAuthService.TryValidateUsername(username, out var usernameError))
             {
-                callback(false, "Enter a valid email address.", false);
+                callback(false, usernameError, false);
                 yield break;
             }
 
-            if (string.IsNullOrEmpty(password) || password.Length < 6)
+            if (!UgsAuthService.TryValidatePassword(password, out var passwordError))
             {
-                callback(false, "Password must be at least 6 characters.", false);
+                callback(false, passwordError, false);
                 yield break;
             }
 
@@ -145,26 +146,23 @@ namespace DreamGate.Battlegrounds.Services
 
             var success = false;
             var message = string.Empty;
-            var requiresEmailConfirmation = false;
-            yield return CloudClient.SignUp(email, password, displayName.Trim(), (ok, msg, pendingConfirmation) =>
+            yield return UgsAuthService.CoSignUpWithUsernamePassword(username, password, (ok, msg) =>
             {
                 success = ok;
                 message = msg;
-                requiresEmailConfirmation = pendingConfirmation;
             });
 
             if (!success)
             {
-                if (message.IndexOf("could not start a session", StringComparison.OrdinalIgnoreCase) >= 0
-                    || message.IndexOf("already exists", StringComparison.OrdinalIgnoreCase) >= 0
-                    || message.IndexOf("already registered", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (message.IndexOf("already", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("exists", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    yield return CloudClient.SignIn(email, password, (loginOk, loginMsg) =>
+                    yield return UgsAuthService.CoSignInWithUsernamePassword(username, password, (loginOk, loginMsg) =>
                     {
-                        if (loginOk || CloudClient.IsAuthenticated)
+                        if (loginOk)
                         {
                             success = true;
-                            message = $"Welcome back, {displayName}!";
+                            message = string.Empty;
                         }
                         else if (!string.IsNullOrWhiteSpace(loginMsg))
                         {
@@ -175,20 +173,20 @@ namespace DreamGate.Battlegrounds.Services
 
                 if (!success)
                 {
-                    if (message.IndexOf("Login failed", StringComparison.OrdinalIgnoreCase) >= 0
-                        || message.IndexOf("could not start a session", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        message = "Account may have been created. Try logging in from the Log In screen.";
-                    }
-
-                    callback(false, message, false);
+                    callback(false, string.IsNullOrWhiteSpace(message) ? "Could not create account." : message, false);
                     yield break;
                 }
             }
 
-            if (requiresEmailConfirmation)
+            yield return CoBridgeUgsToSupabase(displayName.Trim(), (bridgeOk, bridgeMessage) =>
             {
-                callback(true, message, true);
+                success = bridgeOk;
+                message = bridgeMessage;
+            });
+
+            if (!success)
+            {
+                callback(false, string.IsNullOrWhiteSpace(message) ? "Account created, but cloud sync failed." : message, false);
                 yield break;
             }
 
@@ -197,18 +195,18 @@ namespace DreamGate.Battlegrounds.Services
             callback(true, $"Account created. Welcome, {Profile?.displayName ?? displayName}!", false);
         }
 
-        public static IEnumerator CoTryLogin(string email, string password, System.Action<bool, string> callback)
+        public static IEnumerator CoTryLogin(string username, string password, System.Action<bool, string> callback)
         {
             if (!UseCloudBackend || CloudClient == null)
             {
-                var localSuccess = TryLogin(email, password, out var localMessage);
+                var localSuccess = TryLogin(username, password, out var localMessage);
                 callback(localSuccess, localMessage);
                 yield break;
             }
 
-            if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
+            if (!UgsAuthService.TryValidateUsername(username, out var usernameError))
             {
-                callback(false, "Enter a valid email address.");
+                callback(false, usernameError);
                 yield break;
             }
 
@@ -220,7 +218,7 @@ namespace DreamGate.Battlegrounds.Services
 
             var success = false;
             var message = string.Empty;
-            yield return CloudClient.SignIn(email, password, (ok, msg) =>
+            yield return UgsAuthService.CoSignInWithUsernamePassword(username, password, (ok, msg) =>
             {
                 success = ok;
                 message = msg;
@@ -229,6 +227,18 @@ namespace DreamGate.Battlegrounds.Services
             if (!success)
             {
                 callback(false, string.IsNullOrWhiteSpace(message) ? "Login failed." : message);
+                yield break;
+            }
+
+            yield return CoBridgeUgsToSupabase(string.Empty, (bridgeOk, bridgeMessage) =>
+            {
+                success = bridgeOk;
+                message = bridgeMessage;
+            });
+
+            if (!success)
+            {
+                callback(false, string.IsNullOrWhiteSpace(message) ? "Signed in, but cloud sync failed." : message);
                 yield break;
             }
 
@@ -260,7 +270,7 @@ namespace DreamGate.Battlegrounds.Services
 
             var success = false;
             var message = string.Empty;
-            yield return CloudClient.SignInWithApple(appleResult.IdentityToken, appleResult.Nonce, (ok, msg) =>
+            yield return UgsAuthService.CoSignInWithApple(appleResult.IdentityToken, (ok, msg) =>
             {
                 success = ok;
                 message = msg;
@@ -272,13 +282,26 @@ namespace DreamGate.Battlegrounds.Services
                 yield break;
             }
 
-            if (!string.IsNullOrWhiteSpace(appleResult.DisplayName))
+            var displayName = appleResult.DisplayName;
+            yield return CoBridgeUgsToSupabase(displayName, (bridgeOk, bridgeMessage) =>
             {
-                yield return CloudClient.UpdateDisplayName(appleResult.DisplayName.Trim(), (_, _) => { });
+                success = bridgeOk;
+                message = bridgeMessage;
+            });
+
+            if (!success)
+            {
+                callback(false, string.IsNullOrWhiteSpace(message) ? "Apple sign in succeeded, but cloud sync failed." : message);
+                yield break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                yield return CloudClient.UpdateDisplayName(displayName.Trim(), (_, _) => { });
             }
 
             yield return WaitForCloudProfileRoutine();
-            callback(true, $"Welcome, {Profile?.displayName ?? appleResult.DisplayName ?? "Dreamer"}!");
+            callback(true, $"Welcome, {Profile?.displayName ?? displayName ?? "Dreamer"}!");
         }
 
         public static IEnumerator CoTryGoogleSignIn(System.Action<bool, string> callback)
@@ -426,6 +449,7 @@ namespace DreamGate.Battlegrounds.Services
         {
             if (UseCloudBackend)
             {
+                UgsAuthService.SignOut();
                 CloudClient?.SignOut();
             }
             else
@@ -434,6 +458,51 @@ namespace DreamGate.Battlegrounds.Services
             }
 
             Profile = null;
+        }
+
+        private static IEnumerator CoRestoreBridgedCloudSession()
+        {
+            yield return UgsAuthService.CoEnsureInitialized();
+            if (!UgsAuthService.IsSignedIn || CloudClient == null || CloudClient.IsAuthenticated)
+            {
+                yield break;
+            }
+
+            var bridged = false;
+            yield return CoBridgeUgsToSupabase(string.Empty, (ok, _) => bridged = ok);
+            if (bridged)
+            {
+                yield return LoadCloudProfileRoutine();
+            }
+        }
+
+        private static IEnumerator CoBridgeUgsToSupabase(string displayName, System.Action<bool, string> callback)
+        {
+            if (CloudClient == null)
+            {
+                callback(false, "Cloud backend is not available.");
+                yield break;
+            }
+
+            if (!UgsAuthService.IsSignedIn)
+            {
+                callback(false, "Unity sign in is not active.");
+                yield break;
+            }
+
+            var success = false;
+            var message = string.Empty;
+            yield return CloudClient.SignInWithUgsBridge(
+                UgsAuthService.PlayerId,
+                UgsAuthService.AccessToken,
+                displayName,
+                (ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                });
+
+            callback(success, message);
         }
 
         public static void ApplyRatedResult(MatchResult result)
@@ -625,7 +694,8 @@ namespace DreamGate.Battlegrounds.Services
             var lines = new List<string>
             {
                 $"Transport: {SupabaseHttpTransport.AuthTransportRevision}",
-                $"Signed in: {CloudClient.IsAuthenticated}"
+                $"UGS signed in: {UgsAuthService.IsSignedIn}",
+                $"Supabase signed in: {CloudClient.IsAuthenticated}"
             };
 
             if (!CloudClient.IsAuthenticated)

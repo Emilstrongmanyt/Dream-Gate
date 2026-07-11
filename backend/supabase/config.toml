@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.apply-match-result]
 verify_jwt = false
+
+[functions.ugs-session]
+verify_jwt = false

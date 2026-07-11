@@ -9,6 +9,7 @@
     <type fullname="DreamGate.Battlegrounds.Services.Backend.SupabaseAuthNative" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.OAuthConstants" preserve="all" />
     <type fullname="DreamGate.Battlegrounds.Services.Backend.PhoneAuthService" preserve="all" />
+    <type fullname="DreamGate.Battlegrounds.Services.Backend.UgsAuthService" preserve="all" />
   </assembly>
   <assembly fullname="System.Net.Http" preserve="all" />
 </linker>

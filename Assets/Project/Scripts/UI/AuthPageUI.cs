@@ -11,15 +11,20 @@ namespace DreamGate.Battlegrounds.UI
     public sealed class LoginPageView
     {
         private readonly GameObject root;
-        private readonly TMP_InputField emailInput;
+        private readonly TMP_InputField usernameInput;
         private readonly TMP_InputField passwordInput;
         private readonly TextMeshProUGUI statusText;
         private readonly Action onSuccess;
 
-        private LoginPageView(GameObject root, TMP_InputField emailInput, TMP_InputField passwordInput, TextMeshProUGUI statusText, Action onSuccess)
+        private LoginPageView(
+            GameObject root,
+            TMP_InputField usernameInput,
+            TMP_InputField passwordInput,
+            TextMeshProUGUI statusText,
+            Action onSuccess)
         {
             this.root = root;
-            this.emailInput = emailInput;
+            this.usernameInput = usernameInput;
             this.passwordInput = passwordInput;
             this.statusText = statusText;
             this.onSuccess = onSuccess;
@@ -36,19 +41,21 @@ namespace DreamGate.Battlegrounds.UI
             MenuPageUI.CreateBody(
                 root.transform,
                 "LoginDescription",
-                "Sign in with your email and password to play rated matches and sync progress.",
+                "Sign in with your username and password or Apple to play rated matches and sync progress.",
                 620f,
                 70f);
 
-            var emailInput = MenuPageUI.CreateInputField(root.transform, "Email", "Email address", 430f);
+            var usernameInput = MenuPageUI.CreateInputField(root.transform, "Username", "Username", 430f);
             var passwordInput = MenuPageUI.CreateInputField(root.transform, "Password", "Password", 300f, true);
             var statusText = MenuPageUI.CreateStatusText(root.transform, 170f);
 
             var loginButton = MenuPageUI.CreateActionButton(root.transform, "Log In", new Vector2(0, 40), null);
-            MenuPageUI.CreateActionButton(root.transform, "Create Account", new Vector2(0, -80), () => openCreateAccount?.Invoke());
+            var appleButton = MenuPageUI.CreateAppleSignInButton(root.transform, new Vector2(0, -40), null);
+            MenuPageUI.CreateActionButton(root.transform, "Create Account", new Vector2(0, -140), () => openCreateAccount?.Invoke());
 
-            var view = new LoginPageView(root, emailInput, passwordInput, statusText, onSuccess);
+            var view = new LoginPageView(root, usernameInput, passwordInput, statusText, onSuccess);
             loginButton.onClick.AddListener(view.Submit);
+            appleButton.onClick.AddListener(view.SubmitApple);
 
             MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -760f);
             root.SetActive(false);
@@ -74,7 +81,7 @@ namespace DreamGate.Battlegrounds.UI
                 return;
             }
 
-            if (DreamGateServices.TryLogin(emailInput.text, passwordInput.text, out var message))
+            if (DreamGateServices.TryLogin(usernameInput.text, passwordInput.text, out var message))
             {
                 statusText.color = new Color(0.55f, 0.95f, 0.65f);
                 statusText.text = message;
@@ -87,13 +94,27 @@ namespace DreamGate.Battlegrounds.UI
             statusText.text = message;
         }
 
+        private void SubmitApple()
+        {
+            if (!DreamGateServices.UseCloudBackend)
+            {
+                statusText.color = new Color(1f, 0.55f, 0.55f);
+                statusText.text = "Apple sign in requires the cloud backend.";
+                return;
+            }
+
+            statusText.color = Color.white;
+            statusText.text = "Signing in with Apple...";
+            CloudCoroutineHost.Instance.Run(SubmitAppleRoutine());
+        }
+
         private IEnumerator SubmitRoutine()
         {
             var success = false;
             var message = string.Empty;
             var finished = false;
             yield return AuthUiTimeout.Run(
-                DreamGateServices.CoTryLogin(emailInput.text, passwordInput.text, (ok, msg) =>
+                DreamGateServices.CoTryLogin(usernameInput.text, passwordInput.text, (ok, msg) =>
                 {
                     success = ok;
                     message = msg;
@@ -102,10 +123,37 @@ namespace DreamGate.Battlegrounds.UI
                 () => finished,
                 60f,
                 "Sign in timed out. Check your connection and try again.",
-                (timedOutMessage) =>
+                timedOutMessage => message = timedOutMessage);
+
+            if (success)
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
+                yield break;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+
+        private IEnumerator SubmitAppleRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryAppleSignIn((ok, msg) =>
                 {
-                    message = timedOutMessage;
-                });
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                90f,
+                "Apple sign in timed out. Check Sign in with Apple is enabled for this build.",
+                timedOutMessage => message = timedOutMessage);
 
             if (success)
             {
@@ -125,7 +173,7 @@ namespace DreamGate.Battlegrounds.UI
     {
         private readonly GameObject root;
         private readonly TMP_InputField displayNameInput;
-        private readonly TMP_InputField emailInput;
+        private readonly TMP_InputField usernameInput;
         private readonly TMP_InputField passwordInput;
         private readonly TMP_InputField confirmPasswordInput;
         private readonly TextMeshProUGUI statusText;
@@ -134,7 +182,7 @@ namespace DreamGate.Battlegrounds.UI
         private CreateAccountPageView(
             GameObject root,
             TMP_InputField displayNameInput,
-            TMP_InputField emailInput,
+            TMP_InputField usernameInput,
             TMP_InputField passwordInput,
             TMP_InputField confirmPasswordInput,
             TextMeshProUGUI statusText,
@@ -142,7 +190,7 @@ namespace DreamGate.Battlegrounds.UI
         {
             this.root = root;
             this.displayNameInput = displayNameInput;
-            this.emailInput = emailInput;
+            this.usernameInput = usernameInput;
             this.passwordInput = passwordInput;
             this.confirmPasswordInput = confirmPasswordInput;
             this.statusText = statusText;
@@ -160,28 +208,35 @@ namespace DreamGate.Battlegrounds.UI
             MenuPageUI.CreateBody(
                 root.transform,
                 "CreateDescription",
-                "Create a Dream Gate account with your email and password.",
+                "Create a Dream Gate account with a username and password, or continue with Apple.",
                 660f,
                 80f);
 
             var displayNameInput = MenuPageUI.CreateInputField(root.transform, "DisplayName", "Display name", 500f);
-            var emailInput = MenuPageUI.CreateInputField(root.transform, "Email", "Email address", 380f);
-            var passwordInput = MenuPageUI.CreateInputField(root.transform, "Password", "Password (6+ chars)", 260f, true);
+            var usernameInput = MenuPageUI.CreateInputField(root.transform, "Username", "Username (3-20 chars)", 380f);
+            var passwordInput = MenuPageUI.CreateInputField(
+                root.transform,
+                "Password",
+                "Password (8+ chars, upper, lower, number, symbol)",
+                260f,
+                true);
             var confirmPasswordInput = MenuPageUI.CreateInputField(root.transform, "ConfirmPassword", "Confirm password", 140f, true);
             var statusText = MenuPageUI.CreateStatusText(root.transform, 10f);
 
             var createButton = MenuPageUI.CreateActionButton(root.transform, "Create Account", new Vector2(0, -110), null);
-            MenuPageUI.CreateActionButton(root.transform, "Already have an account?", new Vector2(0, -210), () => openLogin?.Invoke());
+            var appleButton = MenuPageUI.CreateAppleSignInButton(root.transform, new Vector2(0, -190), null);
+            MenuPageUI.CreateActionButton(root.transform, "Already have an account?", new Vector2(0, -290), () => openLogin?.Invoke());
 
             var view = new CreateAccountPageView(
                 root,
                 displayNameInput,
-                emailInput,
+                usernameInput,
                 passwordInput,
                 confirmPasswordInput,
                 statusText,
                 onSuccess);
             createButton.onClick.AddListener(view.Submit);
+            appleButton.onClick.AddListener(view.SubmitApple);
 
             MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -820f);
             root.SetActive(false);
@@ -209,7 +264,7 @@ namespace DreamGate.Battlegrounds.UI
 
             if (DreamGateServices.TryRegister(
                     displayNameInput.text,
-                    emailInput.text,
+                    usernameInput.text,
                     passwordInput.text,
                     confirmPasswordInput.text,
                     out var message))
@@ -225,43 +280,78 @@ namespace DreamGate.Battlegrounds.UI
             statusText.text = message;
         }
 
+        private void SubmitApple()
+        {
+            if (!DreamGateServices.UseCloudBackend)
+            {
+                statusText.color = new Color(1f, 0.55f, 0.55f);
+                statusText.text = "Apple sign in requires the cloud backend.";
+                return;
+            }
+
+            statusText.color = Color.white;
+            statusText.text = "Signing in with Apple...";
+            CloudCoroutineHost.Instance.Run(SubmitAppleRoutine());
+        }
+
         private IEnumerator SubmitRoutine()
         {
             var success = false;
             var message = string.Empty;
-            var requiresEmailConfirmation = false;
             var finished = false;
             yield return AuthUiTimeout.Run(
                 DreamGateServices.CoTryRegister(
                     displayNameInput.text,
-                    emailInput.text,
+                    usernameInput.text,
                     passwordInput.text,
                     confirmPasswordInput.text,
-                    (ok, msg, pendingConfirmation) =>
+                    (ok, msg, _) =>
                     {
                         success = ok;
                         message = msg;
-                        requiresEmailConfirmation = pendingConfirmation;
                         finished = true;
                     }),
                 () => finished,
-                55f,
+                60f,
                 "Create account timed out. Check your connection and try again.",
-                (timedOutMessage) =>
-                {
-                    message = timedOutMessage;
-                });
+                timedOutMessage => message = timedOutMessage);
 
             if (success)
             {
                 statusText.color = new Color(0.55f, 0.95f, 0.65f);
                 statusText.text = message;
-                if (!requiresEmailConfirmation)
-                {
-                    onSuccess?.Invoke();
-                    Hide();
-                }
+                onSuccess?.Invoke();
+                Hide();
+                yield break;
+            }
 
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+
+        private IEnumerator SubmitAppleRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryAppleSignIn((ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                90f,
+                "Apple sign in timed out. Check Sign in with Apple is enabled for this build.",
+                timedOutMessage => message = timedOutMessage);
+
+            if (success)
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
                 yield break;
             }
 
