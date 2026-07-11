@@ -23,11 +23,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v9-jsonnative";
-
-#if UNITY_IOS && !UNITY_EDITOR
-        private const int IosAuthTransportTimeoutSeconds = 22;
-#endif
+        internal const string AuthTransportRevision = "v10-emailonly";
 
         internal static string LastAuthAttemptDetails = string.Empty;
 
@@ -75,30 +71,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 SupabaseHttpResult authResult = null;
 
 #if UNITY_IOS && !UNITY_EDITOR
-                yield return SupabaseAuthNative.Post(
-                    url,
-                    body,
-                    headers,
-                    contentType,
-                    IosAuthTransportTimeoutSeconds,
-                    value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, "native-message"));
-                if (IsUsableAuthResult(authResult))
-                {
-                    callback(authResult);
-                    yield break;
-                }
-
-                yield return PostViaUnityWebRequest(
-                    authUrl,
-                    body,
-                    headers,
-                    anonKey,
-                    contentType,
-                    IosAuthTransportTimeoutSeconds,
-                    value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, "unity-webrequest"));
-                if (IsUsableAuthResult(authResult))
+                yield return PostViaNative(url, body, headers, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "native-ios"));
+                if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);
                     yield break;
@@ -110,7 +85,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 #else
                 yield return PostViaHttpClient(authUrl, body, headers, value => authResult = value);
                 attempts.Add(DescribeAttempt(authResult, "httpclient"));
-                if (IsUsableAuthResult(authResult))
+                if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);
                     yield break;
@@ -118,7 +93,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
                 yield return PostViaUnityWebRequest(authUrl, body, headers, anonKey, value => authResult = value);
                 attempts.Add(DescribeAttempt(authResult, "unity-webrequest"));
-                if (IsUsableAuthResult(authResult))
+                if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);
                     yield break;
@@ -163,7 +138,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
 #if UNITY_IOS && !UNITY_EDITOR
                 yield return GetViaNative(authUrl, headers, value => authResult = value);
-                if (IsUsableAuthResult(authResult))
+                if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);
                     yield break;
@@ -171,7 +146,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 #endif
 
                 yield return GetViaHttpClient(authUrl, headers, value => authResult = value);
-                if (IsUsableAuthResult(authResult))
+                if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);
                     yield break;
@@ -201,16 +176,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 "unity-webrequest"));
         }
 
-        private static bool IsUsableAuthResult(SupabaseHttpResult result)
+        private static bool IsUsableAuthResult(SupabaseHttpResult result, string url = null)
         {
             if (result == null)
             {
                 return false;
-            }
-
-            if (result.Success && result.BodyBytes > 0)
-            {
-                return true;
             }
 
             if (IsEmptyBodySuccess(result))
@@ -218,12 +188,41 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 return false;
             }
 
-            if (result.StatusCode > 0)
+            var requiresSession = !string.IsNullOrWhiteSpace(url)
+                                  && url.Contains("/auth/v1/token", StringComparison.Ordinal);
+            if (requiresSession)
+            {
+                if (!result.Success)
+                {
+                    return result.StatusCode > 0
+                           && (!string.IsNullOrWhiteSpace(result.Error) || result.BodyBytes > 0);
+                }
+
+                return ContainsAuthSession(result.Body) && result.BodyBytes >= 32;
+            }
+
+            if (result.Success && result.BodyBytes > 0)
+            {
+                return true;
+            }
+
+            if (result.StatusCode > 0 && (!string.IsNullOrWhiteSpace(result.Error) || result.BodyBytes > 0))
             {
                 return true;
             }
 
             return false;
+        }
+
+        private static bool ContainsAuthSession(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return false;
+            }
+
+            return body.Contains("access_token", StringComparison.Ordinal)
+                   || SupabaseAuthParser.Parse(body).HasSession;
         }
 
         private static bool IsEmptyBodySuccess(SupabaseHttpResult result)
@@ -601,9 +600,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     : ExtractHttpError(responseBody, null, statusCode)
             };
 
-            if (httpSucceeded && bodyBytes == 0)
+            if (httpSucceeded && (bodyBytes == 0 || bodyBytes < 32))
             {
-                result.Error = $"native-ios empty body (HTTP {statusCode}, nativeBytes={nativeByteCount}, read={readDiagnostic ?? "none"})";
+                result.Success = false;
+                result.Error = $"native-ios short body (HTTP {statusCode}, bytes={bodyBytes}, nativeBytes={nativeByteCount}, read={readDiagnostic ?? "none"})";
             }
 
             callback(result);

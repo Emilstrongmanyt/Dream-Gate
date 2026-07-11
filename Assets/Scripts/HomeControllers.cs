@@ -13,7 +13,6 @@ public class HomeMenuController : MonoBehaviour
     private SupportPageView supportPage;
     private LoginPageView loginPage;
     private CreateAccountPageView createAccountPage;
-    private PhoneLoginPageView phoneLoginPage;
 
     private void Start()
     {
@@ -26,9 +25,8 @@ public class HomeMenuController : MonoBehaviour
 
         settingsPage = MenuPageUI.BuildSettingsPage(pageRoot, CloseOverlays, OnLogout);
         supportPage = MenuPageUI.BuildSupportPage(pageRoot, CloseOverlays);
-        loginPage = LoginPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowCreateAccount, ShowPhoneLogin);
-        createAccountPage = CreateAccountPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowLogin, ShowPhoneLogin);
-        phoneLoginPage = PhoneLoginPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus);
+        loginPage = LoginPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowCreateAccount);
+        createAccountPage = CreateAccountPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowLogin);
 
         BindButton("Settings", () =>
         {
@@ -60,7 +58,6 @@ public class HomeMenuController : MonoBehaviour
     {
         CloseOverlays();
         createAccountPage.Hide();
-        phoneLoginPage.Hide();
         loginPage.Show();
     }
 
@@ -68,16 +65,7 @@ public class HomeMenuController : MonoBehaviour
     {
         CloseOverlays();
         loginPage.Hide();
-        phoneLoginPage.Hide();
         createAccountPage.Show();
-    }
-
-    private void ShowPhoneLogin()
-    {
-        CloseOverlays();
-        loginPage.Hide();
-        createAccountPage.Hide();
-        phoneLoginPage.Show();
     }
 
     private void OnLogout()
@@ -160,6 +148,5 @@ public class HomeMenuController : MonoBehaviour
         supportPage?.Hide();
         loginPage?.Hide();
         createAccountPage?.Hide();
-        phoneLoginPage?.Hide();
     }
 }

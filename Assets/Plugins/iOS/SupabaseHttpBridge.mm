@@ -1,8 +1,8 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 8;
-static const NSTimeInterval DreamGateHttpTimeoutSeconds = 22.0;
+static const int DreamGateHttpPluginRevision = 9;
+static const NSTimeInterval DreamGateHttpTimeoutSeconds = 45.0;
 static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
 
 static os_unfair_lock dreamGateHttpLock = OS_UNFAIR_LOCK_INIT;

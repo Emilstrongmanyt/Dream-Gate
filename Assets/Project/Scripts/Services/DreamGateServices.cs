@@ -26,9 +26,6 @@ namespace DreamGate.Battlegrounds.Services
             if (UseCloudBackend)
             {
                 _ = CloudCoroutineHost.Instance;
-                AppleSignInNative.Warmup();
-                GoogleSignInNative.Warmup();
-                SupabaseAuthNative.Warmup();
                 CloudClient ??= new SupabaseClient(settings, CloudCoroutineHost.Instance);
                 if (CloudClient.IsAuthenticated)
                 {
@@ -198,6 +195,18 @@ namespace DreamGate.Battlegrounds.Services
             {
                 var localSuccess = TryLogin(email, password, out var localMessage);
                 callback(localSuccess, localMessage);
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
+            {
+                callback(false, "Enter a valid email address.");
+                yield break;
+            }
+
+            if (string.IsNullOrEmpty(password))
+            {
+                callback(false, "Enter your password.");
                 yield break;
             }
 

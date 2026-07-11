@@ -79,6 +79,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
         public IEnumerator SignIn(string email, string password, Action<bool, string> callback)
         {
             var body = BuildPasswordGrantBody(email, password);
+            if (string.IsNullOrWhiteSpace(body) || body.Length < 12 || !body.Contains("email", StringComparison.Ordinal))
+            {
+                callback(false, "Login request could not be built. Check your email and password.");
+                yield break;
+            }
+
             var contentType = PasswordGrantContentType;
 
             var loginSuccess = false;
@@ -409,6 +415,35 @@ namespace DreamGate.Battlegrounds.Services.Backend
             return parsed;
         }
 
+        private static string DescribeEmptyAuthBody(SupabaseHttpResult result)
+        {
+            var detail = string.IsNullOrWhiteSpace(result?.Error)
+                ? $"via {result?.Transport ?? "unknown"} (HTTP {result?.StatusCode ?? 0}, {result?.BodyBytes ?? 0} bytes)"
+                : result.Error;
+            if (!string.IsNullOrWhiteSpace(SupabaseHttpTransport.LastAuthAttemptDetails))
+            {
+                detail = $"{detail}. {SupabaseHttpTransport.LastAuthAttemptDetails}";
+            }
+
+            return $"Authentication server returned an empty response {detail}, {SupabaseHttpTransport.AuthTransportRevision}. This is not a firewall issue.";
+        }
+
+        private static string DescribeInvalidAuthBody(SupabaseHttpResult result, string response)
+        {
+            var preview = string.IsNullOrWhiteSpace(response)
+                ? $"HTTP {result?.StatusCode ?? 0}, {result?.BodyBytes ?? 0} bytes"
+                : response.Length > 120
+                    ? response.Substring(0, 120) + "..."
+                    : response;
+            var detail = string.IsNullOrWhiteSpace(result?.Error) ? preview : $"{result.Error} ({preview})";
+            if (!string.IsNullOrWhiteSpace(SupabaseHttpTransport.LastAuthAttemptDetails))
+            {
+                detail = $"{detail}. {SupabaseHttpTransport.LastAuthAttemptDetails}";
+            }
+
+            return $"Authentication response did not include a session token ({SupabaseHttpTransport.AuthTransportRevision}). {detail}";
+        }
+
         private static string DescribeMissingSession(string response, string fallback)
         {
             if (string.IsNullOrWhiteSpace(response))
@@ -476,22 +511,19 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
+            if (url.Contains("/auth/v1/token", StringComparison.Ordinal)
+                && result.Success
+                && !SupabaseAuthParser.Parse(response).HasSession)
+            {
+                callback(false, DescribeInvalidAuthBody(result, response), response);
+                yield break;
+            }
+
             if (url.Contains("/auth/v1/", StringComparison.Ordinal)
                 && string.IsNullOrWhiteSpace(response)
                 && !AllowsEmptyAuthBody(url))
             {
-                var detail = string.IsNullOrWhiteSpace(result.Error)
-                    ? $"via {result.Transport} (HTTP {result.StatusCode}, {result.BodyBytes} bytes)"
-                    : result.Error;
-                if (!string.IsNullOrWhiteSpace(SupabaseHttpTransport.LastAuthAttemptDetails))
-                {
-                    detail = $"{detail}. {SupabaseHttpTransport.LastAuthAttemptDetails}";
-                }
-
-                callback(
-                    false,
-                    $"Authentication server returned an empty response {detail}, {SupabaseHttpTransport.AuthTransportRevision}. This is not a firewall issue.",
-                    response);
+                callback(false, DescribeEmptyAuthBody(result), response);
                 yield break;
             }
 
