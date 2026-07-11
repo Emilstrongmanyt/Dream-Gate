@@ -246,7 +246,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         }
     }
 
-    public sealed class SupabaseAuthNative : MonoBehaviour
+    internal sealed class SupabaseAuthNative : MonoBehaviour
     {
         private const string CallbackHostName = "DreamGateSupabaseAuth";
         private static SupabaseAuthNative instance;
