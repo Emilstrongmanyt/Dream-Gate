@@ -26,7 +26,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         internal const string AuthTransportRevision = "v8-formnative";
 
 #if UNITY_IOS && !UNITY_EDITOR
-        private const float IosAuthTransportTimeoutSeconds = 22f;
+        private const int IosAuthTransportTimeoutSeconds = 22;
 #endif
 
         internal static string LastAuthAttemptDetails = string.Empty;
