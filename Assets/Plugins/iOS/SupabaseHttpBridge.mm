@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 9;
+static const int DreamGateHttpPluginRevision = 11;
 static const NSTimeInterval DreamGateHttpTimeoutSeconds = 45.0;
 static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
 
@@ -133,7 +133,8 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
     NSString *body,
     NSString *apikey,
     NSString *authorization,
-    NSString *contentType)
+    NSString *contentType,
+    NSString *preferHeader)
 {
     NSURL *url = DreamGateHttpCreateUrl(urlString);
     if (url == nil)
@@ -159,7 +160,7 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
         [request setValue:authorization forHTTPHeaderField:@"Authorization"];
     }
 
-    if ([method isEqualToString:@"POST"])
+    if ([method isEqualToString:@"POST"] || [method isEqualToString:@"PATCH"])
     {
         NSData *bodyData = body == nil ? [NSData data] : [body dataUsingEncoding:NSUTF8StringEncoding];
         request.HTTPBody = bodyData;
@@ -167,6 +168,11 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
         [request setValue:resolvedContentType forHTTPHeaderField:@"Content-Type"];
         [request setValue:[NSString stringWithFormat:@"%lu", (unsigned long)bodyData.length]
             forHTTPHeaderField:@"Content-Length"];
+    }
+
+    if (preferHeader.length > 0)
+    {
+        [request setValue:preferHeader forHTTPHeaderField:@"Prefer"];
     }
 
     return request;
@@ -177,7 +183,9 @@ static void DreamGateHttpExecute(
     NSString *method,
     NSString *body,
     NSString *apikey,
-    NSString *authorization)
+    NSString *authorization,
+    NSString *contentType,
+    NSString *preferHeader)
 {
     int generation = 0;
 
@@ -199,7 +207,8 @@ static void DreamGateHttpExecute(
         body,
         apikey,
         authorization,
-        @"application/json");
+        contentType.length > 0 ? contentType : @"application/json",
+        preferHeader);
     if (request == nil)
     {
         DreamGateHttpFinish(0, nil, @"Invalid request URL.");
@@ -300,7 +309,9 @@ extern "C" void DreamGate_Http_StartPost(
             @"POST",
             body ? [NSString stringWithUTF8String:body] : @"",
             apikey ? [NSString stringWithUTF8String:apikey] : @"",
-            authorization ? [NSString stringWithUTF8String:authorization] : @"");
+            authorization ? [NSString stringWithUTF8String:authorization] : @"",
+            @"application/json",
+            nil);
     }
 }
 
@@ -316,7 +327,29 @@ extern "C" void DreamGate_Http_StartGet(
             @"GET",
             nil,
             apikey ? [NSString stringWithUTF8String:apikey] : @"",
-            authorization ? [NSString stringWithUTF8String:authorization] : @"");
+            authorization ? [NSString stringWithUTF8String:authorization] : @"",
+            nil,
+            nil);
+    }
+}
+
+extern "C" void DreamGate_Http_StartPatch(
+    const char *url,
+    const char *body,
+    const char *apikey,
+    const char *authorization,
+    const char *prefer)
+{
+    @autoreleasepool
+    {
+        DreamGateHttpExecute(
+            url ? [NSString stringWithUTF8String:url] : @"",
+            @"PATCH",
+            body ? [NSString stringWithUTF8String:body] : @"",
+            apikey ? [NSString stringWithUTF8String:apikey] : @"",
+            authorization ? [NSString stringWithUTF8String:authorization] : @"",
+            @"application/json",
+            prefer ? [NSString stringWithUTF8String:prefer] : nil);
     }
 }
 
@@ -491,7 +524,8 @@ static void DreamGateAuthHttpExecutePost(
         body,
         apikey,
         authorization,
-        contentType);
+        contentType,
+        nil);
     if (request == nil)
     {
         sendPayload(@{
@@ -541,26 +575,51 @@ static void DreamGateAuthHttpExecutePost(
     }
 
     NSInteger statusCode = httpResponse != nil ? httpResponse.statusCode : 0;
-    if ((responseData == nil || responseData.length == 0) && statusCode >= 200 && statusCode < 300)
+    NSData *bodyData = responseData;
+
+    if ((bodyData == nil || bodyData.length == 0) && statusCode >= 200 && statusCode < 300)
     {
+        NSInteger syncStatusCode = 0;
+        NSData *syncData = DreamGateHttpSendSynchronously(request, &syncStatusCode);
+        if (syncData != nil && syncData.length > 0)
+        {
+            bodyData = syncData;
+            if (syncStatusCode > 0)
+            {
+                statusCode = syncStatusCode;
+            }
+        }
+    }
+
+    if (statusCode >= 400 || requestError != nil)
+    {
+        NSString *transportError = requestError != nil
+            ? requestError.localizedDescription
+            : [NSString stringWithFormat:@"Request failed (HTTP %ld).", (long)statusCode];
         sendPayload(@{
             @"ok": @0,
             @"status": @(statusCode),
-            @"error": @"Native auth HTTP returned an empty success body."
+            @"error": transportError
         });
         return;
     }
 
-    NSString *bodyB64 = @"";
-    if (responseData != nil && responseData.length > 0)
+    if (bodyData == nil || bodyData.length == 0)
     {
-        bodyB64 = [responseData base64EncodedStringWithOptions:0];
+        sendPayload(@{
+            @"ok": @0,
+            @"status": @(statusCode),
+            @"error": [NSString stringWithFormat:@"Native auth HTTP returned an empty body (HTTP %ld).", (long)statusCode]
+        });
+        return;
     }
+
+    NSString *bodyB64 = [bodyData base64EncodedStringWithOptions:0] ?: @"";
 
     sendPayload(@{
         @"ok": @1,
         @"status": @(statusCode),
-        @"bodyB64": bodyB64 ?: @""
+        @"bodyB64": bodyB64
     });
 }
 

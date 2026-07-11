@@ -600,5 +600,67 @@ namespace DreamGate.Battlegrounds.Services
             return
                 $"Welcome, {Profile.displayName}  •  MMR {Profile.mmr}  •  W {Profile.wins} / L {Profile.losses}  •  Streak {Profile.currentWinStreak}";
         }
+
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+        public static IEnumerator CoRunAuthSmokeTest(Action<string> callback)
+        {
+            if (!IsInitialized)
+            {
+                Initialize();
+            }
+
+            if (!UseCloudBackend || CloudClient == null)
+            {
+                callback("Cloud backend is not configured.");
+                yield break;
+            }
+
+            var lines = new List<string>
+            {
+                $"Transport: {SupabaseHttpTransport.AuthTransportRevision}",
+                $"Signed in: {CloudClient.IsAuthenticated}"
+            };
+
+            if (!CloudClient.IsAuthenticated)
+            {
+                lines.Add("Log in first, then rerun the smoke test.");
+                callback(string.Join("\n", lines));
+                yield break;
+            }
+
+            var token = CloudClient.AccessToken ?? string.Empty;
+            var userId = CloudClient.UserId ?? string.Empty;
+            lines.Add($"Token length: {token.Length}");
+            lines.Add($"User id: {(userId.Length > 12 ? userId.Substring(0, 12) + "..." : userId)}");
+
+            var refreshed = false;
+            yield return CloudClient.RefreshSession(ok => refreshed = ok);
+            lines.Add($"Refresh: {(refreshed ? "OK" : "failed")}");
+
+            if (refreshed)
+            {
+                lines.Add($"New token length: {CloudClient.AccessToken?.Length ?? 0}");
+            }
+
+            var profileLoaded = false;
+            var profileError = string.Empty;
+            yield return CloudClient.GetProfile((success, error, loadedProfile) =>
+            {
+                profileLoaded = success && loadedProfile != null;
+                profileError = error;
+            });
+
+            if (profileLoaded)
+            {
+                lines.Add($"Profile: {Profile?.displayName ?? "loaded"} | MMR {Profile?.mmr ?? 0}");
+            }
+            else
+            {
+                lines.Add($"Profile fetch failed: {profileError}");
+            }
+
+            callback(string.Join("\n", lines));
+        }
+#endif
     }
 }

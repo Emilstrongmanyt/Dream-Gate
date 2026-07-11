@@ -23,7 +23,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v10-emailonly";
+        internal const string AuthTransportRevision = "v12-authmessage";
 
         internal static string LastAuthAttemptDetails = string.Empty;
 
@@ -71,8 +71,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 SupabaseHttpResult authResult = null;
 
 #if UNITY_IOS && !UNITY_EDITOR
-                yield return PostViaNative(url, body, headers, value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, "native-ios"));
+                yield return PostViaAuthMessage(url, body, headers, contentType, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "native-message"));
                 if (IsUsableAuthResult(authResult, url))
                 {
                     callback(authResult);
@@ -105,13 +105,77 @@ namespace DreamGate.Battlegrounds.Services.Backend
 #endif
             }
 
+#if UNITY_IOS && !UNITY_EDITOR
+            SupabaseHttpResult nativeResult = null;
+            yield return PostViaNative(url, body, headers, contentType, value => nativeResult = value);
+            callback(nativeResult ?? new SupabaseHttpResult
+            {
+                Success = false,
+                Error = "Native HTTP request failed to complete."
+            });
+            yield break;
+#else
             SupabaseHttpResult result = null;
-            yield return PostViaUnityWebRequest(url, body, headers, anonKey, value => result = value);
+            yield return PostViaUnityWebRequest(url, body, headers, anonKey, contentType, 45, value => result = value);
             callback(result ?? new SupabaseHttpResult
             {
                 Success = false,
                 Error = "Request failed to complete."
             });
+#endif
+        }
+
+        public static IEnumerator Patch(
+            string url,
+            string body,
+            IReadOnlyDictionary<string, string> headers,
+            Action<SupabaseHttpResult> callback)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                callback(new SupabaseHttpResult
+                {
+                    Success = false,
+                    Error = "Request URL is missing."
+                });
+                yield break;
+            }
+
+            var anonKey = TryGetAnonKey(headers);
+
+#if UNITY_IOS && !UNITY_EDITOR
+            SupabaseHttpResult nativeResult = null;
+            yield return PatchViaNative(url, body, headers, value => nativeResult = value);
+            callback(nativeResult ?? new SupabaseHttpResult
+            {
+                Success = false,
+                Error = "Native HTTP request failed to complete."
+            });
+            yield break;
+#else
+            using var request = new UnityWebRequest(url, "PATCH");
+            var bytes = Encoding.UTF8.GetBytes(body ?? "{}");
+            WebRequestHelper.ConfigureJsonPost(request, bytes);
+            request.timeout = 45;
+            WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
+            if (headers != null && headers.TryGetValue("Prefer", out var prefer) && !string.IsNullOrWhiteSpace(prefer))
+            {
+                request.SetRequestHeader("Prefer", prefer);
+            }
+
+            yield return request.SendWebRequest();
+            yield return WebRequestHelper.WaitForResponseReady();
+
+            callback(WebRequestHelper.BuildResult(
+                request,
+                httpSucceeded => httpSucceeded
+                    ? string.Empty
+                    : ExtractHttpError(
+                        WebRequestHelper.ReadResponseText(request),
+                        request.error,
+                        request.responseCode),
+                "unity-webrequest"));
+#endif
         }
 
         public static IEnumerator Get(
@@ -137,14 +201,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 SupabaseHttpResult authResult = null;
 
 #if UNITY_IOS && !UNITY_EDITOR
-                yield return GetViaNative(authUrl, headers, value => authResult = value);
-                if (IsUsableAuthResult(authResult, url))
+                yield return GetViaNative(url, headers, value => authResult = value);
+                callback(authResult ?? new SupabaseHttpResult
                 {
-                    callback(authResult);
-                    yield break;
-                }
-#endif
-
+                    Success = false,
+                    Error = "Native HTTP request failed to complete."
+                });
+                yield break;
+#else
                 yield return GetViaHttpClient(authUrl, headers, value => authResult = value);
                 if (IsUsableAuthResult(authResult, url))
                 {
@@ -153,7 +217,19 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 }
 
                 url = authUrl;
+#endif
             }
+
+#if UNITY_IOS && !UNITY_EDITOR
+            SupabaseHttpResult nativeResult = null;
+            yield return GetViaNative(url, headers, value => nativeResult = value);
+            callback(nativeResult ?? new SupabaseHttpResult
+            {
+                Success = false,
+                Error = "Native HTTP request failed to complete."
+            });
+            yield break;
+#endif
 
             using var request = UnityWebRequest.Get(url);
             request.downloadHandler = new DownloadHandlerBuffer();
@@ -430,14 +506,49 @@ namespace DreamGate.Battlegrounds.Services.Backend
         }
 
 #if UNITY_IOS && !UNITY_EDITOR
+        private static IEnumerator PostViaAuthMessage(
+            string url,
+            string body,
+            IReadOnlyDictionary<string, string> headers,
+            string contentType,
+            Action<SupabaseHttpResult> callback)
+        {
+            SupabaseHttpResult result = null;
+            yield return SupabaseAuthNative.Post(
+                url,
+                body,
+                headers,
+                contentType,
+                45f,
+                value => result = value);
+
+            callback(result ?? new SupabaseHttpResult
+            {
+                Success = false,
+                Transport = "native-message",
+                Error = "Native auth HTTP did not return a result."
+            });
+        }
+
         private static IEnumerator PostViaNative(
             string url,
             string body,
             IReadOnlyDictionary<string, string> headers,
             Action<SupabaseHttpResult> callback)
         {
+            yield return PostViaNative(url, body, headers, "application/json", callback);
+        }
+
+        private static IEnumerator PostViaNative(
+            string url,
+            string body,
+            IReadOnlyDictionary<string, string> headers,
+            string contentType,
+            Action<SupabaseHttpResult> callback)
+        {
             SupabaseHttpResult result = null;
             yield return RunNativeRequest(
+                url,
                 () => DreamGate_Http_StartPost(
                     url,
                     body ?? string.Empty,
@@ -460,10 +571,36 @@ namespace DreamGate.Battlegrounds.Services.Backend
         {
             SupabaseHttpResult result = null;
             yield return RunNativeRequest(
+                url,
                 () => DreamGate_Http_StartGet(
                     url,
                     GetHeader(headers, "apikey"),
                     GetHeader(headers, "Authorization")),
+                value => result = value);
+
+            if (result != null)
+            {
+                result.Transport = "native-ios";
+            }
+
+            callback(result);
+        }
+
+        private static IEnumerator PatchViaNative(
+            string url,
+            string body,
+            IReadOnlyDictionary<string, string> headers,
+            Action<SupabaseHttpResult> callback)
+        {
+            SupabaseHttpResult result = null;
+            yield return RunNativeRequest(
+                url,
+                () => DreamGate_Http_StartPatch(
+                    url,
+                    body ?? string.Empty,
+                    GetHeader(headers, "apikey"),
+                    GetHeader(headers, "Authorization"),
+                    GetHeader(headers, "Prefer")),
                 value => result = value);
 
             if (result != null)
@@ -491,6 +628,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string authorization);
 
         [DllImport("__Internal")]
+        private static extern void DreamGate_Http_StartPatch(
+            string url,
+            string body,
+            string apikey,
+            string authorization,
+            string prefer);
+
+        [DllImport("__Internal")]
         private static extern int DreamGate_Http_IsDone();
 
         [DllImport("__Internal")]
@@ -514,7 +659,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
         [DllImport("__Internal")]
         private static extern void DreamGate_Http_CopyError(byte[] buffer, int bufferSize);
 
-        private static IEnumerator RunNativeRequest(Action startRequest, Action<SupabaseHttpResult> callback)
+        private static IEnumerator RunNativeRequest(string url, Action startRequest, Action<SupabaseHttpResult> callback)
         {
             const int BodyBufferSize = 262144;
             const int ErrorBufferSize = 1024;
@@ -600,13 +745,21 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     : ExtractHttpError(responseBody, null, statusCode)
             };
 
-            if (httpSucceeded && (bodyBytes == 0 || bodyBytes < 32))
+            if (httpSucceeded
+                && RequiresAuthSessionBody(url)
+                && (bodyBytes == 0 || bodyBytes < 32 || !ContainsAuthSession(responseBody)))
             {
                 result.Success = false;
-                result.Error = $"native-ios short body (HTTP {statusCode}, bytes={bodyBytes}, nativeBytes={nativeByteCount}, read={readDiagnostic ?? "none"})";
+                result.Error = $"native-ios auth body invalid (HTTP {statusCode}, bytes={bodyBytes}, nativeBytes={nativeByteCount}, read={readDiagnostic ?? "none"})";
             }
 
             callback(result);
+        }
+
+        private static bool RequiresAuthSessionBody(string url)
+        {
+            return !string.IsNullOrWhiteSpace(url)
+                   && url.Contains("/auth/v1/token", StringComparison.Ordinal);
         }
 
         private static bool TryReadNativeBodyFromFile(out string responseBody, out int bodyBytes, out string diagnostic)

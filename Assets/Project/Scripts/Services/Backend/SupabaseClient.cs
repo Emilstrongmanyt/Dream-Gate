@@ -1,9 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
-using UnityEngine.Networking;
 
 namespace DreamGate.Battlegrounds.Services.Backend
 {
@@ -303,6 +301,65 @@ namespace DreamGate.Battlegrounds.Services.Backend
             PlayerPrefs.Save();
         }
 
+        public IEnumerator EnsureValidSession(Action<bool> callback = null)
+        {
+            if (!IsAuthenticated)
+            {
+                callback?.Invoke(false);
+                yield break;
+            }
+
+            if (!IsAccessTokenExpiredOrNearExpiry())
+            {
+                callback?.Invoke(true);
+                yield break;
+            }
+
+            yield return RefreshSession(callback);
+        }
+
+        public IEnumerator RefreshSession(Action<bool> callback = null)
+        {
+            if (string.IsNullOrWhiteSpace(RefreshToken))
+            {
+                callback?.Invoke(false);
+                yield break;
+            }
+
+            var body = ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "refresh_token", RefreshToken }
+            });
+
+            var refreshSuccess = false;
+            var refreshResponse = string.Empty;
+            var refreshError = string.Empty;
+            yield return PostJson(
+                $"{settings.EffectiveSupabaseUrl}/auth/v1/token?grant_type=refresh_token",
+                body,
+                false,
+                (success, response, error) =>
+                {
+                    refreshSuccess = success;
+                    refreshResponse = response;
+                    refreshError = error;
+                });
+
+            if (!refreshSuccess)
+            {
+                if (IsUnauthorized(refreshError, refreshResponse))
+                {
+                    SignOut();
+                }
+
+                callback?.Invoke(false);
+                yield break;
+            }
+
+            ApplyAuthResponse(refreshResponse);
+            callback?.Invoke(IsAuthenticated);
+        }
+
         public IEnumerator GetProfile(Action<bool, string, PlayerProfile> callback)
         {
             if (!IsAuthenticated)
@@ -310,6 +367,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 callback(false, "Not signed in.", null);
                 yield break;
             }
+
+            yield return EnsureValidSession();
 
             if (string.IsNullOrEmpty(UserId))
             {
@@ -323,7 +382,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             var url = $"{settings.EffectiveSupabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}&select=*";
-            yield return Get(url, (success, response, error) =>
+            yield return GetWithRefresh(url, (success, response, error) =>
             {
                 if (!success)
                 {
@@ -350,9 +409,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
+            yield return EnsureValidSession();
+
             var body = ApiJson.BuildObject(new Dictionary<string, object> { { "display_name", displayName } });
             var url = $"{settings.EffectiveSupabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}";
-            yield return Patch(url, body, (success, _, error) => callback(success, success ? string.Empty : error));
+            yield return PatchWithRefresh(url, body, (success, _, error) => callback(success, success ? string.Empty : error));
         }
 
         public IEnumerator InvokeFunction(string functionUrl, Dictionary<string, object> payload, Action<bool, string, string> callback)
@@ -363,8 +424,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
+            yield return EnsureValidSession();
+
             var body = ApiJson.BuildObject(payload);
-            yield return PostJson(functionUrl, body, true, callback);
+            yield return PostJsonWithRefresh(functionUrl, body, true, callback);
         }
 
         private void RestoreSession()
@@ -490,6 +553,26 @@ namespace DreamGate.Battlegrounds.Services.Backend
             bool useAuth,
             Action<bool, string, string> callback)
         {
+            yield return SendPostJson(url, body, contentType, useAuth, false, callback);
+        }
+
+        private IEnumerator PostJsonWithRefresh(
+            string url,
+            string body,
+            bool useAuth,
+            Action<bool, string, string> callback)
+        {
+            yield return SendPostJson(url, body, "application/json", useAuth, true, callback);
+        }
+
+        private IEnumerator SendPostJson(
+            string url,
+            string body,
+            string contentType,
+            bool useAuth,
+            bool allowRefreshRetry,
+            Action<bool, string, string> callback)
+        {
             SupabaseHttpResult result = null;
             yield return SupabaseHttpTransport.Post(
                 url,
@@ -507,6 +590,17 @@ namespace DreamGate.Battlegrounds.Services.Backend
             var response = result.Body ?? string.Empty;
             if (!result.Success)
             {
+                if (allowRefreshRetry && useAuth && IsUnauthorized(result.Error, response, result.StatusCode))
+                {
+                    var refreshed = false;
+                    yield return RefreshSession(ok => refreshed = ok);
+                    if (refreshed)
+                    {
+                        yield return SendPostJson(url, body, contentType, useAuth, false, callback);
+                        yield break;
+                    }
+                }
+
                 callback(false, NormalizeAuthError(result.Error, response), response);
                 yield break;
             }
@@ -524,6 +618,83 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 && !AllowsEmptyAuthBody(url))
             {
                 callback(false, DescribeEmptyAuthBody(result), response);
+                yield break;
+            }
+
+            callback(true, string.Empty, response);
+        }
+
+        private IEnumerator GetWithRefresh(string url, Action<bool, string, string> callback)
+        {
+            yield return SendGet(url, true, callback);
+        }
+
+        private IEnumerator SendGet(string url, bool allowRefreshRetry, Action<bool, string, string> callback)
+        {
+            SupabaseHttpResult result = null;
+            yield return SupabaseHttpTransport.Get(url, BuildRequestHeaders(true, url), value => result = value);
+
+            if (result == null)
+            {
+                callback(false, "Request failed to start.", string.Empty);
+                yield break;
+            }
+
+            var response = result.Body ?? string.Empty;
+            if (!result.Success)
+            {
+                if (allowRefreshRetry && IsUnauthorized(result.Error, response, result.StatusCode))
+                {
+                    var refreshed = false;
+                    yield return RefreshSession(ok => refreshed = ok);
+                    if (refreshed)
+                    {
+                        yield return SendGet(url, false, callback);
+                        yield break;
+                    }
+                }
+
+                callback(false, result.Error ?? "Request failed.", response);
+                yield break;
+            }
+
+            callback(true, string.Empty, response);
+        }
+
+        private IEnumerator PatchWithRefresh(string url, string body, Action<bool, string, string> callback)
+        {
+            yield return SendPatch(url, body, true, callback);
+        }
+
+        private IEnumerator SendPatch(string url, string body, bool allowRefreshRetry, Action<bool, string, string> callback)
+        {
+            var headers = BuildRequestHeaders(true, url);
+            headers["Prefer"] = "return=minimal";
+
+            SupabaseHttpResult result = null;
+            yield return SupabaseHttpTransport.Patch(url, body, headers, value => result = value);
+
+            if (result == null)
+            {
+                callback(false, "Request failed to start.", string.Empty);
+                yield break;
+            }
+
+            var response = result.Body ?? string.Empty;
+            if (!result.Success)
+            {
+                if (allowRefreshRetry && IsUnauthorized(result.Error, response, result.StatusCode))
+                {
+                    var refreshed = false;
+                    yield return RefreshSession(ok => refreshed = ok);
+                    if (refreshed)
+                    {
+                        yield return SendPatch(url, body, false, callback);
+                        yield break;
+                    }
+                }
+
+                callback(false, result.Error ?? "Request failed.", response);
                 yield break;
             }
 
@@ -584,41 +755,52 @@ namespace DreamGate.Battlegrounds.Services.Backend
             return headers;
         }
 
-        private IEnumerator Get(string url, Action<bool, string, string> callback)
+        private static bool IsAccessTokenExpiredOrNearExpiry(string accessToken)
         {
-            using var request = UnityWebRequest.Get(url);
-            request.SetRequestHeader("apikey", settings.EffectiveAnonKey);
-            request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
-            yield return request.SendWebRequest();
-
-            var response = WebRequestHelper.ReadResponseText(request);
-            if (request.result != UnityWebRequest.Result.Success)
+            if (string.IsNullOrWhiteSpace(accessToken))
             {
-                callback(false, request.error ?? "Request failed.", response);
-                yield break;
+                return true;
             }
 
-            callback(true, string.Empty, response);
+            var expClaim = ApiJson.TryGetJwtClaim(accessToken, "exp");
+            if (!long.TryParse(expClaim, out var expiresAtUnix))
+            {
+                return false;
+            }
+
+            var nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            return nowUnix >= expiresAtUnix - 60;
         }
 
-        private IEnumerator Patch(string url, string body, Action<bool, string, string> callback)
+        private bool IsAccessTokenExpiredOrNearExpiry()
         {
-            using var request = new UnityWebRequest(url, "PATCH");
-            var bytes = Encoding.UTF8.GetBytes(body);
-            WebRequestHelper.ConfigureJsonPost(request, bytes);
-            request.SetRequestHeader("apikey", settings.EffectiveAnonKey);
-            request.SetRequestHeader("Authorization", $"Bearer {AccessToken}");
-            request.SetRequestHeader("Prefer", "return=minimal");
-            yield return request.SendWebRequest();
+            return IsAccessTokenExpiredOrNearExpiry(AccessToken);
+        }
 
-            var response = WebRequestHelper.ReadResponseText(request);
-            if (request.result != UnityWebRequest.Result.Success)
+        private static bool IsUnauthorized(string error, string response, long statusCode = 0)
+        {
+            if (statusCode == 401)
             {
-                callback(false, request.error ?? "Request failed.", response);
-                yield break;
+                return true;
             }
 
-            callback(true, string.Empty, response);
+            if (!string.IsNullOrWhiteSpace(error)
+                && error.IndexOf("401", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(error)
+                && error.IndexOf("JWT", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            var parsed = ApiJson.TryGetString(response, "message")
+                         ?? ApiJson.TryGetString(response, "error")
+                         ?? ApiJson.TryGetString(response, "msg");
+            return !string.IsNullOrWhiteSpace(parsed)
+                   && parsed.IndexOf("JWT", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool AllowsEmptyAuthBody(string url)
