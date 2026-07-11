@@ -380,7 +380,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     : result.Error;
                 callback(
                     false,
-                    $"Authentication server returned an empty response {detail}. This is not a firewall issue.",
+                    $"Authentication server returned an empty response {detail}, {SupabaseHttpTransport.AuthTransportRevision}. This is not a firewall issue.",
                     response);
                 yield break;
             }

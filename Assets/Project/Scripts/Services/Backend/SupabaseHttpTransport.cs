@@ -22,7 +22,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v3-sync-native";
+        internal const string AuthTransportRevision = "v4-bytecopy-chain";
 
         public static IEnumerator Post(
             string url,
@@ -66,10 +66,26 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     yield break;
                 }
 
+                yield return PostViaHttpClient(authUrl, body, headers, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "httpclient"));
+                if (IsUsableAuthResult(authResult))
+                {
+                    callback(authResult);
+                    yield break;
+                }
+
+                yield return PostViaUnityWebRequest(authUrl, body, headers, anonKey, value => authResult = value);
+                attempts.Add(DescribeAttempt(authResult, "unity-webrequest"));
+                if (IsUsableAuthResult(authResult))
+                {
+                    callback(authResult);
+                    yield break;
+                }
+
                 callback(authResult ?? new SupabaseHttpResult
                 {
                     Success = false,
-                    Transport = DescribeNativeTransport(),
+                    Transport = "all",
                     Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
                 });
                 yield break;
@@ -424,13 +440,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private static extern int DreamGate_Http_GetStatusCode();
 
         [DllImport("__Internal")]
-        private static extern int DreamGate_Http_GetBodySize();
+        private static extern int DreamGate_Http_GetBodyByteCount();
 
         [DllImport("__Internal")]
         private static extern int DreamGate_Http_GetRevision();
 
         [DllImport("__Internal")]
-        private static extern void DreamGate_Http_CopyBody(byte[] buffer, int bufferSize);
+        private static extern int DreamGate_Http_CopyBody(byte[] buffer, int bufferSize);
 
         [DllImport("__Internal")]
         private static extern void DreamGate_Http_CopyError(byte[] buffer, int bufferSize);
@@ -473,12 +489,22 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             var statusCode = DreamGate_Http_GetStatusCode();
-            var bodyBuffer = new byte[BodyBufferSize];
-            DreamGate_Http_CopyBody(bodyBuffer, bodyBuffer.Length);
-            var responseBody = ReadNullTerminatedUtf8(bodyBuffer);
-            var bodyBytes = string.IsNullOrEmpty(responseBody)
-                ? DreamGate_Http_GetBodySize()
-                : Encoding.UTF8.GetByteCount(responseBody);
+            var bodyBytes = DreamGate_Http_GetBodyByteCount();
+            var responseBody = string.Empty;
+            if (bodyBytes > 0)
+            {
+                var bodyBuffer = new byte[Math.Min(bodyBytes, BodyBufferSize)];
+                var copiedBytes = DreamGate_Http_CopyBody(bodyBuffer, bodyBuffer.Length);
+                if (copiedBytes > 0)
+                {
+                    responseBody = Encoding.UTF8.GetString(bodyBuffer, 0, copiedBytes);
+                    bodyBytes = copiedBytes;
+                }
+                else
+                {
+                    bodyBytes = 0;
+                }
+            }
 
             var errorBuffer = new byte[ErrorBufferSize];
             DreamGate_Http_CopyError(errorBuffer, errorBuffer.Length);

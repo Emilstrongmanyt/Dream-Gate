@@ -1,36 +1,38 @@
 #import <Foundation/Foundation.h>
+#import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 3;
+static const int DreamGateHttpPluginRevision = 4;
 
+static os_unfair_lock dreamGateHttpLock = OS_UNFAIR_LOCK_INIT;
 static BOOL dreamGateHttpDone = NO;
 static NSInteger dreamGateHttpStatusCode = 0;
-static NSString *dreamGateHttpResponseBodyText = nil;
+static NSData *dreamGateHttpResponseBodyData = nil;
 static NSString *dreamGateHttpTransportError = nil;
+static int dreamGateHttpGeneration = 0;
 
-static void DreamGateHttpResetState(void)
+static void DreamGateHttpResetStateLocked(void)
 {
     dreamGateHttpDone = NO;
     dreamGateHttpStatusCode = 0;
-    dreamGateHttpResponseBodyText = nil;
+    dreamGateHttpResponseBodyData = nil;
     dreamGateHttpTransportError = nil;
+}
+
+static void DreamGateHttpResetState(void)
+{
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    DreamGateHttpResetStateLocked();
+    os_unfair_lock_unlock(&dreamGateHttpLock);
 }
 
 static void DreamGateHttpFinish(NSInteger statusCode, NSData *body, NSString *error)
 {
+    os_unfair_lock_lock(&dreamGateHttpLock);
     dreamGateHttpStatusCode = statusCode;
-    dreamGateHttpResponseBodyText = nil;
-
-    if (body != nil && body.length > 0)
-    {
-        dreamGateHttpResponseBodyText = [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding];
-        if (dreamGateHttpResponseBodyText == nil)
-        {
-            dreamGateHttpResponseBodyText = [[NSString alloc] initWithData:body encoding:NSISOLatin1StringEncoding];
-        }
-    }
-
-    dreamGateHttpTransportError = error;
+    dreamGateHttpResponseBodyData = body != nil ? [body copy] : nil;
+    dreamGateHttpTransportError = error != nil ? [error copy] : nil;
     dreamGateHttpDone = YES;
+    os_unfair_lock_unlock(&dreamGateHttpLock);
 }
 
 static NSString *DreamGateHttpUrlWithApiKey(NSString *urlString, NSString *apikey)
@@ -106,7 +108,13 @@ static void DreamGateHttpExecute(
     NSString *apikey,
     NSString *authorization)
 {
-    DreamGateHttpResetState();
+    int generation = 0;
+
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    dreamGateHttpGeneration += 1;
+    generation = dreamGateHttpGeneration;
+    DreamGateHttpResetStateLocked();
+    os_unfair_lock_unlock(&dreamGateHttpLock);
 
     if (urlString.length == 0)
     {
@@ -133,6 +141,7 @@ static void DreamGateHttpExecute(
             configuration.timeoutIntervalForRequest = 45.0;
             configuration.timeoutIntervalForResource = 45.0;
             configuration.HTTPShouldUsePipelining = NO;
+            configuration.waitsForConnectivity = YES;
             configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
             NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
 
@@ -150,6 +159,14 @@ static void DreamGateHttpExecute(
             [task resume];
             dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(45 * NSEC_PER_SEC)));
             [session finishTasksAndInvalidate];
+
+            os_unfair_lock_lock(&dreamGateHttpLock);
+            BOOL stale = generation != dreamGateHttpGeneration;
+            os_unfair_lock_unlock(&dreamGateHttpLock);
+            if (stale)
+            {
+                return;
+            }
 
             NSInteger statusCode = httpResponse != nil ? httpResponse.statusCode : 0;
             NSString *transportError = requestError != nil ? requestError.localizedDescription : nil;
@@ -173,7 +190,10 @@ extern "C" int DreamGate_Http_GetRevision(void)
 
 extern "C" void DreamGate_Http_Reset(void)
 {
-    DreamGateHttpResetState();
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    dreamGateHttpGeneration += 1;
+    DreamGateHttpResetStateLocked();
+    os_unfair_lock_unlock(&dreamGateHttpLock);
 }
 
 extern "C" void DreamGate_Http_StartPost(
@@ -211,46 +231,53 @@ extern "C" void DreamGate_Http_StartGet(
 
 extern "C" int DreamGate_Http_IsDone(void)
 {
-    return dreamGateHttpDone ? 1 : 0;
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    BOOL done = dreamGateHttpDone;
+    os_unfair_lock_unlock(&dreamGateHttpLock);
+    return done ? 1 : 0;
 }
 
 extern "C" int DreamGate_Http_GetStatusCode(void)
 {
-    return (int)dreamGateHttpStatusCode;
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    int statusCode = (int)dreamGateHttpStatusCode;
+    os_unfair_lock_unlock(&dreamGateHttpLock);
+    return statusCode;
 }
 
-extern "C" int DreamGate_Http_GetBodySize(void)
+extern "C" int DreamGate_Http_GetBodyByteCount(void)
 {
-    if (dreamGateHttpResponseBodyText == nil || dreamGateHttpResponseBodyText.length == 0)
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    NSUInteger length = dreamGateHttpResponseBodyData != nil ? dreamGateHttpResponseBodyData.length : 0;
+    os_unfair_lock_unlock(&dreamGateHttpLock);
+    return (int)length;
+}
+
+extern "C" int DreamGate_Http_CopyBody(void *buffer, int bufferSize)
+{
+    if (buffer == NULL || bufferSize <= 0)
     {
         return 0;
     }
 
-    const char *utf8 = [dreamGateHttpResponseBodyText UTF8String];
-    return utf8 == NULL ? 0 : (int)strlen(utf8);
-}
-
-extern "C" void DreamGate_Http_CopyBody(char *buffer, int bufferSize)
-{
-    if (buffer == NULL || bufferSize <= 0)
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    NSData *bodyData = dreamGateHttpResponseBodyData;
+    NSUInteger length = bodyData != nil ? bodyData.length : 0;
+    if (length == 0)
     {
-        return;
+        os_unfair_lock_unlock(&dreamGateHttpLock);
+        return 0;
     }
 
-    buffer[0] = '\0';
-    if (dreamGateHttpResponseBodyText == nil || dreamGateHttpResponseBodyText.length == 0)
+    NSUInteger copyLength = length;
+    if (copyLength > (NSUInteger)bufferSize)
     {
-        return;
+        copyLength = (NSUInteger)bufferSize;
     }
 
-    const char *utf8 = [dreamGateHttpResponseBodyText UTF8String];
-    if (utf8 == NULL)
-    {
-        return;
-    }
-
-    strncpy(buffer, utf8, (size_t)bufferSize - 1);
-    buffer[bufferSize - 1] = '\0';
+    memcpy(buffer, bodyData.bytes, copyLength);
+    os_unfair_lock_unlock(&dreamGateHttpLock);
+    return (int)copyLength;
 }
 
 extern "C" void DreamGate_Http_CopyError(char *buffer, int bufferSize)
@@ -261,12 +288,17 @@ extern "C" void DreamGate_Http_CopyError(char *buffer, int bufferSize)
     }
 
     buffer[0] = '\0';
-    if (dreamGateHttpTransportError == nil || dreamGateHttpTransportError.length == 0)
+
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    NSString *error = dreamGateHttpTransportError;
+    os_unfair_lock_unlock(&dreamGateHttpLock);
+
+    if (error == nil || error.length == 0)
     {
         return;
     }
 
-    const char *utf8 = [dreamGateHttpTransportError UTF8String];
+    const char *utf8 = [error UTF8String];
     if (utf8 == NULL)
     {
         return;
