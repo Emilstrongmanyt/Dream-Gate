@@ -28,9 +28,7 @@ namespace DreamGate.Battlegrounds.Services
                 _ = CloudCoroutineHost.Instance;
                 AppleSignInNative.Warmup();
                 GoogleSignInNative.Warmup();
-#if UNITY_IOS && !UNITY_EDITOR
                 SupabaseAuthNative.Warmup();
-#endif
                 CloudClient ??= new SupabaseClient(settings, CloudCoroutineHost.Instance);
                 if (CloudClient.IsAuthenticated)
                 {

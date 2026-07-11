@@ -56,8 +56,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: Library
-          key: Library-iOS-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: Library-iOS-v2-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
+            Library-iOS-v2-
             Library-iOS-
             Library-
 
