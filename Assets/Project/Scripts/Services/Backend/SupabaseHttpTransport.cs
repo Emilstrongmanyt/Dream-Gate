@@ -23,7 +23,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v7-fastfail";
+        internal const string AuthTransportRevision = "v8-formnative";
 
 #if UNITY_IOS && !UNITY_EDITOR
         private const float IosAuthTransportTimeoutSeconds = 22f;
@@ -35,6 +35,16 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string url,
             string body,
             IReadOnlyDictionary<string, string> headers,
+            Action<SupabaseHttpResult> callback)
+        {
+            yield return Post(url, body, headers, "application/json", callback);
+        }
+
+        public static IEnumerator Post(
+            string url,
+            string body,
+            IReadOnlyDictionary<string, string> headers,
+            string contentType,
             Action<SupabaseHttpResult> callback)
         {
             if (string.IsNullOrWhiteSpace(url))
@@ -66,9 +76,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
 #if UNITY_IOS && !UNITY_EDITOR
                 yield return SupabaseAuthNative.Post(
-                    authUrl,
+                    url,
                     body,
                     headers,
+                    contentType,
                     IosAuthTransportTimeoutSeconds,
                     value => authResult = value);
                 attempts.Add(DescribeAttempt(authResult, "native-message"));
@@ -83,6 +94,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     body,
                     headers,
                     anonKey,
+                    contentType,
                     IosAuthTransportTimeoutSeconds,
                     value => authResult = value);
                 attempts.Add(DescribeAttempt(authResult, "unity-webrequest"));
@@ -201,9 +213,17 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 return true;
             }
 
-            return !result.Success
-                   && !string.IsNullOrWhiteSpace(result.Error)
-                   && !IsEmptyBodySuccess(result);
+            if (IsEmptyBodySuccess(result))
+            {
+                return false;
+            }
+
+            if (result.StatusCode > 0)
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private static bool IsEmptyBodySuccess(SupabaseHttpResult result)
@@ -222,7 +242,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string anonKey,
             Action<SupabaseHttpResult> callback)
         {
-            yield return PostViaUnityWebRequest(url, body, headers, anonKey, 45, callback);
+            yield return PostViaUnityWebRequest(url, body, headers, anonKey, "application/json", 45, callback);
         }
 
         private static IEnumerator PostViaUnityWebRequest(
@@ -230,18 +250,23 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string body,
             IReadOnlyDictionary<string, string> headers,
             string anonKey,
+            string contentType,
             int timeoutSeconds,
             Action<SupabaseHttpResult> callback)
         {
             SupabaseHttpResult result = null;
             var payload = body ?? "{}";
-            var retryEmptyBody = timeoutSeconds >= 30;
+            var resolvedContentType = string.IsNullOrWhiteSpace(contentType)
+                ? "application/json"
+                : contentType;
+            var retryEmptyBody = timeoutSeconds >= 30
+                                 && resolvedContentType.Equals("application/json", StringComparison.OrdinalIgnoreCase);
 
             for (var attempt = 0; attempt < (retryEmptyBody ? 2 : 1); attempt++)
             {
                 using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
                 var bytes = Encoding.UTF8.GetBytes(payload);
-                WebRequestHelper.ConfigureJsonPost(request, bytes);
+                WebRequestHelper.ConfigurePost(request, bytes, resolvedContentType);
                 request.timeout = timeoutSeconds;
                 WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
 
@@ -782,6 +807,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
                    && result.StatusCode >= 200
                    && result.StatusCode < 300
                    && result.BodyBytes == 0;
+        }
+
+        internal static string ExtractAuthError(string body, string transportError, long statusCode)
+        {
+            return ExtractHttpError(body, transportError, statusCode);
         }
 
         private static string ExtractHttpError(string body, string transportError, long statusCode)

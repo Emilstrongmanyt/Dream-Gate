@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 7;
+static const int DreamGateHttpPluginRevision = 8;
 static const NSTimeInterval DreamGateHttpTimeoutSeconds = 22.0;
 static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
 
@@ -110,15 +110,32 @@ static NSString *DreamGateHttpUrlWithApiKey(NSString *urlString, NSString *apike
     return [NSString stringWithFormat:@"%@%@apikey=%@", urlString, separator, encodedKey];
 }
 
+static NSURL *DreamGateHttpCreateUrl(NSString *urlString)
+{
+    if (urlString.length == 0)
+    {
+        return nil;
+    }
+
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (url != nil)
+    {
+        return url;
+    }
+
+    NSURLComponents *components = [NSURLComponents componentsWithString:urlString];
+    return components.URL;
+}
+
 static NSMutableURLRequest *DreamGateHttpBuildRequest(
     NSString *urlString,
     NSString *method,
     NSString *body,
     NSString *apikey,
-    NSString *authorization)
+    NSString *authorization,
+    NSString *contentType)
 {
-    NSString *resolvedUrlString = DreamGateHttpUrlWithApiKey(urlString, apikey);
-    NSURL *url = [NSURL URLWithString:resolvedUrlString];
+    NSURL *url = DreamGateHttpCreateUrl(urlString);
     if (url == nil)
     {
         return nil;
@@ -146,7 +163,8 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
     {
         NSData *bodyData = body == nil ? [NSData data] : [body dataUsingEncoding:NSUTF8StringEncoding];
         request.HTTPBody = bodyData;
-        [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+        NSString *resolvedContentType = contentType.length > 0 ? contentType : @"application/json";
+        [request setValue:resolvedContentType forHTTPHeaderField:@"Content-Type"];
         [request setValue:[NSString stringWithFormat:@"%lu", (unsigned long)bodyData.length]
             forHTTPHeaderField:@"Content-Length"];
     }
@@ -175,7 +193,13 @@ static void DreamGateHttpExecute(
         return;
     }
 
-    NSMutableURLRequest *request = DreamGateHttpBuildRequest(urlString, method, body, apikey, authorization);
+    NSMutableURLRequest *request = DreamGateHttpBuildRequest(
+        urlString,
+        method,
+        body,
+        apikey,
+        authorization,
+        @"application/json");
     if (request == nil)
     {
         DreamGateHttpFinish(0, nil, @"Invalid request URL.");
@@ -441,6 +465,7 @@ static void DreamGateAuthHttpExecutePost(
     NSString *body,
     NSString *apikey,
     NSString *authorization,
+    NSString *contentType,
     const char *callbackObject,
     const char *callbackMethod)
 {
@@ -460,7 +485,13 @@ static void DreamGateAuthHttpExecutePost(
         return;
     }
 
-    NSMutableURLRequest *request = DreamGateHttpBuildRequest(urlString, @"POST", body, apikey, authorization);
+    NSMutableURLRequest *request = DreamGateHttpBuildRequest(
+        urlString,
+        @"POST",
+        body,
+        apikey,
+        authorization,
+        contentType);
     if (request == nil)
     {
         sendPayload(@{
@@ -538,6 +569,7 @@ extern "C" void DreamGate_AuthHttp_StartPost(
     const char *body,
     const char *apikey,
     const char *authorization,
+    const char *contentType,
     const char *callbackObject,
     const char *callbackMethod)
 {
@@ -551,6 +583,7 @@ extern "C" void DreamGate_AuthHttp_StartPost(
                     body ? [NSString stringWithUTF8String:body] : @"",
                     apikey ? [NSString stringWithUTF8String:apikey] : @"",
                     authorization ? [NSString stringWithUTF8String:authorization] : @"",
+                    contentType ? [NSString stringWithUTF8String:contentType] : @"application/json",
                     callbackObject,
                     callbackMethod);
             }

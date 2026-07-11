@@ -53,7 +53,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             if (credential == null)
             {
-                callback(GoogleSignInRequestResult.Failed("Google sign in timed out. Try again."));
+                callback(GoogleSignInRequestResult.Failed(
+                    "Google sign in timed out. Enable Google in Supabase Auth providers, add the redirect URL, then try again."));
                 yield break;
             }
 

@@ -78,16 +78,18 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public IEnumerator SignIn(string email, string password, Action<bool, string> callback)
         {
-            var body = ApiJson.BuildObject(new Dictionary<string, object>
-            {
-                { "email", email },
-                { "password", password }
-            });
+            var body = BuildPasswordGrantBody(email, password);
+            var contentType = PasswordGrantContentType;
 
             var loginSuccess = false;
             var loginResponse = string.Empty;
             var loginError = string.Empty;
-            yield return PostJson($"{settings.EffectiveSupabaseUrl}/auth/v1/token?grant_type=password", body, false, (success, response, error) =>
+            yield return PostJson(
+                $"{settings.EffectiveSupabaseUrl}/auth/v1/token?grant_type=password",
+                body,
+                contentType,
+                false,
+                (success, response, error) =>
             {
                 loginSuccess = success;
                 loginResponse = response;
@@ -443,8 +445,23 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private IEnumerator PostJson(string url, string body, bool useAuth, Action<bool, string, string> callback)
         {
+            yield return PostJson(url, body, "application/json", useAuth, callback);
+        }
+
+        private IEnumerator PostJson(
+            string url,
+            string body,
+            string contentType,
+            bool useAuth,
+            Action<bool, string, string> callback)
+        {
             SupabaseHttpResult result = null;
-            yield return SupabaseHttpTransport.Post(url, body, BuildRequestHeaders(useAuth, url), value => result = value);
+            yield return SupabaseHttpTransport.Post(
+                url,
+                body,
+                BuildRequestHeaders(useAuth, url),
+                contentType,
+                value => result = value);
 
             if (result == null)
             {
@@ -577,11 +594,52 @@ namespace DreamGate.Battlegrounds.Services.Backend
             return url.Contains("/auth/v1/otp", StringComparison.Ordinal);
         }
 
+        private static string BuildPasswordGrantBody(string email, string password)
+        {
+#if UNITY_IOS && !UNITY_EDITOR
+            return
+                $"email={Uri.EscapeDataString(email ?? string.Empty)}&password={Uri.EscapeDataString(password ?? string.Empty)}";
+#else
+            return ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "email", email },
+                { "password", password }
+            });
+#endif
+        }
+
+        private static string PasswordGrantContentType =>
+#if UNITY_IOS && !UNITY_EDITOR
+            "application/x-www-form-urlencoded";
+#else
+            "application/json";
+#endif
+
         private static string NormalizeAuthError(string error, string responseJson = null)
         {
+            if (string.IsNullOrWhiteSpace(error) && !string.IsNullOrWhiteSpace(responseJson))
+            {
+                error = ApiJson.TryGetString(responseJson, "msg")
+                        ?? ApiJson.TryGetString(responseJson, "error_description")
+                        ?? ApiJson.TryGetString(responseJson, "error")
+                        ?? ApiJson.TryGetString(responseJson, "message");
+            }
+
             if (string.IsNullOrWhiteSpace(error))
             {
                 return "Request failed.";
+            }
+
+            if (error.Equals("invalid_request", StringComparison.OrdinalIgnoreCase)
+                || error.IndexOf("invalid request", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Login request was not accepted by the server. Install the latest TestFlight build and try again.";
+            }
+
+            if (error.IndexOf("Invalid login credentials", StringComparison.OrdinalIgnoreCase) >= 0
+                || error.IndexOf("invalid_credentials", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Incorrect email or password.";
             }
 
             var errorCode = ApiJson.TryGetString(responseJson, "error_code");

@@ -671,17 +671,21 @@ namespace DreamGate.Battlegrounds.UI
             string timeoutMessage,
             Action<string> setTimedOutMessage)
         {
-            var host = CloudCoroutineHost.Instance;
-            var runner = host.Run(authRoutine);
             var deadline = AuthCoroutineTimeouts.CreateDeadline(timeoutSeconds);
             while (!isFinished() && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {
-                yield return null;
+                if (authRoutine.MoveNext())
+                {
+                    yield return authRoutine.Current;
+                }
+                else
+                {
+                    break;
+                }
             }
 
             if (!isFinished())
             {
-                host.Stop(runner);
                 setTimedOutMessage(timeoutMessage);
             }
         }

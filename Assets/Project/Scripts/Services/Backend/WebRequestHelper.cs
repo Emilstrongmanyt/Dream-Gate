@@ -75,18 +75,32 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public static void ConfigureJsonPost(UnityWebRequest request, byte[] body, bool disposeHandlers = true)
         {
-            request.uploadHandler = new UploadHandlerRaw(body)
+            ConfigurePost(request, body, "application/json", disposeHandlers);
+        }
+
+        public static void ConfigurePost(
+            UnityWebRequest request,
+            byte[] body,
+            string contentType,
+            bool disposeHandlers = true)
+        {
+            var payload = body ?? Array.Empty<byte>();
+            var resolvedContentType = string.IsNullOrWhiteSpace(contentType)
+                ? "application/json"
+                : contentType;
+
+            request.uploadHandler = new UploadHandlerRaw(payload)
             {
-                contentType = "application/json"
+                contentType = resolvedContentType
             };
             request.downloadHandler = new DownloadHandlerBuffer();
             request.disposeUploadHandlerOnDispose = disposeHandlers;
             request.disposeDownloadHandlerOnDispose = disposeHandlers;
             request.useHttpContinue = false;
-            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Content-Type", resolvedContentType);
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("Accept-Encoding", "identity");
-            request.SetRequestHeader("Content-Length", (body?.Length ?? 0).ToString());
+            request.SetRequestHeader("Content-Length", payload.Length.ToString());
         }
 
         public static IEnumerator WaitForResponseReady(UnityWebRequest request = null)

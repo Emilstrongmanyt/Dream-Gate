@@ -292,6 +292,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string body,
             string apikey,
             string authorization,
+            string contentType,
             string callbackObject,
             string callbackMethod);
 #endif
@@ -300,6 +301,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string url,
             string body,
             IReadOnlyDictionary<string, string> headers,
+            string contentType,
             float timeoutSeconds,
             Action<SupabaseHttpResult> callback)
         {
@@ -309,11 +311,15 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             var apikey = GetHeader(headers, "apikey");
             var authorization = GetHeader(headers, "Authorization");
+            var resolvedContentType = string.IsNullOrWhiteSpace(contentType)
+                ? "application/json"
+                : contentType;
             DreamGate_AuthHttp_StartPost(
                 url,
                 body ?? string.Empty,
                 apikey,
                 authorization,
+                resolvedContentType,
                 CallbackHostName,
                 nameof(OnAuthHttpResult));
 
@@ -385,13 +391,16 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             var bodyBytes = string.IsNullOrEmpty(body) ? 0 : Encoding.UTF8.GetByteCount(body);
             var httpSucceeded = status >= 200 && status < 300;
+            var resolvedError = httpSucceeded
+                ? string.Empty
+                : SupabaseHttpTransport.ExtractAuthError(body, error, status);
             return new SupabaseHttpResult
             {
                 Success = httpSucceeded,
                 StatusCode = status,
                 Body = body,
                 BodyBytes = bodyBytes,
-                Error = httpSucceeded ? string.Empty : error
+                Error = resolvedError
             };
         }
 
