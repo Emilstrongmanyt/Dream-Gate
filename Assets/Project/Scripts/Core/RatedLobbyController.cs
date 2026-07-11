@@ -14,6 +14,14 @@ namespace DreamGate.Battlegrounds.Core
         private void Start()
         {
             DreamGateServices.Initialize();
+
+            if (!DreamGateServices.IsLoggedIn)
+            {
+                DreamGateServices.PendingRatedLobbyAfterLogin = true;
+                SceneNavigator.LoadHome();
+                return;
+            }
+
             EnsureCanvas();
 
             var uiRoot = CreateUiRoot();

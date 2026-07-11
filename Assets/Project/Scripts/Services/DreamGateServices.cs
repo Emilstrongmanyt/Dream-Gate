@@ -13,6 +13,7 @@ namespace DreamGate.Battlegrounds.Services
     public static class DreamGateServices
     {
         public static bool IsInitialized { get; private set; }
+        public static bool PendingRatedLobbyAfterLogin { get; set; }
         public static bool IsLoggedIn => UseCloudBackend ? CloudClient?.IsAuthenticated == true : AuthService.IsLoggedIn;
         public static bool UseCloudBackend { get; private set; }
         public static SupabaseClient CloudClient { get; private set; }
@@ -593,9 +594,7 @@ namespace DreamGate.Battlegrounds.Services
 
             if (!IsLoggedIn || Profile == null)
             {
-                return UseCloudBackend
-                    ? "Log in or create an account to play rated matches online."
-                    : "Log in or create an account to track your rated MMR.";
+                return "Play Practice anytime. Sign in only when you want to queue for Rated matches.";
             }
 
             return

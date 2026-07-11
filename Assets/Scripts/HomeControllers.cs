@@ -25,8 +25,8 @@ public class HomeMenuController : MonoBehaviour
 
         settingsPage = MenuPageUI.BuildSettingsPage(pageRoot, CloseOverlays, OnLogout);
         supportPage = MenuPageUI.BuildSupportPage(pageRoot, CloseOverlays);
-        loginPage = LoginPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowCreateAccount);
-        createAccountPage = CreateAccountPageView.Create(pageRoot, CloseOverlays, RefreshAccountStatus, ShowLogin);
+        loginPage = LoginPageView.Create(pageRoot, CloseOverlays, OnAuthSuccess, ShowCreateAccount);
+        createAccountPage = CreateAccountPageView.Create(pageRoot, CloseOverlays, OnAuthSuccess, ShowLogin);
 
         BindButton("Settings", () =>
         {
@@ -41,17 +41,34 @@ public class HomeMenuController : MonoBehaviour
         BindButton("Login", ShowLogin);
         BindButton("CreateAccount", ShowCreateAccount);
         RefreshAccountStatus();
+
+        if (DreamGateServices.PendingRatedLobbyAfterLogin)
+        {
+            ShowLogin();
+        }
     }
 
     public void GoToMainMenu()
     {
+        SceneNavigator.LoadMainMenu();
+    }
+
+    private void OnAuthSuccess()
+    {
+        RefreshAccountStatus();
+        var goToRatedLobby = DreamGateServices.PendingRatedLobbyAfterLogin;
+        DreamGateServices.PendingRatedLobbyAfterLogin = false;
+        CloseOverlaysWithoutClearingRatedIntent();
+
         if (!DreamGateServices.IsLoggedIn)
         {
-            ShowLogin();
             return;
         }
 
-        SceneNavigator.LoadMainMenu();
+        if (goToRatedLobby)
+        {
+            SceneNavigator.LoadRatedLobby();
+        }
     }
 
     private void ShowLogin()
@@ -143,6 +160,12 @@ public class HomeMenuController : MonoBehaviour
     }
 
     private void CloseOverlays()
+    {
+        CloseOverlaysWithoutClearingRatedIntent();
+        DreamGateServices.PendingRatedLobbyAfterLogin = false;
+    }
+
+    private void CloseOverlaysWithoutClearingRatedIntent()
     {
         settingsPage?.Hide();
         supportPage?.Hide();

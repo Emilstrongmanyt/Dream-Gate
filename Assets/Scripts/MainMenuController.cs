@@ -31,6 +31,7 @@ public class MainMenuController : MonoBehaviour
     {
         if (!DreamGateServices.IsLoggedIn)
         {
+            DreamGateServices.PendingRatedLobbyAfterLogin = true;
             SceneNavigator.LoadHome();
             return;
         }
