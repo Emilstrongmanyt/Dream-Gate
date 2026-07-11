@@ -23,7 +23,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v8-formnative";
+        internal const string AuthTransportRevision = "v9-jsonnative";
 
 #if UNITY_IOS && !UNITY_EDITOR
         private const int IosAuthTransportTimeoutSeconds = 22;

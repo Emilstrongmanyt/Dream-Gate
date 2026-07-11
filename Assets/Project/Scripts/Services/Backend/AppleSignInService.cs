@@ -22,13 +22,15 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
+            AppleSignInNative.Warmup();
+
             var nonce = GenerateNonce();
             var hashedNonce = HashNonce(nonce);
             AppleSignInCredential credential = null;
 
             AppleSignInNative.RequestAuthorization(hashedNonce, result => credential = result);
 
-            const float timeoutSeconds = 90f;
+            const float timeoutSeconds = 120f;
             var deadline = AuthCoroutineTimeouts.CreateDeadline(timeoutSeconds);
             while (credential == null && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {

@@ -49,6 +49,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
 #if UNITY_IOS && !UNITY_EDITOR
         [DllImport("__Internal")]
+        private static extern void DreamGate_AppleSignIn_Reset();
+
+        [DllImport("__Internal")]
         private static extern void DreamGate_AppleSignIn_Request(
             string hashedNonce,
             string callbackObject,
@@ -66,6 +69,15 @@ namespace DreamGate.Battlegrounds.Services.Backend
             pendingCallback = callback;
 #if UNITY_IOS && !UNITY_EDITOR
             Warmup();
+            try
+            {
+                DreamGate_AppleSignIn_Reset();
+            }
+            catch
+            {
+                // Native bridge unavailable in editor/player without plugin.
+            }
+
             DreamGate_AppleSignIn_Request(hashedNonce, CallbackHostName, nameof(OnNativeCallback));
 #else
             InvokeFallback("Sign in with Apple is only available on iOS devices.");
@@ -92,7 +104,22 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public void OnNativeCallback(string signal)
         {
-            if (!TryConsumePendingResult(out var credential))
+            if (TryConsumePendingResult(out var credential))
+            {
+                DeliverCredential(credential);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(signal)
+                && signal.IndexOf("success", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                DeliverCredential(AppleSignInCredential.FromJson(signal));
+            }
+        }
+
+        private static void DeliverCredential(AppleSignInCredential credential)
+        {
+            if (credential == null)
             {
                 return;
             }

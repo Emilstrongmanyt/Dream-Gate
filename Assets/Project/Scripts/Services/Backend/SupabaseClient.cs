@@ -596,24 +596,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         private static string BuildPasswordGrantBody(string email, string password)
         {
-#if UNITY_IOS && !UNITY_EDITOR
-            return
-                $"email={Uri.EscapeDataString(email ?? string.Empty)}&password={Uri.EscapeDataString(password ?? string.Empty)}";
-#else
             return ApiJson.BuildObject(new Dictionary<string, object>
             {
                 { "email", email },
                 { "password", password }
             });
-#endif
         }
 
-        private static string PasswordGrantContentType =>
-#if UNITY_IOS && !UNITY_EDITOR
-            "application/x-www-form-urlencoded";
-#else
-            "application/json";
-#endif
+        private static string PasswordGrantContentType => "application/json";
 
         private static string NormalizeAuthError(string error, string responseJson = null)
         {
@@ -634,6 +624,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 || error.IndexOf("invalid request", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return "Login request was not accepted by the server. Install the latest TestFlight build and try again.";
+            }
+
+            if (error.IndexOf("bad json", StringComparison.OrdinalIgnoreCase) >= 0
+                || error.IndexOf("406", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Login request format was rejected by the server. Install the latest TestFlight build and try again.";
             }
 
             if (error.IndexOf("Invalid login credentials", StringComparison.OrdinalIgnoreCase) >= 0

@@ -4,9 +4,12 @@
 
 extern UIViewController *UnityGetGLViewController(void);
 
+static const NSTimeInterval DreamGateAppleSignInTimeoutSeconds = 120.0;
+
 static id dreamGateAppleSignInDelegate = nil;
 static ASAuthorizationController *dreamGateAppleAuthorizationController = nil;
 static NSString *dreamGateApplePendingJson = nil;
+static int dreamGateAppleSignInGeneration = 0;
 
 @interface DreamGateAppleSignInDelegate : NSObject<ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
 @property (nonatomic, copy) NSString *callbackObject;
@@ -120,10 +123,14 @@ static NSString *dreamGateApplePendingJson = nil;
     }
 
     dreamGateApplePendingJson = json;
-    UnitySendMessage(
-        [self.callbackObject UTF8String],
-        [self.callbackMethod UTF8String],
-        "ready");
+    NSString *callbackObject = [self.callbackObject copy];
+    NSString *callbackMethod = [self.callbackMethod copy];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UnitySendMessage(
+            [callbackObject UTF8String],
+            [callbackMethod UTF8String],
+            "ready");
+    });
 }
 
 - (void)authorizationController:(ASAuthorizationController *)controller
@@ -170,6 +177,14 @@ static NSString *dreamGateApplePendingJson = nil;
 
 @end
 
+extern "C" void DreamGate_AppleSignIn_Reset(void)
+{
+    dreamGateAppleSignInGeneration += 1;
+    dreamGateAppleSignInDelegate = nil;
+    dreamGateAppleAuthorizationController = nil;
+    dreamGateApplePendingJson = nil;
+}
+
 extern "C" int DreamGate_AppleSignIn_IsReady(void)
 {
     return (dreamGateApplePendingJson != nil && dreamGateApplePendingJson.length > 0) ? 1 : 0;
@@ -203,7 +218,15 @@ extern "C" void DreamGate_AppleSignIn_Request(const char *hashedNonce, const cha
 {
     if (@available(iOS 13.0, *))
     {
+        dreamGateAppleSignInGeneration += 1;
+        const int requestGeneration = dreamGateAppleSignInGeneration;
+
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (requestGeneration != dreamGateAppleSignInGeneration)
+            {
+                return;
+            }
+
             DreamGateAppleSignInDelegate *delegate = [DreamGateAppleSignInDelegate new];
             delegate.callbackObject = callbackObject ? [NSString stringWithUTF8String:callbackObject] : @"";
             delegate.callbackMethod = callbackMethod ? [NSString stringWithUTF8String:callbackMethod] : @"";
@@ -228,26 +251,44 @@ extern "C" void DreamGate_AppleSignIn_Request(const char *hashedNonce, const cha
             controller.delegate = delegate;
             controller.presentationContextProvider = delegate;
             dreamGateAppleAuthorizationController = controller;
-            [controller performRequests];
 
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(60 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                if (dreamGateAppleSignInDelegate == delegate && !delegate.didSendPayload)
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (requestGeneration != dreamGateAppleSignInGeneration)
                 {
-                    [delegate sendPayload:@{
-                        @"success": @0,
-                        @"error": @"Apple sign in timed out. Try again."
-                    }];
+                    return;
                 }
+
+                [controller performRequests];
             });
+
+            dispatch_after(
+                dispatch_time(DISPATCH_TIME_NOW, (int64_t)(DreamGateAppleSignInTimeoutSeconds * NSEC_PER_SEC)),
+                dispatch_get_main_queue(),
+                ^{
+                    if (requestGeneration != dreamGateAppleSignInGeneration)
+                    {
+                        return;
+                    }
+
+                    if (dreamGateAppleSignInDelegate == delegate && !delegate.didSendPayload)
+                    {
+                        [delegate sendPayload:@{
+                            @"success": @0,
+                            @"error": @"Apple sign in timed out. Close the Apple sheet and try again."
+                        }];
+                    }
+                });
         });
         return;
     }
 
     if (callbackObject != NULL && callbackMethod != NULL)
     {
-        UnitySendMessage(
-            callbackObject,
-            callbackMethod,
-            "{\"success\":0,\"error\":\"Sign in with Apple requires iOS 13 or later.\"}");
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UnitySendMessage(
+                callbackObject,
+                callbackMethod,
+                "{\"success\":0,\"error\":\"Sign in with Apple requires iOS 13 or later.\"}");
+        });
     }
 }
