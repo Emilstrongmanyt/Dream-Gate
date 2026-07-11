@@ -107,6 +107,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 Transport = "native-message",
                 Error = "Native auth HTTP is only available on iOS devices."
             });
+            yield break;
 #endif
         }
 
