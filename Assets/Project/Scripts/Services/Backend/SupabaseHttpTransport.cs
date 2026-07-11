@@ -488,7 +488,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             var nativeByteCount = DreamGate_Http_GetBodyByteCount();
             var responseBody = string.Empty;
             var bodyBytes = 0;
-            string readDiagnostic;
+            var readDiagnostic = "none";
 
             if (!TryReadNativeBodyFromFile(out responseBody, out bodyBytes, out readDiagnostic)
                 && nativeByteCount > 0)
@@ -640,21 +640,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
         }
 
-        private static SupabaseHttpResult BuildFailedAuthChainResult(
-            SupabaseHttpResult lastResult,
-            IReadOnlyList<string> attempts)
-        {
-            return new SupabaseHttpResult
-            {
-                Success = false,
-                StatusCode = lastResult?.StatusCode ?? 0,
-                Body = lastResult?.Body ?? string.Empty,
-                BodyBytes = lastResult?.BodyBytes ?? 0,
-                Transport = "all",
-                Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
-            };
-        }
-
         private static string ReadNullTerminatedUtf8(byte[] buffer)
         {
             var length = Array.IndexOf(buffer, (byte)0);
@@ -681,6 +666,21 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
         }
 #endif
+
+        private static SupabaseHttpResult BuildFailedAuthChainResult(
+            SupabaseHttpResult lastResult,
+            IReadOnlyList<string> attempts)
+        {
+            return new SupabaseHttpResult
+            {
+                Success = false,
+                StatusCode = lastResult?.StatusCode ?? 0,
+                Body = lastResult?.Body ?? string.Empty,
+                BodyBytes = lastResult?.BodyBytes ?? 0,
+                Transport = "all",
+                Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
+            };
+        }
 
         private static string GetHeader(IReadOnlyDictionary<string, string> headers, string key)
         {
