@@ -228,9 +228,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 Success = false,
                 Error = "Native HTTP request failed to complete."
             });
-            yield break;
-#endif
-
+#else
             using var request = UnityWebRequest.Get(url);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.timeout = 45;
@@ -250,6 +248,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                         request.error,
                         request.responseCode),
                 "unity-webrequest"));
+#endif
         }
 
         private static bool IsUsableAuthResult(SupabaseHttpResult result, string url = null)
