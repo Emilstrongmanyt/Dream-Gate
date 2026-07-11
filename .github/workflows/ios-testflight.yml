@@ -314,15 +314,19 @@ jobs:
           xcodebuild -version
           KEY_PATH=$RUNNER_TEMP/AuthKey.p8
           printf '%s' "$APPLE_CONNECT_KEY" | base64 --decode > "$KEY_PATH"
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
+            echo "Decoded App Store Connect API key is invalid (missing PEM header)."
+            exit 1
+          fi
           API_KEY_JSON=$RUNNER_TEMP/api_key.json
           python3 - <<'PY'
           import json, os
           key_path = os.path.join(os.environ["RUNNER_TEMP"], "AuthKey.p8")
           with open(key_path, "r", encoding="utf-8") as f:
-              key = f.read()
+              key = f.read().strip()
           payload = {
-              "key_id": os.environ["APPLE_CONNECT_KEY_ID"],
-              "issuer_id": os.environ["APPLE_CONNECT_ISSUER_ID"],
+              "key_id": os.environ["APPLE_CONNECT_KEY_ID"].strip(),
+              "issuer_id": os.environ["APPLE_CONNECT_ISSUER_ID"].strip(),
               "key": key,
               "duration": 1200,
               "in_house": False,
@@ -339,7 +343,24 @@ jobs:
           fi
           echo "Uploading $IPA_PATH"
           gem install fastlane --no-document
-          fastlane pilot upload \
-            --api_key_path "$RUNNER_TEMP/api_key.json" \
-            --ipa "$IPA_PATH" \
-            --skip_waiting_for_build_processing true
+          UPLOAD_OK=0
+          for attempt in 1 2 3; do
+            echo "TestFlight upload attempt $attempt/3"
+            if fastlane pilot upload \
+              --api_key_path "$RUNNER_TEMP/api_key.json" \
+              --ipa "$IPA_PATH" \
+              --skip_waiting_for_build_processing true; then
+              UPLOAD_OK=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Upload failed; retrying in 30s..."
+              sleep 30
+            fi
+          done
+          if [ "$UPLOAD_OK" -ne 1 ]; then
+            echo "TestFlight upload failed after 3 attempts."
+            echo "If the error mentions invalid bearer token, verify APPLE_CONNECT_KEY_ID,"
+            echo "APPLE_CONNECT_ISSUER_ID, and APPLE_CONNECT_KEY secrets in GitHub."
+            exit 1
+          fi
