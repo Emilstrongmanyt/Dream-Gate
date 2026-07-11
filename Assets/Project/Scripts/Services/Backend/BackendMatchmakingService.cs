@@ -137,7 +137,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                         humansFound = Math.Max(1, ApiJson.TryGetInt(response, "humansFound", 1));
                         if (status == "matched")
                         {
-                            matchedResult = ParseMatchResult(response);
+                            matchedResult = ParseMatchResult(response, profile.playerId, profile.displayName);
                         }
                     });
 
@@ -163,7 +163,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
         }
 
-        private static MatchmakingResult ParseMatchResult(string response)
+        private static MatchmakingResult ParseMatchResult(string response, string localPlayerId, string localDisplayName)
         {
             var result = new MatchmakingResult
             {
@@ -202,12 +202,29 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 for (var i = 0; i < TargetPlayers; i++)
                 {
+                    var isLocalHuman = i == result.humanSlotIndex;
                     slots.Add(new MatchSlot
                     {
                         slotIndex = i,
-                        isBot = i != result.humanSlotIndex,
-                        displayName = i == result.humanSlotIndex ? "You" : $"Bot {i + 1}"
+                        isBot = !isLocalHuman,
+                        playerId = isLocalHuman ? localPlayerId : null,
+                        displayName = isLocalHuman ? localDisplayName ?? "You" : $"Bot {i + 1}"
                     });
+                }
+            }
+            else
+            {
+                foreach (var slot in slots)
+                {
+                    if (slot == null || slot.isBot || !string.IsNullOrEmpty(slot.playerId))
+                    {
+                        continue;
+                    }
+
+                    if (slot.slotIndex == result.humanSlotIndex)
+                    {
+                        slot.playerId = localPlayerId;
+                    }
                 }
             }
 

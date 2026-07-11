@@ -56,7 +56,8 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const ugsPlayerId = String(body.ugsPlayerId ?? "").trim();
-  const displayName = String(body.displayName ?? "Dreamer").trim() || "Dreamer";
+  const requestedDisplayName = String(body.displayName ?? "").trim();
+  const displayName = requestedDisplayName || "Dreamer";
 
   if (!ugsPlayerId) {
     return json({ error: "Missing Unity player id." }, 400);
@@ -107,10 +108,13 @@ Deno.serve(async (req) => {
     return json({ error: "Could not start cloud session." }, 400);
   }
 
-  if (displayName) {
+  if (
+    requestedDisplayName.length >= 2 &&
+    !requestedDisplayName.toLowerCase().startsWith("ugs+")
+  ) {
     await admin
       .from("player_profiles")
-      .update({ display_name: displayName })
+      .update({ display_name: requestedDisplayName })
       .eq("id", userId);
   }
 

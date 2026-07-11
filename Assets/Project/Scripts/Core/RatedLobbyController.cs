@@ -30,6 +30,7 @@ namespace DreamGate.Battlegrounds.Core
             lobbyUi.FindMatchClicked += OnFindMatch;
             lobbyUi.CancelClicked += OnCancel;
             lobbyUi.BackClicked += OnBack;
+            DreamGateServices.ProfileChanged += OnProfileChanged;
 
             matchmaking = MatchmakingServiceFactory.Create(this);
             matchmaking.QueueUpdated += OnQueueUpdated;
@@ -39,6 +40,8 @@ namespace DreamGate.Battlegrounds.Core
 
         private void OnDestroy()
         {
+            DreamGateServices.ProfileChanged -= OnProfileChanged;
+
             if (lobbyUi != null)
             {
                 lobbyUi.FindMatchClicked -= OnFindMatch;
@@ -102,6 +105,11 @@ namespace DreamGate.Battlegrounds.Core
         {
             lobbyUi.SetSearching(false);
             lobbyUi.SetQueueStatus(message);
+        }
+
+        private void OnProfileChanged()
+        {
+            lobbyUi?.RefreshProfile();
         }
 
         private void EnsureCanvas()

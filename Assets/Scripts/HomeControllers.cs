@@ -45,6 +45,7 @@ public class HomeMenuController : MonoBehaviour
         });
         BindButton("Login", ShowLogin);
         BindButton("CreateAccount", ShowCreateAccount);
+        DreamGateServices.ProfileChanged += OnProfileChanged;
         RefreshAccountStatus();
 
         if (DreamGateServices.PendingRatedLobbyAfterLogin)
@@ -55,6 +56,11 @@ public class HomeMenuController : MonoBehaviour
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
         CreateAuthSmokeTestUi(pageRoot);
 #endif
+    }
+
+    private void OnDestroy()
+    {
+        DreamGateServices.ProfileChanged -= OnProfileChanged;
     }
 
     public void GoToMainMenu()
@@ -98,6 +104,11 @@ public class HomeMenuController : MonoBehaviour
     {
         DreamGateServices.Logout();
         CloseOverlays();
+        RefreshAccountStatus();
+    }
+
+    private void OnProfileChanged()
+    {
         RefreshAccountStatus();
     }
 

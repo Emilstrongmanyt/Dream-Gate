@@ -172,11 +172,17 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
-            var body = ApiJson.BuildObject(new Dictionary<string, object>
+            var bodyFields = new Dictionary<string, object>
             {
-                { "ugsPlayerId", ugsPlayerId.Trim() },
-                { "displayName", string.IsNullOrWhiteSpace(displayName) ? "Dreamer" : displayName.Trim() }
-            });
+                { "ugsPlayerId", ugsPlayerId.Trim() }
+            };
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                bodyFields["displayName"] = displayName.Trim();
+            }
+
+            var body = ApiJson.BuildObject(bodyFields);
 
             var headers = new Dictionary<string, string>
             {

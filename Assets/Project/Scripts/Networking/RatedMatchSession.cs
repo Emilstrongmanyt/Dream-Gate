@@ -46,7 +46,16 @@ namespace DreamGate.Battlegrounds.Networking
             }
         }
 
-        public void Tick(float deltaTime) => manager.TickRecruitTimer(deltaTime);
+        public void Tick(float deltaTime)
+        {
+            var before = (int)Math.Ceiling(Math.Max(0d, manager.RecruitTimeRemaining));
+            manager.TickRecruitTimer(deltaTime);
+            var after = (int)Math.Ceiling(Math.Max(0d, manager.RecruitTimeRemaining));
+            if (before != after)
+            {
+                BumpVersion();
+            }
+        }
 
         public MatchSnapshot GetSnapshot(string externalPlayerId)
         {

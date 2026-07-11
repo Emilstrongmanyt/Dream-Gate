@@ -18,7 +18,10 @@ namespace DreamGate.Battlegrounds.Services
     {
         public static bool IsInitialized { get; private set; }
         public static bool PendingRatedLobbyAfterLogin { get; set; }
+        public static event Action ProfileChanged;
         public static bool IsLoggedIn => UseCloudBackend ? CloudClient?.IsAuthenticated == true : AuthService.IsLoggedIn;
+
+        private const string CachedDisplayNameKey = "dreamgate_cached_display_name";
         public static bool UseCloudBackend { get; private set; }
         public static SupabaseClient CloudClient { get; private set; }
         public static PlayerProfile Profile { get; private set; }
@@ -41,7 +44,7 @@ namespace DreamGate.Battlegrounds.Services
                 CloudClient ??= new SupabaseClient(settings, CloudCoroutineHost.Instance);
                 if (CloudClient.IsAuthenticated)
                 {
-                    CloudCoroutineHost.Instance.Run(LoadCloudProfileRoutine());
+                    CloudCoroutineHost.Instance.Run(CoLoadAndRepairCloudProfile());
                 }
                 else
                 {
@@ -182,7 +185,8 @@ namespace DreamGate.Battlegrounds.Services
                 }
             }
 
-            yield return CoBridgeUgsToSupabase(displayName.Trim(), (bridgeOk, bridgeMessage) =>
+            var bridgedDisplayName = displayName.Trim();
+            yield return CoBridgeUgsToSupabase(bridgedDisplayName, (bridgeOk, bridgeMessage) =>
             {
                 success = bridgeOk;
                 message = bridgeMessage;
@@ -194,7 +198,8 @@ namespace DreamGate.Battlegrounds.Services
                 yield break;
             }
 
-            yield return CloudClient.UpdateDisplayName(displayName.Trim(), (_, _) => { });
+            CacheDisplayName(bridgedDisplayName);
+            yield return CloudClient.UpdateDisplayName(bridgedDisplayName, (_, _) => { });
             yield return WaitForCloudProfileRoutine();
             callback(true, $"Account created. Welcome, {Profile?.displayName ?? displayName}!", false);
         }
@@ -234,7 +239,9 @@ namespace DreamGate.Battlegrounds.Services
                 yield break;
             }
 
-            yield return CoBridgeUgsToSupabase(string.Empty, (bridgeOk, bridgeMessage) =>
+            var bridgedDisplayName = string.Empty;
+            yield return CoResolveUgsDisplayName(username.Trim(), resolved => bridgedDisplayName = resolved);
+            yield return CoBridgeUgsToSupabase(bridgedDisplayName, (bridgeOk, bridgeMessage) =>
             {
                 success = bridgeOk;
                 message = bridgeMessage;
@@ -246,8 +253,13 @@ namespace DreamGate.Battlegrounds.Services
                 yield break;
             }
 
-            yield return LoadCloudProfileRoutine();
-            callback(true, $"Welcome back, {Profile?.displayName ?? CloudClient.DisplayNameFromMetadata ?? "Dreamer"}!");
+            if (!string.IsNullOrWhiteSpace(bridgedDisplayName))
+            {
+                CacheDisplayName(bridgedDisplayName);
+            }
+
+            yield return CoLoadAndRepairCloudProfile();
+            callback(true, $"Welcome back, {Profile?.displayName ?? bridgedDisplayName ?? CloudClient.DisplayNameFromMetadata ?? "Dreamer"}!");
         }
 
         public static IEnumerator CoTryAppleSignIn(System.Action<bool, string> callback)
@@ -462,21 +474,37 @@ namespace DreamGate.Battlegrounds.Services
             }
 
             Profile = null;
+            PlayerPrefs.DeleteKey(CachedDisplayNameKey);
+            PlayerPrefs.Save();
         }
 
         private static IEnumerator CoRestoreBridgedCloudSession()
         {
             yield return UgsAuthService.CoEnsureInitialized();
-            if (!UgsAuthService.IsSignedIn || CloudClient == null || CloudClient.IsAuthenticated)
+            if (!UgsAuthService.IsSignedIn || CloudClient == null)
             {
                 yield break;
             }
 
+            if (CloudClient.IsAuthenticated)
+            {
+                yield return CoLoadAndRepairCloudProfile();
+                yield break;
+            }
+
+            var bridgedDisplayName = string.Empty;
+            yield return CoResolveUgsDisplayName(string.Empty, resolved => bridgedDisplayName = resolved);
+
             var bridged = false;
-            yield return CoBridgeUgsToSupabase(string.Empty, (ok, _) => bridged = ok);
+            yield return CoBridgeUgsToSupabase(bridgedDisplayName, (ok, _) => bridged = ok);
             if (bridged)
             {
-                yield return LoadCloudProfileRoutine();
+                if (!string.IsNullOrWhiteSpace(bridgedDisplayName))
+                {
+                    CacheDisplayName(bridgedDisplayName);
+                }
+
+                yield return CoLoadAndRepairCloudProfile();
             }
         }
 
@@ -586,6 +614,16 @@ namespace DreamGate.Battlegrounds.Services
             result.mmrDelta = delta;
         }
 
+        private static IEnumerator CoLoadAndRepairCloudProfile()
+        {
+            yield return LoadCloudProfileRoutine();
+            yield return CoRepairProfileDisplayName();
+            if (Profile != null)
+            {
+                NotifyProfileChanged();
+            }
+        }
+
         private static IEnumerator LoadCloudProfileRoutine()
         {
             if (CloudClient == null || !CloudClient.IsAuthenticated)
@@ -612,13 +650,57 @@ namespace DreamGate.Battlegrounds.Services
             });
         }
 
+        private static IEnumerator CoRepairProfileDisplayName()
+        {
+            if (Profile == null || CloudClient == null || !CloudClient.IsAuthenticated)
+            {
+                yield break;
+            }
+
+            if (!IsSyntheticDisplayName(Profile.displayName))
+            {
+                CacheDisplayName(Profile.displayName);
+                yield break;
+            }
+
+            var repairedName = string.Empty;
+            yield return CoResolveUgsDisplayName(string.Empty, resolved => repairedName = resolved);
+            if (string.IsNullOrWhiteSpace(repairedName))
+            {
+                yield break;
+            }
+
+            Profile.displayName = repairedName;
+            CacheDisplayName(repairedName);
+            yield return CloudClient.UpdateDisplayName(repairedName, (_, _) => { });
+        }
+
+        private static IEnumerator CoResolveUgsDisplayName(string preferredName, Action<string> callback)
+        {
+            var resolved = ResolveBridgedDisplayName(preferredName);
+            if (!string.IsNullOrWhiteSpace(resolved))
+            {
+                callback(resolved);
+                yield break;
+            }
+
+            yield return UgsAuthService.CoGetUsername(username =>
+            {
+                callback(!string.IsNullOrWhiteSpace(username) ? username.Trim() : string.Empty);
+            });
+        }
+
         private static PlayerProfile BuildFallbackCloudProfile()
         {
             var email = CloudClient.UserEmail ?? string.Empty;
-            var displayName = CloudClient.DisplayNameFromMetadata;
+            var displayName = ResolveBridgedDisplayName(CloudClient.DisplayNameFromMetadata);
             if (string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrEmpty(email))
             {
-                displayName = email.Split('@')[0];
+                var emailPrefix = email.Split('@')[0];
+                if (!IsSyntheticDisplayName(emailPrefix))
+                {
+                    displayName = emailPrefix;
+                }
             }
 
             if (string.IsNullOrWhiteSpace(displayName))
@@ -636,6 +718,50 @@ namespace DreamGate.Battlegrounds.Services
             };
         }
 
+        private static bool IsSyntheticDisplayName(string displayName)
+        {
+            return !string.IsNullOrWhiteSpace(displayName)
+                && displayName.StartsWith("ugs+", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string ResolveBridgedDisplayName(string preferredName)
+        {
+            if (!string.IsNullOrWhiteSpace(preferredName) && !IsSyntheticDisplayName(preferredName))
+            {
+                return preferredName.Trim();
+            }
+
+            var cached = PlayerPrefs.GetString(CachedDisplayNameKey, string.Empty);
+            if (!string.IsNullOrWhiteSpace(cached) && !IsSyntheticDisplayName(cached))
+            {
+                return cached.Trim();
+            }
+
+            var metadata = CloudClient?.DisplayNameFromMetadata;
+            if (!string.IsNullOrWhiteSpace(metadata) && !IsSyntheticDisplayName(metadata))
+            {
+                return metadata.Trim();
+            }
+
+            return string.Empty;
+        }
+
+        private static void CacheDisplayName(string displayName)
+        {
+            if (string.IsNullOrWhiteSpace(displayName) || IsSyntheticDisplayName(displayName))
+            {
+                return;
+            }
+
+            PlayerPrefs.SetString(CachedDisplayNameKey, displayName.Trim());
+            PlayerPrefs.Save();
+        }
+
+        private static void NotifyProfileChanged()
+        {
+            ProfileChanged?.Invoke();
+        }
+
         private static IEnumerator WaitForCloudProfileRoutine()
         {
             const int maxAttempts = 4;
@@ -646,7 +772,7 @@ namespace DreamGate.Battlegrounds.Services
                     yield return new WaitForSeconds(0.4f);
                 }
 
-                yield return LoadCloudProfileRoutine();
+                yield return CoLoadAndRepairCloudProfile();
             }
         }
 
@@ -1000,6 +1126,37 @@ namespace DreamGate.Battlegrounds.Services.Backend
             {
                 AuthenticationService.Instance.SignOut();
             }
+        }
+
+        public static IEnumerator CoGetUsername(Action<string> callback)
+        {
+            var success = false;
+            var message = string.Empty;
+            yield return CoEnsureInitialized((ok, error) =>
+            {
+                success = ok;
+                message = error;
+            });
+
+            if (!success || !IsSignedIn)
+            {
+                callback(string.Empty);
+                yield break;
+            }
+
+            PlayerInfo playerInfo = null;
+            Exception failure = null;
+            yield return RunAsync(
+                async () => playerInfo = await AuthenticationService.Instance.GetPlayerInfoAsync(),
+                ex => failure = ex);
+
+            if (failure != null || playerInfo == null || string.IsNullOrWhiteSpace(playerInfo.Username))
+            {
+                callback(string.Empty);
+                yield break;
+            }
+
+            callback(playerInfo.Username.Trim());
         }
 
         private static bool IsUnityServicesReady()

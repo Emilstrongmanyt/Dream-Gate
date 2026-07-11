@@ -204,6 +204,22 @@ namespace DreamGate.Battlegrounds.Core
             }
         }
 
+        public void TickRecruitTimerDisplayOnly(float deltaTime)
+        {
+            if (Phase != MatchPhase.Recruit)
+            {
+                return;
+            }
+
+            RecruitTimeRemaining = Mathf.Max(0f, RecruitTimeRemaining - deltaTime);
+            var timerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
+            if (timerDisplay != lastRecruitTimerDisplay)
+            {
+                lastRecruitTimerDisplay = timerDisplay;
+                StateChanged?.Invoke();
+            }
+        }
+
         public bool TryBuyFromShop(int shopIndex, out string message) =>
             TryBuyFromShop(humanPlayerId, shopIndex, out message);
 

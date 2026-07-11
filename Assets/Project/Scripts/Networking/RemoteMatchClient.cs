@@ -15,6 +15,7 @@ namespace DreamGate.Battlegrounds.Networking
     public class RemoteMatchClient : INetworkMatchHost, IMatchActionRelay
     {
         private const float PollIntervalSeconds = 0.25f;
+        private const float ProfileWaitSeconds = 8f;
 
         private readonly string serverUrl;
         private readonly string lobbyId;
@@ -47,12 +48,18 @@ namespace DreamGate.Battlegrounds.Networking
         {
             matchManager = manager;
             matchManager.ActionRelay = this;
-            playerId = DreamGateServices.Profile?.playerId ?? string.Empty;
+            playerId = ResolvePlayerId();
             CloudCoroutineHost.Instance.Run(ConnectRoutine());
         }
 
         public void TickRecruitTimer(float deltaTime)
         {
+            if (!connected || matchManager == null)
+            {
+                return;
+            }
+
+            matchManager.TickRecruitTimerDisplayOnly(deltaTime);
         }
 
         public void Dispose()
@@ -81,8 +88,39 @@ namespace DreamGate.Battlegrounds.Networking
                 return false;
             }
 
-            CloudCoroutineHost.Instance.Run(SendActionRoutine(action, payload));
-            return true;
+            var payloadJson = MatchSnapshotJson.BuildActionPayload(payload);
+            var body =
+                "{" +
+                $"\"lobbyId\":\"{ApiJson.Escape(lobbyId)}\"," +
+                $"\"playerId\":\"{ApiJson.Escape(this.playerId)}\"," +
+                $"\"action\":\"{ApiJson.Escape(action)}\"," +
+                $"\"payload\":{payloadJson}" +
+                "}";
+
+            using var request = CreatePost($"{ToHttpUrl(serverUrl)}/match/action", body);
+            var operation = request.SendWebRequest();
+            while (!operation.isDone)
+            {
+            }
+
+            var response = request.downloadHandler?.text ?? string.Empty;
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                message = string.IsNullOrWhiteSpace(request.error) ? "Action request failed." : request.error;
+                Debug.LogWarning($"RemoteMatchClient action '{action}' failed: {message}");
+                return false;
+            }
+
+            var success = ApiJson.TryGetBool(response, "success", false);
+            message = ApiJson.TryGetString(response, "message") ?? string.Empty;
+            ApplyResponseSnapshot(response);
+
+            if (!success)
+            {
+                Debug.LogWarning($"RemoteMatchClient action '{action}' rejected: {message}");
+            }
+
+            return success;
         }
 
         public bool TryRelayCompleteCombat(out string message)
@@ -94,8 +132,30 @@ namespace DreamGate.Battlegrounds.Networking
                 return false;
             }
 
-            CloudCoroutineHost.Instance.Run(SendCompleteCombatRoutine());
-            return true;
+            var body =
+                "{" +
+                $"\"lobbyId\":\"{ApiJson.Escape(lobbyId)}\"," +
+                $"\"playerId\":\"{ApiJson.Escape(playerId)}\"" +
+                "}";
+
+            using var request = CreatePost($"{ToHttpUrl(serverUrl)}/match/complete-combat", body);
+            var operation = request.SendWebRequest();
+            while (!operation.isDone)
+            {
+            }
+
+            var response = request.downloadHandler?.text ?? string.Empty;
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                message = string.IsNullOrWhiteSpace(request.error) ? "Combat completion failed." : request.error;
+                Debug.LogWarning($"RemoteMatchClient complete-combat failed: {message}");
+                return false;
+            }
+
+            var success = ApiJson.TryGetBool(response, "success", false);
+            message = ApiJson.TryGetString(response, "message") ?? string.Empty;
+            ApplyResponseSnapshot(response);
+            return success;
         }
 
         private IEnumerator ConnectRoutine()
@@ -105,6 +165,26 @@ namespace DreamGate.Battlegrounds.Networking
                 Debug.LogWarning("RemoteMatchClient missing server URL or lobby id.");
                 yield break;
             }
+
+            var deadline = Time.realtimeSinceStartup + ProfileWaitSeconds;
+            while (string.IsNullOrWhiteSpace(playerId) && Time.realtimeSinceStartup < deadline)
+            {
+                playerId = ResolvePlayerId();
+                if (!string.IsNullOrWhiteSpace(playerId))
+                {
+                    break;
+                }
+
+                yield return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(playerId))
+            {
+                Debug.LogWarning("RemoteMatchClient could not resolve player id before join.");
+                yield break;
+            }
+
+            EnsureLocalSlotHasPlayerId();
 
             var slotsJson = BuildSlotsJson(slots);
             var body =
@@ -136,7 +216,7 @@ namespace DreamGate.Battlegrounds.Networking
             connected = true;
             ApplyResponseSnapshot(response);
             pollCoroutine = CloudCoroutineHost.Instance.Run(PollRoutine());
-            Debug.Log($"RemoteMatchClient connected to authoritative match {lobbyId}.");
+            Debug.Log($"RemoteMatchClient connected to authoritative match {lobbyId} as {playerId}.");
         }
 
         private IEnumerator PollRoutine()
@@ -157,43 +237,6 @@ namespace DreamGate.Battlegrounds.Networking
             }
         }
 
-        private IEnumerator SendActionRoutine(string action, Dictionary<string, int> payload)
-        {
-            var payloadJson = MatchSnapshotJson.BuildActionPayload(payload);
-            var body =
-                "{" +
-                $"\"lobbyId\":\"{ApiJson.Escape(lobbyId)}\"," +
-                $"\"playerId\":\"{ApiJson.Escape(playerId)}\"," +
-                $"\"action\":\"{ApiJson.Escape(action)}\"," +
-                $"\"payload\":{payloadJson}" +
-                "}";
-
-            using var request = CreatePost($"{ToHttpUrl(serverUrl)}/match/action", body);
-            yield return request.SendWebRequest();
-
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                ApplyResponseSnapshot(request.downloadHandler?.text ?? string.Empty);
-            }
-        }
-
-        private IEnumerator SendCompleteCombatRoutine()
-        {
-            var body =
-                "{" +
-                $"\"lobbyId\":\"{ApiJson.Escape(lobbyId)}\"," +
-                $"\"playerId\":\"{ApiJson.Escape(playerId)}\"" +
-                "}";
-
-            using var request = CreatePost($"{ToHttpUrl(serverUrl)}/match/complete-combat", body);
-            yield return request.SendWebRequest();
-
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                ApplyResponseSnapshot(request.downloadHandler?.text ?? string.Empty);
-            }
-        }
-
         private void ApplyResponseSnapshot(string response)
         {
             var snapshotJson = ExtractSnapshotJson(response);
@@ -205,7 +248,10 @@ namespace DreamGate.Battlegrounds.Networking
                 return;
             }
 
-            if (snapshot.version == lastSnapshotVersion)
+            var timerChanged = Mathf.CeilToInt(snapshot.recruitTimeRemaining)
+                != Mathf.CeilToInt(matchManager.RecruitTimeRemaining);
+            var phaseChanged = snapshot.phase != (int)matchManager.Phase;
+            if (snapshot.version == lastSnapshotVersion && !timerChanged && !phaseChanged)
             {
                 return;
             }
@@ -224,6 +270,32 @@ namespace DreamGate.Battlegrounds.Networking
             {
                 connected = false;
             }
+        }
+
+        private void EnsureLocalSlotHasPlayerId()
+        {
+            if (slots == null || localSlotIndex < 0 || localSlotIndex >= slots.Length)
+            {
+                return;
+            }
+
+            var slot = slots[localSlotIndex];
+            if (slot == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(slot.playerId))
+            {
+                slot.playerId = playerId;
+            }
+        }
+
+        private static string ResolvePlayerId()
+        {
+            return DreamGateServices.Profile?.playerId
+                ?? DreamGateServices.CloudClient?.UserId
+                ?? string.Empty;
         }
 
         private static UnityWebRequest CreatePost(string url, string body)

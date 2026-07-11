@@ -106,11 +106,6 @@ namespace DreamGate.Battlegrounds.Core
 
         private void Update()
         {
-            if (networkHost is RemoteMatchClient { IsAuthoritative: true })
-            {
-                return;
-            }
-
             networkHost?.TickRecruitTimer(Time.deltaTime);
         }
 
