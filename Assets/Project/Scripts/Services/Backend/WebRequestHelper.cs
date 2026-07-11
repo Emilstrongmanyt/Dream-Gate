@@ -100,7 +100,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
             request.SetRequestHeader("Content-Type", resolvedContentType);
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("Accept-Encoding", "identity");
-            request.SetRequestHeader("Content-Length", payload.Length.ToString());
         }
 
         public static IEnumerator WaitForResponseReady(UnityWebRequest request = null)

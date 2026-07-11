@@ -11,7 +11,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private const int TargetPlayers = 8;
         private const float PollIntervalSeconds = 1f;
 
-        private readonly MonoBehaviour coroutineHost;
         private readonly BackendSettings settings;
         private readonly SupabaseClient supabaseClient;
         private readonly PlayerProfile profile;
@@ -25,12 +24,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
         public event Action<string> QueueFailed;
 
         public BackendMatchmakingService(
-            MonoBehaviour host,
             BackendSettings settings,
             SupabaseClient supabaseClient,
             PlayerProfile profile)
         {
-            coroutineHost = host;
             this.settings = settings;
             this.supabaseClient = supabaseClient;
             this.profile = profile;
@@ -38,12 +35,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public void StartQueue()
         {
-            if (coroutineHost == null)
-            {
-                QueueFailed?.Invoke("Matchmaking unavailable.");
-                return;
-            }
-
             if (!supabaseClient.IsAuthenticated || profile == null)
             {
                 QueueFailed?.Invoke("Sign in to queue for rated matches.");
@@ -56,7 +47,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             IsSearching = true;
-            searchCoroutine = coroutineHost.StartCoroutine(SearchRoutine());
+            searchCoroutine = CloudCoroutineHost.Instance.Run(SearchRoutine());
         }
 
         public void CancelQueue()
@@ -66,14 +57,14 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 return;
             }
 
-            if (searchCoroutine != null && coroutineHost != null)
+            if (searchCoroutine != null)
             {
-                coroutineHost.StopCoroutine(searchCoroutine);
+                CloudCoroutineHost.Instance.Stop(searchCoroutine);
                 searchCoroutine = null;
             }
 
             IsSearching = false;
-            coroutineHost?.StartCoroutine(CancelRemoteQueue());
+            CloudCoroutineHost.Instance.Run(CancelRemoteQueue());
         }
 
         private IEnumerator CancelRemoteQueue()

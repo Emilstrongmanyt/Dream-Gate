@@ -10,7 +10,7 @@ namespace DreamGate.Battlegrounds.Services
             var settings = BackendSettings.Load();
             if (settings != null && settings.IsConfigured && DreamGateServices.CloudClient != null && DreamGateServices.Profile != null)
             {
-                return new BackendMatchmakingService(host, settings, DreamGateServices.CloudClient, DreamGateServices.Profile);
+                return new BackendMatchmakingService(settings, DreamGateServices.CloudClient, DreamGateServices.Profile);
             }
 
             return new LocalMatchmakingService(host);
