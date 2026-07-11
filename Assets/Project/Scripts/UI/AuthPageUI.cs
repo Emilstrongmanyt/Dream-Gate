@@ -138,8 +138,8 @@ namespace DreamGate.Battlegrounds.UI
                     finished = true;
                 }),
                 () => finished,
-                90f,
-                "Sign in timed out. Try again.",
+                55f,
+                "Sign in timed out. Check your connection and try again.",
                 (timedOutMessage) =>
                 {
                     message = timedOutMessage;
@@ -379,8 +379,8 @@ namespace DreamGate.Battlegrounds.UI
                         finished = true;
                     }),
                 () => finished,
-                90f,
-                "Create account timed out. Try again.",
+                55f,
+                "Create account timed out. Check your connection and try again.",
                 (timedOutMessage) =>
                 {
                     message = timedOutMessage;
@@ -589,8 +589,8 @@ namespace DreamGate.Battlegrounds.UI
                     finished = true;
                 }),
                 () => finished,
-                90f,
-                "Sending code timed out. Try again.",
+                55f,
+                "Sending code timed out. Check your connection and try again.",
                 (timedOutMessage) =>
                 {
                     message = timedOutMessage;
@@ -641,8 +641,8 @@ namespace DreamGate.Battlegrounds.UI
                         finished = true;
                     }),
                 () => finished,
-                90f,
-                "Verification timed out. Try again.",
+                55f,
+                "Verification timed out. Check your connection and try again.",
                 (timedOutMessage) =>
                 {
                     message = timedOutMessage;
@@ -671,7 +671,8 @@ namespace DreamGate.Battlegrounds.UI
             string timeoutMessage,
             Action<string> setTimedOutMessage)
         {
-            CloudCoroutineHost.Instance.Run(authRoutine);
+            var host = CloudCoroutineHost.Instance;
+            var runner = host.Run(authRoutine);
             var deadline = AuthCoroutineTimeouts.CreateDeadline(timeoutSeconds);
             while (!isFinished() && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {
@@ -680,6 +681,7 @@ namespace DreamGate.Battlegrounds.UI
 
             if (!isFinished())
             {
+                host.Stop(runner);
                 setTimedOutMessage(timeoutMessage);
             }
         }

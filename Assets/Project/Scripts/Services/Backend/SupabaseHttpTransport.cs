@@ -23,7 +23,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v6-unitymessage";
+        internal const string AuthTransportRevision = "v7-fastfail";
+
+#if UNITY_IOS && !UNITY_EDITOR
+        private const float IosAuthTransportTimeoutSeconds = 22f;
+#endif
 
         internal static string LastAuthAttemptDetails = string.Empty;
 
@@ -61,7 +65,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 SupabaseHttpResult authResult = null;
 
 #if UNITY_IOS && !UNITY_EDITOR
-                yield return SupabaseAuthNative.Post(authUrl, body, headers, value => authResult = value);
+                yield return SupabaseAuthNative.Post(
+                    authUrl,
+                    body,
+                    headers,
+                    IosAuthTransportTimeoutSeconds,
+                    value => authResult = value);
                 attempts.Add(DescribeAttempt(authResult, "native-message"));
                 if (IsUsableAuthResult(authResult))
                 {
@@ -69,23 +78,13 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     yield break;
                 }
 
-                yield return PostViaNative(authUrl, body, headers, value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, DescribeNativeTransport()));
-                if (IsUsableAuthResult(authResult))
-                {
-                    callback(authResult);
-                    yield break;
-                }
-
-                yield return PostViaHttpClient(authUrl, body, headers, value => authResult = value);
-                attempts.Add(DescribeAttempt(authResult, "httpclient"));
-                if (IsUsableAuthResult(authResult))
-                {
-                    callback(authResult);
-                    yield break;
-                }
-
-                yield return PostViaUnityWebRequest(authUrl, body, headers, anonKey, value => authResult = value);
+                yield return PostViaUnityWebRequest(
+                    authUrl,
+                    body,
+                    headers,
+                    anonKey,
+                    IosAuthTransportTimeoutSeconds,
+                    value => authResult = value);
                 attempts.Add(DescribeAttempt(authResult, "unity-webrequest"));
                 if (IsUsableAuthResult(authResult))
                 {
@@ -223,15 +222,27 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string anonKey,
             Action<SupabaseHttpResult> callback)
         {
+            yield return PostViaUnityWebRequest(url, body, headers, anonKey, 45, callback);
+        }
+
+        private static IEnumerator PostViaUnityWebRequest(
+            string url,
+            string body,
+            IReadOnlyDictionary<string, string> headers,
+            string anonKey,
+            int timeoutSeconds,
+            Action<SupabaseHttpResult> callback)
+        {
             SupabaseHttpResult result = null;
             var payload = body ?? "{}";
+            var retryEmptyBody = timeoutSeconds >= 30;
 
-            for (var attempt = 0; attempt < 2; attempt++)
+            for (var attempt = 0; attempt < (retryEmptyBody ? 2 : 1); attempt++)
             {
                 using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
                 var bytes = Encoding.UTF8.GetBytes(payload);
                 WebRequestHelper.ConfigureJsonPost(request, bytes);
-                request.timeout = 45;
+                request.timeout = timeoutSeconds;
                 WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
 
                 yield return request.SendWebRequest();
@@ -247,7 +258,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
                             request.responseCode),
                     "unity-webrequest");
 
-                if (!ShouldRetryEmptyAuthBody(url, result) || attempt == 1)
+                if (!retryEmptyBody || !ShouldRetryEmptyAuthBody(url, result) || attempt == 1)
                 {
                     break;
                 }
@@ -265,9 +276,21 @@ namespace DreamGate.Battlegrounds.Services.Backend
             Action<SupabaseHttpResult> callback)
         {
             var task = SendAuthRequestAsync(HttpMethod.Post, url, body, headers);
-            while (!task.IsCompleted)
+            var deadline = AuthCoroutineTimeouts.CreateDeadline(45f);
+            while (!task.IsCompleted && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {
                 yield return null;
+            }
+
+            if (!task.IsCompleted)
+            {
+                callback(new SupabaseHttpResult
+                {
+                    Success = false,
+                    Transport = "httpclient",
+                    Error = "HTTP client request timed out."
+                });
+                yield break;
             }
 
             if (task.IsFaulted)
@@ -290,9 +313,21 @@ namespace DreamGate.Battlegrounds.Services.Backend
             Action<SupabaseHttpResult> callback)
         {
             var task = SendAuthRequestAsync(HttpMethod.Get, url, null, headers);
-            while (!task.IsCompleted)
+            var deadline = AuthCoroutineTimeouts.CreateDeadline(45f);
+            while (!task.IsCompleted && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {
                 yield return null;
+            }
+
+            if (!task.IsCompleted)
+            {
+                callback(new SupabaseHttpResult
+                {
+                    Success = false,
+                    Transport = "httpclient",
+                    Error = "HTTP client request timed out."
+                });
+                yield break;
             }
 
             if (task.IsFaulted)

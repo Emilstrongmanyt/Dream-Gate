@@ -1,7 +1,8 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 6;
+static const int DreamGateHttpPluginRevision = 7;
+static const NSTimeInterval DreamGateHttpTimeoutSeconds = 22.0;
 static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
 
 static os_unfair_lock dreamGateHttpLock = OS_UNFAIR_LOCK_INIT;
@@ -125,7 +126,7 @@ static NSMutableURLRequest *DreamGateHttpBuildRequest(
 
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     request.HTTPMethod = method;
-    request.timeoutInterval = 45.0;
+    request.timeoutInterval = DreamGateHttpTimeoutSeconds;
     request.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
@@ -190,10 +191,10 @@ static void DreamGateHttpExecute(
             dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
             NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
-            configuration.timeoutIntervalForRequest = 45.0;
-            configuration.timeoutIntervalForResource = 45.0;
+            configuration.timeoutIntervalForRequest = DreamGateHttpTimeoutSeconds;
+            configuration.timeoutIntervalForResource = DreamGateHttpTimeoutSeconds;
             configuration.HTTPShouldUsePipelining = NO;
-            configuration.waitsForConnectivity = YES;
+            configuration.waitsForConnectivity = NO;
             configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
             NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
 
@@ -209,7 +210,7 @@ static void DreamGateHttpExecute(
                     dispatch_semaphore_signal(semaphore);
                 }];
             [task resume];
-            dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(45 * NSEC_PER_SEC)));
+            dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(DreamGateHttpTimeoutSeconds * NSEC_PER_SEC)));
             [session finishTasksAndInvalidate];
 
             os_unfair_lock_lock(&dreamGateHttpLock);
@@ -443,9 +444,15 @@ static void DreamGateAuthHttpExecutePost(
     const char *callbackObject,
     const char *callbackMethod)
 {
+    void (^sendPayload)(NSDictionary *) = ^(NSDictionary *payload) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, payload);
+        });
+    };
+
     if (urlString.length == 0)
     {
-        DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+        sendPayload(@{
             @"ok": @0,
             @"status": @0,
             @"error": @"Request URL is missing."
@@ -456,7 +463,7 @@ static void DreamGateAuthHttpExecutePost(
     NSMutableURLRequest *request = DreamGateHttpBuildRequest(urlString, @"POST", body, apikey, authorization);
     if (request == nil)
     {
-        DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+        sendPayload(@{
             @"ok": @0,
             @"status": @0,
             @"error": @"Invalid request URL."
@@ -464,60 +471,51 @@ static void DreamGateAuthHttpExecutePost(
         return;
     }
 
-    NSInteger statusCode = 0;
-    NSString *transportError = nil;
-    NSData *responseData = DreamGateHttpSendSynchronously(request, &statusCode);
+    __block NSData *responseData = nil;
+    __block NSHTTPURLResponse *httpResponse = nil;
+    __block NSError *requestError = nil;
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-    if (responseData == nil || responseData.length == 0)
-    {
-        __block NSData *sessionData = nil;
-        __block NSHTTPURLResponse *httpResponse = nil;
-        __block NSError *requestError = nil;
-        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    configuration.timeoutIntervalForRequest = DreamGateHttpTimeoutSeconds;
+    configuration.timeoutIntervalForResource = DreamGateHttpTimeoutSeconds;
+    configuration.HTTPShouldUsePipelining = NO;
+    configuration.waitsForConnectivity = NO;
+    configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
 
-        NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
-        configuration.timeoutIntervalForRequest = 45.0;
-        configuration.timeoutIntervalForResource = 45.0;
-        configuration.HTTPShouldUsePipelining = NO;
-        configuration.waitsForConnectivity = YES;
-        configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-        NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
-
-        NSURLSessionDataTask *task = [session
-            dataTaskWithRequest:request
-            completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-                sessionData = data;
-                requestError = error;
-                if ([response isKindOfClass:[NSHTTPURLResponse class]])
-                {
-                    httpResponse = (NSHTTPURLResponse *)response;
-                }
-                dispatch_semaphore_signal(semaphore);
-            }];
-        [task resume];
-        dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(45 * NSEC_PER_SEC)));
-        [session finishTasksAndInvalidate];
-
-        if (requestError != nil)
-        {
-            transportError = requestError.localizedDescription;
-        }
-        else
-        {
-            responseData = sessionData;
-            if (httpResponse != nil)
+    NSURLSessionDataTask *task = [session
+        dataTaskWithRequest:request
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            responseData = data;
+            requestError = error;
+            if ([response isKindOfClass:[NSHTTPURLResponse class]])
             {
-                statusCode = httpResponse.statusCode;
+                httpResponse = (NSHTTPURLResponse *)response;
             }
-        }
-    }
+            dispatch_semaphore_signal(semaphore);
+        }];
+    [task resume];
+    dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(DreamGateHttpTimeoutSeconds * NSEC_PER_SEC)));
+    [session finishTasksAndInvalidate];
 
-    if (transportError != nil)
+    if (requestError != nil)
     {
-        DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+        sendPayload(@{
             @"ok": @0,
             @"status": @0,
-            @"error": transportError
+            @"error": requestError.localizedDescription
+        });
+        return;
+    }
+
+    NSInteger statusCode = httpResponse != nil ? httpResponse.statusCode : 0;
+    if ((responseData == nil || responseData.length == 0) && statusCode >= 200 && statusCode < 300)
+    {
+        sendPayload(@{
+            @"ok": @0,
+            @"status": @(statusCode),
+            @"error": @"Native auth HTTP returned an empty success body."
         });
         return;
     }
@@ -528,7 +526,7 @@ static void DreamGateAuthHttpExecutePost(
         bodyB64 = [responseData base64EncodedStringWithOptions:0];
     }
 
-    DreamGateAuthHttpSendMessage(callbackObject, callbackMethod, @{
+    sendPayload(@{
         @"ok": @1,
         @"status": @(statusCode),
         @"bodyB64": bodyB64 ?: @""

@@ -36,6 +36,22 @@ namespace DreamGate.Battlegrounds.Services.Backend
             return StartCoroutine(routine);
         }
 
+        public void Stop(IEnumerator routine)
+        {
+            if (routine != null)
+            {
+                StopCoroutine(routine);
+            }
+        }
+
+        public void Stop(Coroutine routine)
+        {
+            if (routine != null)
+            {
+                StopCoroutine(routine);
+            }
+        }
+
         private void OnDestroy()
         {
             if (instance == this)

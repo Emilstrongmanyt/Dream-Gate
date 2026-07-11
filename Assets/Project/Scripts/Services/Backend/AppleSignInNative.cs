@@ -300,6 +300,7 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string url,
             string body,
             IReadOnlyDictionary<string, string> headers,
+            float timeoutSeconds,
             Action<SupabaseHttpResult> callback)
         {
 #if UNITY_IOS && !UNITY_EDITOR
@@ -316,7 +317,6 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 CallbackHostName,
                 nameof(OnAuthHttpResult));
 
-            const float timeoutSeconds = 45f;
             var deadline = AuthCoroutineTimeouts.CreateDeadline(timeoutSeconds);
             while (pendingResult == null && !AuthCoroutineTimeouts.HasTimedOut(deadline))
             {
