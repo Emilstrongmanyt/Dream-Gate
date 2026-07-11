@@ -10,6 +10,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private static GoogleSignInNative instance;
         private static Action<GoogleSignInCredential> pendingCallback;
 
+        public static void Warmup()
+        {
+            var host = Instance;
+            host.gameObject.SetActive(true);
+        }
+
         public static GoogleSignInNative Instance
         {
             get

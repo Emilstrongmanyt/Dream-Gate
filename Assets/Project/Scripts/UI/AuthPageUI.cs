@@ -8,6 +8,42 @@ using UnityEngine.UI;
 
 namespace DreamGate.Battlegrounds.UI
 {
+    internal static class CloudAuthUi
+    {
+        public static void AddSocialButtons(
+            Transform root,
+            float startY,
+            Action onApple,
+            Action onGoogle,
+            Action onPhone)
+        {
+            if (!DreamGateServices.UseCloudBackend)
+            {
+                return;
+            }
+
+            var y = startY;
+            if (AppleSignInService.IsSupported)
+            {
+                var appleButton = MenuPageUI.CreateAppleSignInButton(root, new Vector2(0, y), null);
+                appleButton.onClick.AddListener(() => onApple?.Invoke());
+                y -= 80f;
+            }
+
+            if (GoogleSignInService.IsSupported)
+            {
+                var googleButton = MenuPageUI.CreateGoogleSignInButton(root, new Vector2(0, y), null);
+                googleButton.onClick.AddListener(() => onGoogle?.Invoke());
+                y -= 80f;
+            }
+
+            if (onPhone != null)
+            {
+                MenuPageUI.CreateActionButton(root, "Log in with phone", new Vector2(0, y), onPhone);
+            }
+        }
+    }
+
     public sealed class LoginPageView
     {
         private readonly GameObject root;
@@ -25,7 +61,12 @@ namespace DreamGate.Battlegrounds.UI
             this.onSuccess = onSuccess;
         }
 
-        public static LoginPageView Create(Transform parent, Action onBack, Action onSuccess, Action openCreateAccount)
+        public static LoginPageView Create(
+            Transform parent,
+            Action onBack,
+            Action onSuccess,
+            Action openCreateAccount,
+            Action openPhoneLogin)
         {
             var root = MenuPageUI.CreateOverlay(parent, "LoginPage");
             MenuPageUI.CreateTitle(root.transform, "Log In");
@@ -45,13 +86,9 @@ namespace DreamGate.Battlegrounds.UI
 
             var view = new LoginPageView(root, emailInput, passwordInput, statusText, onSuccess);
             loginButton.onClick.AddListener(view.Submit);
-            if (DreamGateServices.UseCloudBackend && AppleSignInService.IsSupported)
-            {
-                var appleButton = MenuPageUI.CreateAppleSignInButton(root.transform, new Vector2(0, -160), null);
-                appleButton.onClick.AddListener(view.SubmitApple);
-            }
+            CloudAuthUi.AddSocialButtons(root.transform, -160f, view.SubmitApple, view.SubmitGoogle, openPhoneLogin);
 
-            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke());
+            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -760f);
             root.SetActive(false);
             return view;
         }
@@ -179,11 +216,21 @@ namespace DreamGate.Battlegrounds.UI
         {
             var success = false;
             var message = string.Empty;
-            yield return DreamGateServices.CoTryGoogleSignIn((ok, msg) =>
-            {
-                success = ok;
-                message = msg;
-            });
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryGoogleSignIn((ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                120f,
+                "Google sign in timed out. Close the browser sheet and try again.",
+                (timedOutMessage) =>
+                {
+                    message = timedOutMessage;
+                });
 
             if (success)
             {
@@ -234,7 +281,12 @@ namespace DreamGate.Battlegrounds.UI
             this.onSuccess = onSuccess;
         }
 
-        public static CreateAccountPageView Create(Transform parent, Action onBack, Action onSuccess, Action openLogin)
+        public static CreateAccountPageView Create(
+            Transform parent,
+            Action onBack,
+            Action onSuccess,
+            Action openLogin,
+            Action openPhoneLogin)
         {
             var root = MenuPageUI.CreateOverlay(parent, "CreateAccountPage");
             MenuPageUI.CreateTitle(root.transform, "Create Account");
@@ -263,13 +315,9 @@ namespace DreamGate.Battlegrounds.UI
                 statusText,
                 onSuccess);
             createButton.onClick.AddListener(view.Submit);
-            if (DreamGateServices.UseCloudBackend && AppleSignInService.IsSupported)
-            {
-                var appleButton = MenuPageUI.CreateAppleSignInButton(root.transform, new Vector2(0, -310), null);
-                appleButton.onClick.AddListener(view.SubmitApple);
-            }
+            CloudAuthUi.AddSocialButtons(root.transform, -310f, view.SubmitApple, view.SubmitGoogle, openPhoneLogin);
 
-            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -760f);
+            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -820f);
             root.SetActive(false);
             return view;
         }
@@ -413,11 +461,21 @@ namespace DreamGate.Battlegrounds.UI
         {
             var success = false;
             var message = string.Empty;
-            yield return DreamGateServices.CoTryGoogleSignIn((ok, msg) =>
-            {
-                success = ok;
-                message = msg;
-            });
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryGoogleSignIn((ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                120f,
+                "Google sign in timed out. Close the browser sheet and try again.",
+                (timedOutMessage) =>
+                {
+                    message = timedOutMessage;
+                });
 
             if (success)
             {
@@ -432,6 +490,170 @@ namespace DreamGate.Battlegrounds.UI
             {
                 statusText.color = new Color(0.85f, 0.9f, 1f, 1f);
                 statusText.text = string.Empty;
+                yield break;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+    }
+
+    public sealed class PhoneLoginPageView
+    {
+        private readonly GameObject root;
+        private readonly TMP_InputField phoneInput;
+        private readonly TMP_InputField displayNameInput;
+        private readonly TMP_InputField otpInput;
+        private readonly GameObject verifyButtonObject;
+        private readonly TextMeshProUGUI statusText;
+        private readonly Action onSuccess;
+        private bool awaitingOtp;
+
+        private PhoneLoginPageView(
+            GameObject root,
+            TMP_InputField phoneInput,
+            TMP_InputField displayNameInput,
+            TMP_InputField otpInput,
+            GameObject verifyButtonObject,
+            TextMeshProUGUI statusText,
+            Action onSuccess)
+        {
+            this.root = root;
+            this.phoneInput = phoneInput;
+            this.displayNameInput = displayNameInput;
+            this.otpInput = otpInput;
+            this.verifyButtonObject = verifyButtonObject;
+            this.statusText = statusText;
+            this.onSuccess = onSuccess;
+        }
+
+        public static PhoneLoginPageView Create(Transform parent, Action onBack, Action onSuccess)
+        {
+            var root = MenuPageUI.CreateOverlay(parent, "PhoneLoginPage");
+            MenuPageUI.CreateTitle(root.transform, "Phone Log In");
+            MenuPageUI.CreateBody(
+                root.transform,
+                "PhoneLoginDescription",
+                "We will text you a one-time code. Include your country code, e.g. +15551234567.",
+                620f,
+                70f);
+
+            var phoneInput = MenuPageUI.CreateInputField(root.transform, "Phone", "+1 555 123 4567", 430f);
+            var displayNameInput = MenuPageUI.CreateInputField(root.transform, "DisplayName", "Display name (optional)", 320f);
+            var otpInput = MenuPageUI.CreateInputField(root.transform, "OtpCode", "6-digit code", 210f);
+            otpInput.interactable = false;
+            var statusText = MenuPageUI.CreateStatusText(root.transform, 90f);
+
+            var sendCodeButton = MenuPageUI.CreateActionButton(root.transform, "Send Code", new Vector2(0, 0), null);
+            var verifyButtonObject = MenuPageUI.CreateActionButton(root.transform, "Verify & Log In", new Vector2(0, -90), null).gameObject;
+            verifyButtonObject.SetActive(false);
+
+            var view = new PhoneLoginPageView(root, phoneInput, displayNameInput, otpInput, verifyButtonObject, statusText, onSuccess);
+            sendCodeButton.onClick.AddListener(view.SendCode);
+            verifyButtonObject.GetComponent<Button>().onClick.AddListener(view.Verify);
+            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -760f);
+            root.SetActive(false);
+            return view;
+        }
+
+        public void Show()
+        {
+            awaitingOtp = false;
+            statusText.text = string.Empty;
+            otpInput.text = string.Empty;
+            otpInput.interactable = false;
+            verifyButtonObject.SetActive(false);
+            root.SetActive(true);
+            root.transform.SetAsLastSibling();
+        }
+
+        public void Hide() => root.SetActive(false);
+
+        private void SendCode()
+        {
+            statusText.color = Color.white;
+            statusText.text = "Sending code...";
+            CloudCoroutineHost.Instance.Run(SendCodeRoutine());
+        }
+
+        private IEnumerator SendCodeRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryPhoneSendOtp(phoneInput.text, displayNameInput.text, (ok, msg) =>
+                {
+                    success = ok;
+                    message = msg;
+                    finished = true;
+                }),
+                () => finished,
+                90f,
+                "Sending code timed out. Try again.",
+                (timedOutMessage) =>
+                {
+                    message = timedOutMessage;
+                });
+
+            if (success)
+            {
+                awaitingOtp = true;
+                otpInput.interactable = true;
+                verifyButtonObject.SetActive(true);
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                yield break;
+            }
+
+            statusText.color = new Color(1f, 0.55f, 0.55f);
+            statusText.text = message;
+        }
+
+        private void Verify()
+        {
+            if (!awaitingOtp)
+            {
+                statusText.color = new Color(1f, 0.55f, 0.55f);
+                statusText.text = "Tap Send Code first.";
+                return;
+            }
+
+            statusText.color = Color.white;
+            statusText.text = "Verifying code...";
+            CloudCoroutineHost.Instance.Run(VerifyRoutine());
+        }
+
+        private IEnumerator VerifyRoutine()
+        {
+            var success = false;
+            var message = string.Empty;
+            var finished = false;
+            yield return AuthUiTimeout.Run(
+                DreamGateServices.CoTryPhoneVerifyOtp(
+                    phoneInput.text,
+                    otpInput.text,
+                    displayNameInput.text,
+                    (ok, msg) =>
+                    {
+                        success = ok;
+                        message = msg;
+                        finished = true;
+                    }),
+                () => finished,
+                90f,
+                "Verification timed out. Try again.",
+                (timedOutMessage) =>
+                {
+                    message = timedOutMessage;
+                });
+
+            if (success)
+            {
+                statusText.color = new Color(0.55f, 0.95f, 0.65f);
+                statusText.text = message;
+                onSuccess?.Invoke();
+                Hide();
                 yield break;
             }
 

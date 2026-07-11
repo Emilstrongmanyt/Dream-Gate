@@ -27,6 +27,7 @@ namespace DreamGate.Battlegrounds.Services
             {
                 _ = CloudCoroutineHost.Instance;
                 AppleSignInNative.Warmup();
+                GoogleSignInNative.Warmup();
                 SupabaseAuthNative.Warmup();
                 CloudClient ??= new SupabaseClient(settings, CloudCoroutineHost.Instance);
                 if (CloudClient.IsAuthenticated)
@@ -321,6 +322,78 @@ namespace DreamGate.Battlegrounds.Services
             if (string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(CloudClient.UserEmail))
             {
                 displayName = CloudClient.UserEmail.Split('@')[0];
+            }
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                yield return CloudClient.UpdateDisplayName(displayName.Trim(), (_, _) => { });
+            }
+
+            yield return WaitForCloudProfileRoutine();
+            callback(true, $"Welcome, {Profile?.displayName ?? displayName ?? "Dreamer"}!");
+        }
+
+        public static IEnumerator CoTryPhoneSendOtp(string rawPhone, string displayName, Action<bool, string> callback)
+        {
+            if (!UseCloudBackend || CloudClient == null)
+            {
+                callback(false, "Cloud sign in is not available.");
+                yield break;
+            }
+
+            if (!PhoneAuthService.TryNormalize(rawPhone, out var phone, out var normalizeError))
+            {
+                callback(false, normalizeError);
+                yield break;
+            }
+
+            var success = false;
+            var message = string.Empty;
+            yield return CloudClient.SendPhoneOtp(phone, displayName, (ok, msg) =>
+            {
+                success = ok;
+                message = msg;
+            });
+
+            callback(success, success ? message : (string.IsNullOrWhiteSpace(message) ? "Could not send verification code." : message));
+        }
+
+        public static IEnumerator CoTryPhoneVerifyOtp(
+            string rawPhone,
+            string rawOtp,
+            string displayName,
+            Action<bool, string> callback)
+        {
+            if (!UseCloudBackend || CloudClient == null)
+            {
+                callback(false, "Cloud sign in is not available.");
+                yield break;
+            }
+
+            if (!PhoneAuthService.TryNormalize(rawPhone, out var phone, out var normalizeError))
+            {
+                callback(false, normalizeError);
+                yield break;
+            }
+
+            if (!PhoneAuthService.IsValidOtp(rawOtp, out var otp, out var otpError))
+            {
+                callback(false, otpError);
+                yield break;
+            }
+
+            var success = false;
+            var message = string.Empty;
+            yield return CloudClient.VerifyPhoneOtp(phone, otp, (ok, msg) =>
+            {
+                success = ok;
+                message = msg;
+            });
+
+            if (!success)
+            {
+                callback(false, string.IsNullOrWhiteSpace(message) ? "Verification failed." : message);
+                yield break;
             }
 
             if (!string.IsNullOrWhiteSpace(displayName))

@@ -45,11 +45,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             GoogleSignInNative.RequestAuthorization(authorizeUrl, result => credential = result);
 
-            const float timeoutSeconds = 120f;
-            var elapsed = 0f;
-            while (credential == null && elapsed < timeoutSeconds)
+            var deadline = Time.unscaledTime + 120f;
+            while (credential == null && Time.unscaledTime < deadline)
             {
-                elapsed += Time.unscaledDeltaTime;
                 yield return null;
             }
 

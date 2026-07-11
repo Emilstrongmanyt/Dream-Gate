@@ -167,6 +167,92 @@ namespace DreamGate.Battlegrounds.Services.Backend
             yield break;
         }
 
+        public IEnumerator SendPhoneOtp(string phone, string displayName, Action<bool, string> callback)
+        {
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                callback(false, "Enter your phone number.");
+                yield break;
+            }
+
+            var body = string.IsNullOrWhiteSpace(displayName)
+                ? ApiJson.BuildObject(new Dictionary<string, object>
+                {
+                    { "phone", phone },
+                    { "create_user", true }
+                })
+                : "{" +
+                  $"\"phone\":\"{ApiJson.Escape(phone)}\"," +
+                  "\"create_user\":true," +
+                  $"\"data\":{{\"display_name\":\"{ApiJson.Escape(displayName.Trim())}\"}}" +
+                  "}";
+            var otpSuccess = false;
+            var otpResponse = string.Empty;
+            var otpError = string.Empty;
+            yield return PostJson($"{settings.EffectiveSupabaseUrl}/auth/v1/otp", body, false, (success, response, error) =>
+            {
+                otpSuccess = success;
+                otpResponse = response;
+                otpError = error;
+            });
+
+            if (!otpSuccess)
+            {
+                callback(false, NormalizeAuthError(otpError, otpResponse));
+                yield break;
+            }
+
+            callback(true, "Verification code sent.");
+        }
+
+        public IEnumerator VerifyPhoneOtp(string phone, string otp, Action<bool, string> callback)
+        {
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                callback(false, "Enter your phone number.");
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(otp))
+            {
+                callback(false, "Enter the verification code.");
+                yield break;
+            }
+
+            var body = ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "phone", phone },
+                { "token", otp },
+                { "type", "sms" }
+            });
+
+            var verifySuccess = false;
+            var verifyResponse = string.Empty;
+            var verifyError = string.Empty;
+            yield return PostJson($"{settings.EffectiveSupabaseUrl}/auth/v1/verify", body, false, (success, response, error) =>
+            {
+                verifySuccess = success;
+                verifyResponse = response;
+                verifyError = error;
+            });
+
+            if (!verifySuccess)
+            {
+                callback(false, NormalizeAuthError(verifyError, verifyResponse));
+                yield break;
+            }
+
+            ApplyAuthResponse(verifyResponse);
+            if (!IsAuthenticated)
+            {
+                callback(false, DescribeMissingSession(verifyResponse, "Phone verification failed."));
+                yield break;
+            }
+
+            yield return EnsureUserIdentity();
+            callback(true, "Welcome!");
+        }
+
         public IEnumerator SignInWithOAuthCode(string authCode, string codeVerifier, Action<bool, string> callback)
         {
             if (string.IsNullOrWhiteSpace(authCode))
@@ -373,7 +459,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
-            if (url.Contains("/auth/v1/", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(response))
+            if (url.Contains("/auth/v1/", StringComparison.Ordinal)
+                && string.IsNullOrWhiteSpace(response)
+                && !AllowsEmptyAuthBody(url))
             {
                 var detail = string.IsNullOrWhiteSpace(result.Error)
                     ? $"via {result.Transport} (HTTP {result.StatusCode}, {result.BodyBytes} bytes)"
@@ -482,6 +570,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             callback(true, string.Empty, response);
+        }
+
+        private static bool AllowsEmptyAuthBody(string url)
+        {
+            return url.Contains("/auth/v1/otp", StringComparison.Ordinal);
         }
 
         private static string NormalizeAuthError(string error, string responseJson = null)
