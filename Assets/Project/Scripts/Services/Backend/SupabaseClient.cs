@@ -378,6 +378,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 var detail = string.IsNullOrWhiteSpace(result.Error)
                     ? $"via {result.Transport} (HTTP {result.StatusCode}, {result.BodyBytes} bytes)"
                     : result.Error;
+                if (!string.IsNullOrWhiteSpace(SupabaseHttpTransport.LastAuthAttemptDetails))
+                {
+                    detail = $"{detail}. {SupabaseHttpTransport.LastAuthAttemptDetails}";
+                }
+
                 callback(
                     false,
                     $"Authentication server returned an empty response {detail}, {SupabaseHttpTransport.AuthTransportRevision}. This is not a firewall issue.",

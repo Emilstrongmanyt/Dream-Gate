@@ -1,13 +1,16 @@
 #import <Foundation/Foundation.h>
 #import <os/lock.h>
 
-static const int DreamGateHttpPluginRevision = 4;
+static const int DreamGateHttpPluginRevision = 5;
+static NSString *const DreamGateHttpBodyFileName = @"dreamgate_auth_response.bin";
 
 static os_unfair_lock dreamGateHttpLock = OS_UNFAIR_LOCK_INIT;
 static BOOL dreamGateHttpDone = NO;
 static NSInteger dreamGateHttpStatusCode = 0;
 static NSData *dreamGateHttpResponseBodyData = nil;
+static NSString *dreamGateHttpResponseFilePath = nil;
 static NSString *dreamGateHttpTransportError = nil;
+static int dreamGateHttpNativeByteCount = 0;
 static int dreamGateHttpGeneration = 0;
 
 static void DreamGateHttpResetStateLocked(void)
@@ -15,7 +18,9 @@ static void DreamGateHttpResetStateLocked(void)
     dreamGateHttpDone = NO;
     dreamGateHttpStatusCode = 0;
     dreamGateHttpResponseBodyData = nil;
+    dreamGateHttpResponseFilePath = nil;
     dreamGateHttpTransportError = nil;
+    dreamGateHttpNativeByteCount = 0;
 }
 
 static void DreamGateHttpResetState(void)
@@ -25,12 +30,59 @@ static void DreamGateHttpResetState(void)
     os_unfair_lock_unlock(&dreamGateHttpLock);
 }
 
+static NSString *DreamGateHttpBodyFilePath(void)
+{
+    return [NSTemporaryDirectory() stringByAppendingPathComponent:DreamGateHttpBodyFileName];
+}
+
+static void DreamGateHttpWriteBodyFile(NSData *body)
+{
+    if (body == nil || body.length == 0)
+    {
+        return;
+    }
+
+    NSString *path = DreamGateHttpBodyFilePath();
+    [body writeToFile:path atomically:YES];
+    dreamGateHttpResponseFilePath = path;
+}
+
+static NSData *DreamGateHttpSendSynchronously(NSURLRequest *request, NSInteger *statusCode)
+{
+    if (statusCode != NULL)
+    {
+        *statusCode = 0;
+    }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    NSURLResponse *response = nil;
+    NSError *error = nil;
+    NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
+#pragma clang diagnostic pop
+
+    if (error != nil)
+    {
+        return nil;
+    }
+
+    if ([response isKindOfClass:[NSHTTPURLResponse class]] && statusCode != NULL)
+    {
+        *statusCode = ((NSHTTPURLResponse *)response).statusCode;
+    }
+
+    return data;
+}
+
 static void DreamGateHttpFinish(NSInteger statusCode, NSData *body, NSString *error)
 {
     os_unfair_lock_lock(&dreamGateHttpLock);
     dreamGateHttpStatusCode = statusCode;
     dreamGateHttpResponseBodyData = body != nil ? [body copy] : nil;
+    dreamGateHttpNativeByteCount = body != nil ? (int)body.length : 0;
+    dreamGateHttpResponseFilePath = nil;
     dreamGateHttpTransportError = error != nil ? [error copy] : nil;
+    DreamGateHttpWriteBodyFile(body);
     dreamGateHttpDone = YES;
     os_unfair_lock_unlock(&dreamGateHttpLock);
 }
@@ -178,6 +230,20 @@ static void DreamGateHttpExecute(
                 return;
             }
 
+            if ((bodyData == nil || bodyData.length == 0) && statusCode >= 200 && statusCode < 300)
+            {
+                NSInteger syncStatusCode = 0;
+                NSData *syncData = DreamGateHttpSendSynchronously(request, &syncStatusCode);
+                if (syncData != nil && syncData.length > 0)
+                {
+                    bodyData = syncData;
+                    if (syncStatusCode > 0)
+                    {
+                        statusCode = syncStatusCode;
+                    }
+                }
+            }
+
             DreamGateHttpFinish(statusCode, bodyData, nil);
         }
     });
@@ -248,12 +314,49 @@ extern "C" int DreamGate_Http_GetStatusCode(void)
 extern "C" int DreamGate_Http_GetBodyByteCount(void)
 {
     os_unfair_lock_lock(&dreamGateHttpLock);
-    NSUInteger length = dreamGateHttpResponseBodyData != nil ? dreamGateHttpResponseBodyData.length : 0;
+    int byteCount = dreamGateHttpNativeByteCount;
     os_unfair_lock_unlock(&dreamGateHttpLock);
-    return (int)length;
+    return byteCount;
 }
 
-extern "C" int DreamGate_Http_CopyBody(void *buffer, int bufferSize)
+extern "C" int DreamGate_Http_HasBodyFile(void)
+{
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    BOOL hasFile = dreamGateHttpResponseFilePath != nil && dreamGateHttpResponseFilePath.length > 0;
+    os_unfair_lock_unlock(&dreamGateHttpLock);
+    return hasFile ? 1 : 0;
+}
+
+extern "C" int DreamGate_Http_CopyBodyFilePath(char *buffer, int bufferSize)
+{
+    if (buffer == NULL || bufferSize <= 0)
+    {
+        return 0;
+    }
+
+    buffer[0] = '\0';
+
+    os_unfair_lock_lock(&dreamGateHttpLock);
+    NSString *path = dreamGateHttpResponseFilePath;
+    os_unfair_lock_unlock(&dreamGateHttpLock);
+
+    if (path == nil || path.length == 0)
+    {
+        return 0;
+    }
+
+    const char *utf8 = [path UTF8String];
+    if (utf8 == NULL)
+    {
+        return 0;
+    }
+
+    strncpy(buffer, utf8, (size_t)bufferSize - 1);
+    buffer[bufferSize - 1] = '\0';
+    return (int)strlen(buffer);
+}
+
+extern "C" int DreamGate_Http_CopyBody(unsigned char *buffer, int bufferSize)
 {
     if (buffer == NULL || bufferSize <= 0)
     {

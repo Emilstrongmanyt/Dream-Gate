@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -22,7 +23,9 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
     internal static class SupabaseHttpTransport
     {
-        internal const string AuthTransportRevision = "v4-bytecopy-chain";
+        internal const string AuthTransportRevision = "v5-file-sync";
+
+        internal static string LastAuthAttemptDetails = string.Empty;
 
         public static IEnumerator Post(
             string url,
@@ -82,12 +85,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     yield break;
                 }
 
-                callback(authResult ?? new SupabaseHttpResult
-                {
-                    Success = false,
-                    Transport = "all",
-                    Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
-                });
+                LastAuthAttemptDetails = BuildAuthFailureMessage(attempts, AuthTransportRevision);
+                callback(BuildFailedAuthChainResult(authResult, attempts));
                 yield break;
 #else
                 yield return PostViaHttpClient(authUrl, body, headers, value => authResult = value);
@@ -106,12 +105,8 @@ namespace DreamGate.Battlegrounds.Services.Backend
                     yield break;
                 }
 
-                callback(authResult ?? new SupabaseHttpResult
-                {
-                    Success = false,
-                    Transport = "all",
-                    Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
-                });
+                LastAuthAttemptDetails = BuildAuthFailureMessage(attempts, AuthTransportRevision);
+                callback(BuildFailedAuthChainResult(authResult, attempts));
                 yield break;
 #endif
             }
@@ -225,20 +220,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
             for (var attempt = 0; attempt < 2; attempt++)
             {
-#if UNITY_IOS && !UNITY_EDITOR
-                using var request = UnityWebRequest.Post(url, payload, "application/json");
-                request.timeout = 45;
-                request.useHttpContinue = false;
-                request.SetRequestHeader("Accept", "application/json");
-                request.SetRequestHeader("Accept-Encoding", "identity");
-                WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
-#else
                 using var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
                 var bytes = Encoding.UTF8.GetBytes(payload);
                 WebRequestHelper.ConfigureJsonPost(request, bytes);
                 request.timeout = 45;
                 WebRequestHelper.ApplySupabaseHeaders(request, headers, anonKey);
-#endif
 
                 yield return request.SendWebRequest();
                 yield return WebRequestHelper.WaitForResponseReady(request);
@@ -321,7 +307,11 @@ namespace DreamGate.Battlegrounds.Services.Backend
             string body,
             IReadOnlyDictionary<string, string> headers)
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
+            using var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.None
+            };
+            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(45) };
             using var request = new HttpRequestMessage(method, url);
             request.Headers.TryAddWithoutValidation("Accept", "application/json");
             request.Headers.TryAddWithoutValidation("Accept-Encoding", "identity");
@@ -446,6 +436,12 @@ namespace DreamGate.Battlegrounds.Services.Backend
         private static extern int DreamGate_Http_GetRevision();
 
         [DllImport("__Internal")]
+        private static extern int DreamGate_Http_HasBodyFile();
+
+        [DllImport("__Internal")]
+        private static extern int DreamGate_Http_CopyBodyFilePath(byte[] buffer, int bufferSize);
+
+        [DllImport("__Internal")]
         private static extern int DreamGate_Http_CopyBody(byte[] buffer, int bufferSize);
 
         [DllImport("__Internal")]
@@ -489,20 +485,21 @@ namespace DreamGate.Battlegrounds.Services.Backend
             }
 
             var statusCode = DreamGate_Http_GetStatusCode();
-            var bodyBytes = DreamGate_Http_GetBodyByteCount();
+            var nativeByteCount = DreamGate_Http_GetBodyByteCount();
             var responseBody = string.Empty;
-            if (bodyBytes > 0)
+            var bodyBytes = 0;
+            string readDiagnostic;
+
+            if (!TryReadNativeBodyFromFile(out responseBody, out bodyBytes, out readDiagnostic)
+                && nativeByteCount > 0)
             {
-                var bodyBuffer = new byte[Math.Min(bodyBytes, BodyBufferSize)];
-                var copiedBytes = DreamGate_Http_CopyBody(bodyBuffer, bodyBuffer.Length);
-                if (copiedBytes > 0)
+                if (TryReadNativeBodyPinned(nativeByteCount, BodyBufferSize, out responseBody, out bodyBytes, out var pinnedDiagnostic))
                 {
-                    responseBody = Encoding.UTF8.GetString(bodyBuffer, 0, copiedBytes);
-                    bodyBytes = copiedBytes;
+                    readDiagnostic = pinnedDiagnostic;
                 }
                 else
                 {
-                    bodyBytes = 0;
+                    readDiagnostic = $"native={nativeByteCount}, file={readDiagnostic}, pin={pinnedDiagnostic}";
                 }
             }
 
@@ -524,16 +521,138 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 yield break;
             }
 
-            callback(new SupabaseHttpResult
+            var result = new SupabaseHttpResult
             {
                 Success = httpSucceeded,
                 StatusCode = statusCode,
                 Body = responseBody,
                 BodyBytes = bodyBytes,
+                Transport = DescribeNativeTransport(),
                 Error = httpSucceeded
                     ? string.Empty
                     : ExtractHttpError(responseBody, null, statusCode)
-            });
+            };
+
+            if (httpSucceeded && bodyBytes == 0)
+            {
+                result.Error = $"native-ios empty body (HTTP {statusCode}, nativeBytes={nativeByteCount}, read={readDiagnostic ?? "none"})";
+            }
+
+            callback(result);
+        }
+
+        private static bool TryReadNativeBodyFromFile(out string responseBody, out int bodyBytes, out string diagnostic)
+        {
+            responseBody = string.Empty;
+            bodyBytes = 0;
+            diagnostic = "no-file";
+
+            if (DreamGate_Http_HasBodyFile() == 0)
+            {
+                return false;
+            }
+
+            var pathBuffer = new byte[1024];
+            var pathLength = DreamGate_Http_CopyBodyFilePath(pathBuffer, pathBuffer.Length);
+            if (pathLength <= 0)
+            {
+                diagnostic = "path-copy-failed";
+                return false;
+            }
+
+            var path = ReadNullTerminatedUtf8(pathBuffer);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                diagnostic = $"missing:{path}";
+                return false;
+            }
+
+            try
+            {
+                var bytes = File.ReadAllBytes(path);
+                if (bytes.Length == 0)
+                {
+                    diagnostic = "file-empty";
+                    return false;
+                }
+
+                responseBody = Encoding.UTF8.GetString(bytes);
+                bodyBytes = bytes.Length;
+                diagnostic = $"file:{bodyBytes}";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                diagnostic = $"file-read:{ex.GetType().Name}";
+                return false;
+            }
+            finally
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
+                }
+                catch
+                {
+                    // Best effort cleanup.
+                }
+            }
+        }
+
+        private static bool TryReadNativeBodyPinned(
+            int nativeByteCount,
+            int maxBufferSize,
+            out string responseBody,
+            out int bodyBytes,
+            out string diagnostic)
+        {
+            responseBody = string.Empty;
+            bodyBytes = 0;
+            diagnostic = "pin-skipped";
+
+            if (nativeByteCount <= 0)
+            {
+                return false;
+            }
+
+            var buffer = new byte[Math.Min(nativeByteCount, maxBufferSize)];
+            var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
+            {
+                var copiedBytes = DreamGate_Http_CopyBody(buffer, buffer.Length);
+                if (copiedBytes <= 0)
+                {
+                    diagnostic = $"pin-copy-0/native={nativeByteCount}";
+                    return false;
+                }
+
+                responseBody = Encoding.UTF8.GetString(buffer, 0, copiedBytes);
+                bodyBytes = copiedBytes;
+                diagnostic = $"pin:{copiedBytes}";
+                return true;
+            }
+            finally
+            {
+                handle.Free();
+            }
+        }
+
+        private static SupabaseHttpResult BuildFailedAuthChainResult(
+            SupabaseHttpResult lastResult,
+            IReadOnlyList<string> attempts)
+        {
+            return new SupabaseHttpResult
+            {
+                Success = false,
+                StatusCode = lastResult?.StatusCode ?? 0,
+                Body = lastResult?.Body ?? string.Empty,
+                BodyBytes = lastResult?.BodyBytes ?? 0,
+                Transport = "all",
+                Error = BuildAuthFailureMessage(attempts, AuthTransportRevision)
+            };
         }
 
         private static string ReadNullTerminatedUtf8(byte[] buffer)
