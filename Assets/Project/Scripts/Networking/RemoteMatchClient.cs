@@ -197,7 +197,10 @@ namespace DreamGate.Battlegrounds.Networking
         private void ApplyResponseSnapshot(string response)
         {
             var snapshotJson = ExtractSnapshotJson(response);
-            if (string.IsNullOrEmpty(snapshotJson) || !MatchSnapshotJson.TryParse(snapshotJson, out var snapshot))
+            if (string.IsNullOrEmpty(snapshotJson)
+                || !MatchSnapshotJson.TryParse(snapshotJson, out var snapshot)
+                || snapshot.players == null
+                || snapshot.players.Length == 0)
             {
                 return;
             }
@@ -244,19 +247,26 @@ namespace DreamGate.Battlegrounds.Networking
                 return string.Empty;
             }
 
-            if (response.TrimStart().StartsWith("{") && response.Contains("\"turn\""))
+            var marker = "\"snapshot\":";
+            var markerIndex = response.IndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex >= 0)
+            {
+                return ExtractJsonObject(response, markerIndex);
+            }
+
+            if (response.TrimStart().StartsWith("{", StringComparison.Ordinal)
+                && response.Contains("\"players\"", StringComparison.Ordinal)
+                && response.Contains("\"turn\"", StringComparison.Ordinal))
             {
                 return response;
             }
 
-            var marker = "\"snapshot\":";
-            var index = response.IndexOf(marker, StringComparison.Ordinal);
-            if (index < 0)
-            {
-                return string.Empty;
-            }
+            return string.Empty;
+        }
 
-            index = response.IndexOf('{', index);
+        private static string ExtractJsonObject(string response, int markerIndex)
+        {
+            var index = response.IndexOf('{', markerIndex);
             if (index < 0)
             {
                 return string.Empty;
