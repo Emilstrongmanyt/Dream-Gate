@@ -756,24 +756,60 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public static bool IsSupported => Application.isEditor || Application.platform == RuntimePlatform.IPhonePlayer;
 
-        public static bool IsSignedIn =>
-            initializeFinished
-            && string.IsNullOrEmpty(initializeError)
-            && AuthenticationService.Instance != null
-            && AuthenticationService.Instance.IsSignedIn;
+        public static bool IsSignedIn
+        {
+            get
+            {
+                if (!initializeFinished || !string.IsNullOrEmpty(initializeError) || !IsUnityServicesReady())
+                {
+                    return false;
+                }
 
-        public static string PlayerId =>
-            IsSignedIn ? AuthenticationService.Instance.PlayerId ?? string.Empty : string.Empty;
+                return AuthenticationService.Instance.IsSignedIn;
+            }
+        }
 
-        public static string AccessToken =>
-            IsSignedIn ? AuthenticationService.Instance.AccessToken ?? string.Empty : string.Empty;
+        public static string PlayerId
+        {
+            get
+            {
+                if (!IsSignedIn)
+                {
+                    return string.Empty;
+                }
+
+                return AuthenticationService.Instance.PlayerId ?? string.Empty;
+            }
+        }
+
+        public static string AccessToken
+        {
+            get
+            {
+                if (!IsSignedIn)
+                {
+                    return string.Empty;
+                }
+
+                return AuthenticationService.Instance.AccessToken ?? string.Empty;
+            }
+        }
 
         public static IEnumerator CoEnsureInitialized(Action<bool, string> callback = null)
         {
-            if (initializeFinished && string.IsNullOrEmpty(initializeError))
+            if (initializeFinished
+                && string.IsNullOrEmpty(initializeError)
+                && IsUnityServicesReady())
             {
                 callback?.Invoke(true, string.Empty);
                 yield break;
+            }
+
+            if (initializeFinished && !IsUnityServicesReady())
+            {
+                initializeFinished = false;
+                initializeStarted = false;
+                initializeError = string.Empty;
             }
 
             if (initializeStarted && !initializeFinished)
@@ -955,10 +991,20 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
         public static void SignOut()
         {
-            if (AuthenticationService.Instance != null && AuthenticationService.Instance.IsSignedIn)
+            if (!IsUnityServicesReady())
+            {
+                return;
+            }
+
+            if (AuthenticationService.Instance.IsSignedIn)
             {
                 AuthenticationService.Instance.SignOut();
             }
+        }
+
+        private static bool IsUnityServicesReady()
+        {
+            return UnityServices.State == ServicesInitializationState.Initialized;
         }
 
         public static bool TryValidateUsername(string rawUsername, out string error)
