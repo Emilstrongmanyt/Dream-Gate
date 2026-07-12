@@ -207,8 +207,18 @@ jobs:
           name = os.environ["PROFILE_NAME"]
           identity = "iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN"
 
+          def ensure_setting(block, key, value):
+              if key in block:
+                  return block
+              return block.replace(
+                  "\t\t\tbuildSettings = {\n",
+                  f"\t\t\tbuildSettings = {{\n\t\t\t\t{key} = {value};\n",
+                  1,
+              )
+
           def patch_config(match):
               block = match.group(0)
+              block = ensure_setting(block, "ENABLE_USER_SCRIPT_SANDBOXING", "NO")
               if "PRODUCT_BUNDLE_IDENTIFIER = com.solodreams.dreamgate;" not in block:
                   return block
               block = block.replace('DEVELOPMENT_TEAM = "";', f'DEVELOPMENT_TEAM = {team};')
@@ -280,12 +290,15 @@ jobs:
           print(f"Wrote single-size app icon catalog to {contents_path}")
           PY
           cd "$XCODE_DIR"
+          ARCHIVE_LOG=$RUNNER_TEMP/xcodebuild-archive.log
+          set +e
           xcodebuild -allowProvisioningUpdates \
             -scheme Unity-iPhone \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath $RUNNER_TEMP/DreamGate.xcarchive \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
             Unity-iPhone_CODE_SIGN_STYLE=Manual \
             Unity-iPhone_CODE_SIGN_IDENTITY="iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN" \
             Unity-iPhone_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
@@ -295,9 +308,20 @@ jobs:
             Unity-iPhone_PROVISIONING_PROFILE_SPECIFIER_APP="$PROFILE_NAME" \
             UnityFramework_CODE_SIGN_STYLE=Automatic \
             UnityFramework_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            GameAssembly_CODE_SIGN_STYLE=Automatic \
+            GameAssembly_CODE_SIGNING_ALLOWED=NO \
+            GameAssembly_CODE_SIGN_STYLE=Manual \
             GameAssembly_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            archive
+            archive 2>&1 | tee "$ARCHIVE_LOG"
+          ARCHIVE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$ARCHIVE_STATUS" -ne 0 ]; then
+            echo "xcodebuild archive failed with exit code $ARCHIVE_STATUS"
+            echo "---- last 120 lines of archive log ----"
+            tail -120 "$ARCHIVE_LOG"
+            echo "---- errors/warnings in archive log ----"
+            grep -E "error:|fatal error:|ARCHIVE FAILED|Code Sign error|Provisioning profile" "$ARCHIVE_LOG" | tail -40 || true
+            exit "$ARCHIVE_STATUS"
+          fi
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/DreamGate.xcarchive \
             -exportPath $RUNNER_TEMP/export \
