@@ -27,11 +27,11 @@ namespace DreamGate.Battlegrounds.Networking
         private string playerId;
         private int lastSnapshotVersion = -1;
         private bool connected;
-        private bool recruitEndPollPending;
+        private bool snapshotSynced;
         private Coroutine pollCoroutine;
 
         public bool IsServer => false;
-        public bool IsAuthoritative => connected;
+        public bool IsAuthoritative => connected && snapshotSynced;
         public MatchMode Mode => MatchMode.Rated;
 
         public event Action CombatPlaybackRequested;
@@ -55,23 +55,6 @@ namespace DreamGate.Battlegrounds.Networking
 
         public void TickRecruitTimer(float deltaTime)
         {
-            if (!connected || matchManager == null)
-            {
-                return;
-            }
-
-            if (matchManager.Phase != MatchPhase.Recruit)
-            {
-                return;
-            }
-
-            matchManager.TickRecruitTimerDisplayOnly(deltaTime);
-
-            if (matchManager.RecruitTimeRemaining <= 0f && !recruitEndPollPending)
-            {
-                recruitEndPollPending = true;
-                CloudCoroutineHost.Instance.Run(ForcePollOnce());
-            }
         }
 
         public void Dispose()
@@ -232,8 +215,11 @@ namespace DreamGate.Battlegrounds.Networking
             }
 
             connected = true;
-            recruitEndPollPending = false;
-            ApplyResponseSnapshot(response);
+            if (!ApplyResponseSnapshot(response))
+            {
+                Debug.LogWarning("RemoteMatchClient join returned empty snapshot; waiting for poll sync.");
+            }
+
             pollCoroutine = CloudCoroutineHost.Instance.Run(PollRoutine());
             Debug.Log($"RemoteMatchClient connected to authoritative match {lobbyId} as {playerId}.");
         }
@@ -266,22 +252,37 @@ namespace DreamGate.Battlegrounds.Networking
             }
         }
 
-        private void ApplyResponseSnapshot(string response)
+        private bool ApplyResponseSnapshot(string response)
         {
             var snapshotJson = ExtractSnapshotJson(response);
             if (string.IsNullOrEmpty(snapshotJson) || !MatchSnapshotJson.TryParse(snapshotJson, out var snapshot))
             {
-                return;
+                return false;
+            }
+
+            if (snapshot.version <= lastSnapshotVersion && snapshotSynced)
+            {
+                return true;
             }
 
             var wasAwaitingCombat = matchManager.IsAwaitingCombatPlayback;
             matchManager.ApplySnapshot(snapshot, localSlotIndex);
             lastSnapshotVersion = snapshot.version;
+            snapshotSynced = true;
 
-            if (snapshot.phase != (int)MatchPhase.Recruit)
+            PlayerSnapshot localPlayer = null;
+            foreach (var player in snapshot.players)
             {
-                recruitEndPollPending = false;
+                if (player.playerId == localSlotIndex)
+                {
+                    localPlayer = player;
+                    break;
+                }
             }
+            Debug.Log(
+                $"RemoteMatchClient snapshot v{snapshot.version} turn={snapshot.turn} " +
+                $"phase={snapshot.phase} timer={snapshot.recruitTimeRemaining:F1}s " +
+                $"gold={localPlayer?.gold ?? -1} awaitingCombat={snapshot.awaitingCombat}");
 
             TryStartCombatPlayback(snapshot, wasAwaitingCombat);
 
@@ -289,6 +290,8 @@ namespace DreamGate.Battlegrounds.Networking
             {
                 connected = false;
             }
+
+            return true;
         }
 
         private void TryStartCombatPlayback(MatchSnapshot snapshot, bool wasAwaitingCombat)

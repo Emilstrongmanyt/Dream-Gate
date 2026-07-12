@@ -11,7 +11,8 @@ var sessions = new ConcurrentDictionary<string, RatedMatchSession>();
 var jsonOptions = new JsonSerializerOptions
 {
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    IncludeFields = true
 };
 
 app.MapGet("/health", () => Results.Json(new { ok = true, matches = sessions.Count }));

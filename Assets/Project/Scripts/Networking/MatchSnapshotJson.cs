@@ -22,16 +22,12 @@ namespace DreamGate.Battlegrounds.Networking
             }
 
             var normalized = ApiJson.NormalizeResponseJson(json);
-
-            if (TryParseWithJsonUtility(normalized, out snapshot))
-            {
-                return true;
-            }
-
             snapshot = ParseWithApiJson(normalized);
-            return snapshot != null
-                && (snapshot.players.Length > 0 || snapshot.version >= 0 || snapshot.turn > 0);
+            return IsValidSnapshot(snapshot);
         }
+
+        public static bool IsValidSnapshot(MatchSnapshot snapshot) =>
+            snapshot != null && snapshot.players != null && snapshot.players.Length > 0;
 
         public static string BuildActionPayload(Dictionary<string, int> payload)
         {
@@ -55,26 +51,6 @@ namespace DreamGate.Battlegrounds.Networking
 
             builder.Append('}');
             return builder.ToString();
-        }
-
-        private static bool TryParseWithJsonUtility(string json, out MatchSnapshot snapshot)
-        {
-            snapshot = null;
-            try
-            {
-                var parsed = JsonUtility.FromJson<MatchSnapshot>(json);
-                if (parsed == null || parsed.players == null || parsed.players.Length == 0)
-                {
-                    return false;
-                }
-
-                snapshot = parsed;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private static MatchSnapshot ParseWithApiJson(string json)

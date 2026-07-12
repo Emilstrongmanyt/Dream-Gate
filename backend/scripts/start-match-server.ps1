@@ -23,11 +23,12 @@ catch {
     # not running; continue startup
 }
 
+$publishDir = Join-Path $root "publish\match-server"
 Push-Location $project
-Write-Host "Building Dream Gate authoritative match server..."
-dotnet build -v q
+Write-Host "Publishing Dream Gate authoritative match server..."
+dotnet publish -c Release -o $publishDir -v q
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[WARN] Build failed (server may be running). Attempting to start existing binary..."
+    Write-Host "[WARN] Publish failed (server may be running). Attempting to start existing binary..."
 }
 
 if ($Background) {
@@ -35,7 +36,7 @@ if ($Background) {
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     $logPath = Join-Path $logDir "match-server.log"
     Write-Host "Starting match server in background on port $Port..."
-    $proc = Start-Process -FilePath "dotnet" -ArgumentList "run","--no-build" -WorkingDirectory $project -PassThru -RedirectStandardOutput $logPath -RedirectStandardError (Join-Path $logDir "match-server.err.log")
+    $proc = Start-Process -FilePath "dotnet" -ArgumentList (Join-Path $publishDir "DreamGate.MatchServer.dll") -WorkingDirectory $publishDir -PassThru -RedirectStandardOutput $logPath -RedirectStandardError (Join-Path $logDir "match-server.err.log")
     Start-Sleep -Seconds 5
     try {
         $health = Invoke-RestMethod -Uri "http://localhost:$Port/health" -TimeoutSec 5
@@ -48,6 +49,6 @@ if ($Background) {
 }
 else {
     Write-Host "Starting Dream Gate authoritative match server on port $Port..."
-    dotnet run --no-build
+    dotnet (Join-Path $publishDir "DreamGate.MatchServer.dll")
 }
 Pop-Location
