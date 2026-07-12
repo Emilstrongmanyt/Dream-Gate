@@ -27,6 +27,7 @@ namespace DreamGate.Battlegrounds.Networking
         private string playerId;
         private int lastSnapshotVersion = -1;
         private bool connected;
+        private bool recruitEndPollPending;
         private Coroutine pollCoroutine;
 
         public bool IsServer => false;
@@ -59,7 +60,18 @@ namespace DreamGate.Battlegrounds.Networking
                 return;
             }
 
+            if (matchManager.Phase != MatchPhase.Recruit)
+            {
+                return;
+            }
+
             matchManager.TickRecruitTimerDisplayOnly(deltaTime);
+
+            if (matchManager.RecruitTimeRemaining <= 0f && !recruitEndPollPending)
+            {
+                recruitEndPollPending = true;
+                CloudCoroutineHost.Instance.Run(ForcePollOnce());
+            }
         }
 
         public void Dispose()
@@ -85,6 +97,12 @@ namespace DreamGate.Battlegrounds.Networking
             if (!connected)
             {
                 message = "Not connected to match server.";
+                return false;
+            }
+
+            if (matchManager.Phase != MatchPhase.Recruit)
+            {
+                message = "Recruit phase has ended.";
                 return false;
             }
 
@@ -214,6 +232,7 @@ namespace DreamGate.Battlegrounds.Networking
             }
 
             connected = true;
+            recruitEndPollPending = false;
             ApplyResponseSnapshot(response);
             pollCoroutine = CloudCoroutineHost.Instance.Run(PollRoutine());
             Debug.Log($"RemoteMatchClient connected to authoritative match {lobbyId} as {playerId}.");
@@ -224,34 +243,33 @@ namespace DreamGate.Battlegrounds.Networking
             var wait = new WaitForSeconds(PollIntervalSeconds);
             while (connected && matchManager != null)
             {
-                var httpUrl = ToHttpUrl(serverUrl);
-                using var request = UnityWebRequest.Get($"{httpUrl}/match/state?lobbyId={UnityWebRequest.EscapeURL(lobbyId)}&playerId={UnityWebRequest.EscapeURL(playerId)}");
-                yield return request.SendWebRequest();
-
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    ApplyResponseSnapshot(request.downloadHandler?.text ?? string.Empty);
-                }
-
+                yield return ForcePollOnce();
                 yield return wait;
+            }
+        }
+
+        private IEnumerator ForcePollOnce()
+        {
+            if (!connected || matchManager == null || string.IsNullOrWhiteSpace(lobbyId))
+            {
+                yield break;
+            }
+
+            var httpUrl = ToHttpUrl(serverUrl);
+            using var request = UnityWebRequest.Get(
+                $"{httpUrl}/match/state?lobbyId={UnityWebRequest.EscapeURL(lobbyId)}&playerId={UnityWebRequest.EscapeURL(playerId)}");
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                ApplyResponseSnapshot(request.downloadHandler?.text ?? string.Empty);
             }
         }
 
         private void ApplyResponseSnapshot(string response)
         {
             var snapshotJson = ExtractSnapshotJson(response);
-            if (string.IsNullOrEmpty(snapshotJson)
-                || !MatchSnapshotJson.TryParse(snapshotJson, out var snapshot)
-                || snapshot.players == null
-                || snapshot.players.Length == 0)
-            {
-                return;
-            }
-
-            var timerChanged = Mathf.CeilToInt(snapshot.recruitTimeRemaining)
-                != Mathf.CeilToInt(matchManager.RecruitTimeRemaining);
-            var phaseChanged = snapshot.phase != (int)matchManager.Phase;
-            if (snapshot.version == lastSnapshotVersion && !timerChanged && !phaseChanged)
+            if (string.IsNullOrEmpty(snapshotJson) || !MatchSnapshotJson.TryParse(snapshotJson, out var snapshot))
             {
                 return;
             }
@@ -260,15 +278,36 @@ namespace DreamGate.Battlegrounds.Networking
             matchManager.ApplySnapshot(snapshot, localSlotIndex);
             lastSnapshotVersion = snapshot.version;
 
-            if (!wasAwaitingCombat && snapshot.awaitingCombat && snapshot.pendingCombat != null)
+            if (snapshot.phase != (int)MatchPhase.Recruit)
             {
-                matchManager.BeginCombatPlaybackFromSnapshot(snapshot.pendingCombat, localSlotIndex);
-                CombatPlaybackRequested?.Invoke();
+                recruitEndPollPending = false;
             }
+
+            TryStartCombatPlayback(snapshot, wasAwaitingCombat);
 
             if (snapshot.matchEnded && snapshot.matchEnd != null)
             {
                 connected = false;
+            }
+        }
+
+        private void TryStartCombatPlayback(MatchSnapshot snapshot, bool wasAwaitingCombat)
+        {
+            if (wasAwaitingCombat || !snapshot.awaitingCombat)
+            {
+                return;
+            }
+
+            if (snapshot.pendingCombat != null)
+            {
+                matchManager.BeginCombatPlaybackFromSnapshot(snapshot.pendingCombat, localSlotIndex);
+                CombatPlaybackRequested?.Invoke();
+                return;
+            }
+
+            if (matchManager.Phase == MatchPhase.Combat)
+            {
+                CloudCoroutineHost.Instance.Run(ForcePollOnce());
             }
         }
 

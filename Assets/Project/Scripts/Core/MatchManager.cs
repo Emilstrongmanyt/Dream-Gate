@@ -225,9 +225,14 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TryBuyFromShop(int playerId, int shopIndex, out string message)
         {
+            if (TryRelayRecruitAction("buy_shop", playerId, new Dictionary<string, int> { { "shopIndex", shopIndex } }, out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("buy_shop", playerId, new Dictionary<string, int> { { "shopIndex", shopIndex } }, out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -248,9 +253,14 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TrySellFromBoard(int playerId, int boardIndex, out string message)
         {
+            if (TryRelayRecruitAction("sell_board", playerId, new Dictionary<string, int> { { "boardIndex", boardIndex } }, out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("sell_board", playerId, new Dictionary<string, int> { { "boardIndex", boardIndex } }, out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -270,9 +280,18 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TryReorderBoard(int playerId, int fromIndex, int toIndex, out string message)
         {
+            if (TryRelayRecruitAction(
+                    "reorder_board",
+                    playerId,
+                    new Dictionary<string, int> { { "fromIndex", fromIndex }, { "toIndex", toIndex } },
+                    out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("reorder_board", playerId, new Dictionary<string, int> { { "fromIndex", fromIndex }, { "toIndex", toIndex } }, out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -292,9 +311,14 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TryPlayFromHand(int playerId, int handIndex, out string message)
         {
+            if (TryRelayRecruitAction("play_hand", playerId, new Dictionary<string, int> { { "handIndex", handIndex } }, out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("play_hand", playerId, new Dictionary<string, int> { { "handIndex", handIndex } }, out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -314,9 +338,18 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TryPlayFromHandToSlot(int playerId, int handIndex, int boardIndex, out string message)
         {
+            if (TryRelayRecruitAction(
+                    "play_hand_slot",
+                    playerId,
+                    new Dictionary<string, int> { { "handIndex", handIndex }, { "boardIndex", boardIndex } },
+                    out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("play_hand_slot", playerId, new Dictionary<string, int> { { "handIndex", handIndex }, { "boardIndex", boardIndex } }, out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -336,9 +369,18 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TryCastSpellFromHand(int playerId, int handIndex, int targetBoardIndex, out string message)
         {
+            if (TryRelayRecruitAction(
+                    "cast_spell",
+                    playerId,
+                    new Dictionary<string, int> { { "handIndex", handIndex }, { "targetBoardIndex", targetBoardIndex } },
+                    out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("cast_spell", playerId, new Dictionary<string, int> { { "handIndex", handIndex }, { "targetBoardIndex", targetBoardIndex } }, out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -359,9 +401,14 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TryUpgradeTavern(int playerId, out string message)
         {
+            if (TryRelayRecruitAction("upgrade", playerId, new Dictionary<string, int>(), out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("upgrade", playerId, new Dictionary<string, int>(), out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -381,9 +428,14 @@ namespace DreamGate.Battlegrounds.Core
 
         public bool TryRefreshShop(int playerId, out string message)
         {
+            if (TryRelayRecruitAction("refresh", playerId, new Dictionary<string, int>(), out message))
+            {
+                return true;
+            }
+
             if (ActionRelay != null && ActionRelay.IsAuthoritative)
             {
-                return ActionRelay.TryRelayAction("refresh", playerId, new Dictionary<string, int>(), out message);
+                return false;
             }
 
             EnsureRecruitPhase();
@@ -798,6 +850,27 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             StateChanged?.Invoke();
+        }
+
+        private bool TryRelayRecruitAction(
+            string action,
+            int playerId,
+            Dictionary<string, int> payload,
+            out string message)
+        {
+            message = string.Empty;
+            if (ActionRelay == null || !ActionRelay.IsAuthoritative)
+            {
+                return false;
+            }
+
+            if (Phase != MatchPhase.Recruit)
+            {
+                message = "Recruit phase has ended.";
+                return false;
+            }
+
+            return ActionRelay.TryRelayAction(action, playerId, payload, out message);
         }
 
         private PlayerState RequirePlayer(int playerId)
