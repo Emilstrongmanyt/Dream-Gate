@@ -25,6 +25,7 @@ app.MapPost("/match/join", (JoinMatchRequest request) =>
 
     var session = sessions.GetOrAdd(request.LobbyId, _ =>
         new RatedMatchSession(request.LobbyId, request.MatchSeed, request.Slots ?? Array.Empty<MatchSlot>()));
+    session.EnsurePlayerRegistered(request.PlayerId);
 
     return Results.Json(new
     {

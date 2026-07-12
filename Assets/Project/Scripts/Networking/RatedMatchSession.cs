@@ -48,17 +48,67 @@ namespace DreamGate.Battlegrounds.Networking
 
         public void Tick(float deltaTime)
         {
+            var phaseBefore = manager.Phase;
             var before = (int)Math.Ceiling(Math.Max(0d, manager.RecruitTimeRemaining));
             manager.TickRecruitTimer(deltaTime);
             var after = (int)Math.Ceiling(Math.Max(0d, manager.RecruitTimeRemaining));
-            if (before != after)
+            if (before != after || manager.Phase != phaseBefore)
             {
                 BumpVersion();
             }
         }
 
+        public void EnsurePlayerRegistered(string externalPlayerId)
+        {
+            if (string.IsNullOrWhiteSpace(externalPlayerId) || playerIdToSlot.ContainsKey(externalPlayerId))
+            {
+                return;
+            }
+
+            for (var i = 0; i < Slots.Length; i++)
+            {
+                var slot = Slots[i];
+                if (slot == null || slot.isBot || string.IsNullOrEmpty(slot.playerId))
+                {
+                    continue;
+                }
+
+                if (string.Equals(slot.playerId, externalPlayerId, StringComparison.OrdinalIgnoreCase))
+                {
+                    playerIdToSlot[externalPlayerId] = slot.slotIndex >= 0 ? slot.slotIndex : i;
+                    return;
+                }
+            }
+
+            for (var i = 0; i < Slots.Length; i++)
+            {
+                var slot = Slots[i];
+                if (slot == null || slot.isBot)
+                {
+                    continue;
+                }
+
+                var slotIndex = slot.slotIndex >= 0 ? slot.slotIndex : i;
+                if (playerIdToSlot.ContainsValue(slotIndex))
+                {
+                    continue;
+                }
+
+                slot.playerId = externalPlayerId;
+                playerIdToSlot[externalPlayerId] = slotIndex;
+                return;
+            }
+
+            var humanSlot = manager.Players.FirstOrDefault(p => p.isHuman);
+            if (humanSlot != null)
+            {
+                playerIdToSlot[externalPlayerId] = humanSlot.playerId;
+            }
+        }
+
         public MatchSnapshot GetSnapshot(string externalPlayerId)
         {
+            EnsurePlayerRegistered(externalPlayerId);
             var slot = ResolveSlot(externalPlayerId);
             var snapshot = MatchSnapshotBuilder.Build(manager, stateVersion, slot);
             if (manager.Phase == MatchPhase.GameOver)
@@ -82,6 +132,7 @@ namespace DreamGate.Battlegrounds.Networking
         public bool TryApplyAction(string externalPlayerId, string action, Dictionary<string, string> payload, out string message)
         {
             message = string.Empty;
+            EnsurePlayerRegistered(externalPlayerId);
             var slot = ResolveSlot(externalPlayerId);
             if (slot < 0)
             {
@@ -119,6 +170,7 @@ namespace DreamGate.Battlegrounds.Networking
         public bool TryCompleteCombat(string externalPlayerId, out string message)
         {
             message = string.Empty;
+            EnsurePlayerRegistered(externalPlayerId);
             var slot = ResolveSlot(externalPlayerId);
             if (slot < 0)
             {
