@@ -228,7 +228,7 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             var snapped = Mathf.Max(0f, serverTimeRemaining);
-            if (Mathf.Approximately(RecruitTimeRemaining, snapped))
+            if (Math.Abs(RecruitTimeRemaining - snapped) < 0.01f)
             {
                 return;
             }
