@@ -49,13 +49,19 @@ namespace DreamGate.Battlegrounds.Networking
         public void Tick(float deltaTime)
         {
             var phaseBefore = manager.Phase;
-            var before = (int)Math.Ceiling(Math.Max(0d, manager.RecruitTimeRemaining));
+            if (manager.Phase != MatchPhase.Recruit)
+            {
+                return;
+            }
+
             manager.TickRecruitTimer(deltaTime);
-            var after = (int)Math.Ceiling(Math.Max(0d, manager.RecruitTimeRemaining));
-            if (before != after || manager.Phase != phaseBefore)
+            if (manager.Phase != phaseBefore)
             {
                 BumpVersion();
+                return;
             }
+
+            BumpVersion();
         }
 
         public void EnsurePlayerRegistered(string externalPlayerId)

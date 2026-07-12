@@ -59,7 +59,7 @@ namespace DreamGate.Battlegrounds.UI
         private TextMeshProUGUI playerGoldText;
         private Image playerHeroHpImage;
         private TextMeshProUGUI playerHeroHpText;
-        private int pendingSpellHandIndex = -1;
+
         private bool humanCombatPlaybackActive;
         private readonly StringBuilder logBuilder = new();
         private const int RecruitCountdownStartSeconds = 20;
@@ -1306,12 +1306,6 @@ namespace DreamGate.Battlegrounds.UI
 
         private void OnBoardClicked(int index)
         {
-            if (pendingSpellHandIndex >= 0)
-            {
-                matchManager.TryCastSpellFromHand(pendingSpellHandIndex, index, out var castMessage);
-                pendingSpellHandIndex = -1;
-                AppendLog(castMessage);
-            }
         }
 
         internal bool CanDragBoardSlot(int index)
@@ -1427,13 +1421,23 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             var player = matchManager.GetHumanPlayer();
-            if (player == null || handIndex < 0 || handIndex >= player.hand.Count || player.BoardFull)
+            if (player == null || handIndex < 0 || handIndex >= player.hand.Count)
             {
                 return false;
             }
 
             var definition = CardRegistry.Get(player.hand[handIndex].cardId);
-            return definition == null || definition.cardKind != CardKind.Spell;
+            if (definition == null)
+            {
+                return !player.BoardFull;
+            }
+
+            if (definition.cardKind == CardKind.Spell)
+            {
+                return SpellSystem.RequiresBoardTarget(definition.spellEffect);
+            }
+
+            return !player.BoardFull;
         }
 
         internal void TryPlayHandToBoard(int handIndex, int boardIndex)
@@ -1443,6 +1447,38 @@ namespace DreamGate.Battlegrounds.UI
             {
                 AppendLog(message);
             }
+        }
+
+        internal void TryCastSpellOnBoard(int handIndex, int boardIndex)
+        {
+            matchManager.TryCastSpellFromHand(handIndex, boardIndex, out var message);
+            if (!string.IsNullOrEmpty(message))
+            {
+                AppendLog(message);
+            }
+        }
+
+        internal bool IsTargetedSpellHandIndex(int handIndex)
+        {
+            var player = matchManager?.GetHumanPlayer();
+            if (player == null || handIndex < 0 || handIndex >= player.hand.Count)
+            {
+                return false;
+            }
+
+            var definition = CardRegistry.Get(player.hand[handIndex].cardId);
+            return definition != null &&
+                   definition.cardKind == CardKind.Spell &&
+                   SpellSystem.RequiresBoardTarget(definition.spellEffect);
+        }
+
+        internal bool IsBoardSlotEmpty(int boardIndex)
+        {
+            var player = matchManager?.GetHumanPlayer();
+            return player != null &&
+                   boardIndex >= 0 &&
+                   boardIndex < player.board.Length &&
+                   player.board[boardIndex] == null;
         }
 
         internal void ForceRefreshHand()
@@ -1527,20 +1563,13 @@ namespace DreamGate.Battlegrounds.UI
             {
                 if (!SpellSystem.RequiresBoardTarget(definition.spellEffect))
                 {
-                    pendingSpellHandIndex = -1;
                     matchManager.TryCastSpellFromHand(handIndex, -1, out var castMessage);
                     AppendLog(castMessage);
-                }
-                else
-                {
-                    pendingSpellHandIndex = handIndex;
-                    AppendLog($"Select a friendly minion for {definition.displayName}.");
                 }
 
                 return;
             }
 
-            pendingSpellHandIndex = -1;
             matchManager.TryPlayFromHand(handIndex, out var message);
             AppendLog(message);
         }
@@ -1781,8 +1810,8 @@ namespace DreamGate.Battlegrounds.UI
             var shieldGo = new GameObject("DivineShieldEffect", typeof(RectTransform), typeof(Image));
             shieldGo.transform.SetParent(artGo.transform, false);
             var shieldRect = shieldGo.GetComponent<RectTransform>();
-            shieldRect.anchorMin = Vector2.zero;
-            shieldRect.anchorMax = Vector2.one;
+            shieldRect.anchorMin = new Vector2(0.2f, 0.42f);
+            shieldRect.anchorMax = new Vector2(0.8f, 0.92f);
             shieldRect.offsetMin = Vector2.zero;
             shieldRect.offsetMax = Vector2.zero;
             var divineShieldImage = shieldGo.GetComponent<Image>();
@@ -2531,8 +2560,14 @@ namespace DreamGate.Battlegrounds.UI
             tierUpPlayer?.Play();
         }
 
+        public void ClearTierUpEffect()
+        {
+            tierUpPlayer?.Stop();
+        }
+
         public void SetShopkeeper()
         {
+            ClearTierUpEffect();
             NameText.text = HeroRegistry.ShopkeeperHeroName;
             HpText.text = "Shop";
 
@@ -2551,6 +2586,7 @@ namespace DreamGate.Battlegrounds.UI
 
         public void SetHero(string heroName, string heroId, int heroHealth, bool combatDisplay = false)
         {
+            ClearTierUpEffect();
             NameText.text = heroName;
             HpText.text = heroHealth < 0 ? "Shop" : $"{heroHealth} HP";
             HpText.fontSize = combatDisplay ? 22 : 15;
@@ -2989,10 +3025,17 @@ namespace DreamGate.Battlegrounds.UI
             if (draggedDistance >= DragSuppressDistance)
             {
                 inspectHandler?.SuppressNextClick();
-                var dropIndex = ui.GetBoardDropSlotIndex(eventData.position, eventData.pressEventCamera, requireEmpty: true);
+                var dropIndex = ui.GetBoardDropSlotIndex(eventData.position, eventData.pressEventCamera, requireEmpty: false);
                 if (dropIndex >= 0)
                 {
-                    ui.TryPlayHandToBoard(handIndex, dropIndex);
+                    if (ui.IsTargetedSpellHandIndex(handIndex))
+                    {
+                        ui.TryCastSpellOnBoard(handIndex, dropIndex);
+                    }
+                    else if (ui.IsBoardSlotEmpty(dropIndex))
+                    {
+                        ui.TryPlayHandToBoard(handIndex, dropIndex);
+                    }
                 }
             }
 

@@ -290,17 +290,26 @@ namespace DreamGate.Battlegrounds.UI
 
         private IEnumerator PlayRoutine()
         {
-            image.enabled = true;
-            var frameDelay = 1f / framesPerSecond;
-
-            for (var i = 0; i < frames.Length; i++)
+            try
             {
-                image.sprite = frames[i];
-                yield return new WaitForSeconds(frameDelay);
-            }
+                image.enabled = true;
+                var frameDelay = 1f / framesPerSecond;
 
-            image.enabled = false;
-            activeRoutine = null;
+                for (var i = 0; i < frames.Length; i++)
+                {
+                    image.sprite = frames[i];
+                    yield return new WaitForSeconds(frameDelay);
+                }
+            }
+            finally
+            {
+                if (image != null)
+                {
+                    image.enabled = false;
+                }
+
+                activeRoutine = null;
+            }
         }
     }
 }

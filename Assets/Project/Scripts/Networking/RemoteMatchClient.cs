@@ -55,6 +55,12 @@ namespace DreamGate.Battlegrounds.Networking
 
         public void TickRecruitTimer(float deltaTime)
         {
+            if (!connected || !snapshotSynced || matchManager == null || matchManager.Phase != MatchPhase.Recruit)
+            {
+                return;
+            }
+
+            matchManager.TickRecruitTimerDisplayOnly(deltaTime);
         }
 
         public void Dispose()
@@ -260,8 +266,14 @@ namespace DreamGate.Battlegrounds.Networking
                 return false;
             }
 
-            if (snapshot.version <= lastSnapshotVersion && snapshotSynced)
+            var isNewVersion = snapshot.version > lastSnapshotVersion || !snapshotSynced;
+            if (!isNewVersion)
             {
+                if (snapshot.phase == (int)MatchPhase.Recruit && matchManager.Phase == MatchPhase.Recruit)
+                {
+                    matchManager.SyncRecruitTimerFromServer(snapshot.recruitTimeRemaining);
+                }
+
                 return true;
             }
 
