@@ -173,11 +173,8 @@ jobs:
           fi
           echo "Using Xcode project at $XCODE_DIR"
           export XCODE_DIR
-          find "$XCODE_DIR" -name "*.sh" -exec chmod +x {} \;
-          if [ -f "$XCODE_DIR/process_symbols.sh" ]; then
-            chmod +x "$XCODE_DIR/process_symbols.sh"
-            echo "Marked process_symbols.sh executable"
-          fi
+          find "$XCODE_DIR" -type f \( -name "*.sh" -o -name "usymtool*" \) -exec chmod +x {} \;
+          ls -la "$XCODE_DIR"/process_symbols.sh "$XCODE_DIR"/usymtool* 2>/dev/null || true
           ENTITLEMENTS_SRC="Assets/Plugins/iOS/DreamGate.entitlements"
           ENTITLEMENTS_DST="$XCODE_DIR/DreamGate.entitlements"
           if [ -f "$ENTITLEMENTS_SRC" ]; then
