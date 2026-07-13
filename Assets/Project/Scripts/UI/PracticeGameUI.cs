@@ -62,6 +62,7 @@ namespace DreamGate.Battlegrounds.UI
 
         private bool humanCombatPlaybackActive;
         private readonly StringBuilder logBuilder = new();
+        private int lastDisplayedRecruitSeconds = -1;
         private const int RecruitCountdownStartSeconds = 20;
         private const float RecruitHubOffsetY = 15f;
         private const float RecruitActionButtonY = 610f + RecruitHubOffsetY;
@@ -99,6 +100,46 @@ namespace DreamGate.Battlegrounds.UI
             matchManager.MessagePosted += AppendLog;
             matchManager.MatchEnded += OnMatchEnded;
             Refresh();
+        }
+
+        private void Update()
+        {
+            if (matchManager == null || matchManager.Phase != MatchPhase.Recruit)
+            {
+                return;
+            }
+
+            if (combatPanel != null && combatPanel.activeSelf)
+            {
+                return;
+            }
+
+            var timerDisplay = Mathf.CeilToInt(matchManager.RecruitTimeRemaining);
+            if (timerDisplay == lastDisplayedRecruitSeconds)
+            {
+                return;
+            }
+
+            lastDisplayedRecruitSeconds = timerDisplay;
+            RefreshRecruitCountdown();
+
+            var player = matchManager.GetHumanPlayer();
+            if (player == null || hudText == null)
+            {
+                return;
+            }
+
+            var modeLabel = matchManager.Mode == MatchMode.Rated ? "RATED" : "PRACTICE";
+            var mmrSuffix = matchManager.Mode == MatchMode.Rated &&
+                              DreamGateServices.IsInitialized &&
+                              DreamGateServices.IsLoggedIn &&
+                              DreamGateServices.Profile != null
+                ? $"  •  MMR {DreamGateServices.Profile.mmr}"
+                : string.Empty;
+
+            hudText.text =
+                $"{modeLabel}  •  Turn {matchManager.Turn}  •  {timerDisplay}s\n" +
+                $"Tier {player.tavernTier}/{MatchConfig.MaxTavernTier}  •  HP {player.heroHealth}{mmrSuffix}";
         }
 
         public void BeginCombatPlayback(PlayerState opponent, CombatResult result)
@@ -1033,6 +1074,11 @@ namespace DreamGate.Battlegrounds.UI
                             DreamGateServices.Profile != null
                 ? $"  •  MMR {DreamGateServices.Profile.mmr}"
                 : string.Empty;
+
+            var timerDisplay = matchManager.Phase == MatchPhase.Recruit
+                ? Mathf.CeilToInt(matchManager.RecruitTimeRemaining)
+                : -1;
+            lastDisplayedRecruitSeconds = timerDisplay;
 
             hudText.text =
                 $"{modeLabel}  •  Turn {matchManager.Turn}{timerSuffix}\n" +

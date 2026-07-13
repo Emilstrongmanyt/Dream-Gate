@@ -55,7 +55,7 @@ namespace DreamGate.Battlegrounds.Networking
 
         public void TickRecruitTimer(float deltaTime)
         {
-            if (!connected || !snapshotSynced || matchManager == null || matchManager.Phase != MatchPhase.Recruit)
+            if (!connected || matchManager == null || matchManager.Phase != MatchPhase.Recruit)
             {
                 return;
             }
@@ -256,6 +256,10 @@ namespace DreamGate.Battlegrounds.Networking
             {
                 ApplyResponseSnapshot(request.downloadHandler?.text ?? string.Empty);
             }
+            else
+            {
+                Debug.LogWarning($"RemoteMatchClient poll failed: {request.error}");
+            }
         }
 
         private bool ApplyResponseSnapshot(string response)
@@ -271,7 +275,7 @@ namespace DreamGate.Battlegrounds.Networking
             {
                 if (snapshot.phase == (int)MatchPhase.Recruit && matchManager.Phase == MatchPhase.Recruit)
                 {
-                    matchManager.SyncRecruitTimerFromServer(snapshot.recruitTimeRemaining);
+                    matchManager.ApplyRecruitTimerFromServer(snapshot.recruitTimeRemaining);
                 }
 
                 return true;

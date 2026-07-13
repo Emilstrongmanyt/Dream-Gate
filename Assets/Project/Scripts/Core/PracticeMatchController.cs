@@ -45,7 +45,8 @@ namespace DreamGate.Battlegrounds.Core
                     mode,
                     MatchSessionContext.HumanSlotIndex,
                     MatchSessionContext.MatchSeed,
-                    MatchSessionContext.Slots);
+                    MatchSessionContext.Slots,
+                    deferRecruitStart: true);
                 networkHost = CreateRatedNetworkHost();
             }
             else

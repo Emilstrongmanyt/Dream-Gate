@@ -86,13 +86,19 @@ namespace DreamGate.Battlegrounds.Core
         private int nextPlacement = MatchConfig.MaxPlayers;
         private int lastRecruitTimerDisplay = -1;
         private int pendingHumanPlayerId = -1;
+        private bool recruitTimerInitializedFromServer;
 
         public void Initialize(int humanId = 0)
         {
             Initialize(MatchMode.Practice, humanId, -1);
         }
 
-        public void Initialize(MatchMode mode, int humanId = 0, int matchSeed = -1, MatchSlot[] slots = null)
+        public void Initialize(
+            MatchMode mode,
+            int humanId = 0,
+            int matchSeed = -1,
+            MatchSlot[] slots = null,
+            bool deferRecruitStart = false)
         {
             CardRegistry.Initialize();
             players.Clear();
@@ -143,6 +149,15 @@ namespace DreamGate.Battlegrounds.Core
                 {
                     humanPlayer = player;
                 }
+            }
+
+            if (deferRecruitStart && mode == MatchMode.Rated)
+            {
+                Phase = MatchPhase.Recruit;
+                RecruitTimeRemaining = MatchConfig.GetRecruitDurationForTurn(Turn);
+                lastRecruitTimerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
+                recruitTimerInitializedFromServer = false;
+                return;
             }
 
             BeginRecruitPhase();
@@ -212,34 +227,49 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             RecruitTimeRemaining = Mathf.Max(0f, RecruitTimeRemaining - deltaTime);
-            var timerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
-            if (timerDisplay != lastRecruitTimerDisplay)
-            {
-                lastRecruitTimerDisplay = timerDisplay;
-                StateChanged?.Invoke();
-            }
+            NotifyRecruitTimerDisplayChanged();
         }
 
-        public void SyncRecruitTimerFromServer(float serverTimeRemaining)
+        public void ApplyRecruitTimerFromServer(float serverTimeRemaining)
         {
+            var snapped = Mathf.Max(0f, serverTimeRemaining);
             if (Phase != MatchPhase.Recruit)
             {
-                return;
-            }
+                recruitTimerInitializedFromServer = false;
+                if (Math.Abs(RecruitTimeRemaining - snapped) < 0.01f)
+                {
+                    return;
+                }
 
-            var snapped = Mathf.Max(0f, serverTimeRemaining);
-            if (Math.Abs(RecruitTimeRemaining - snapped) < 0.01f)
-            {
-                return;
-            }
-
-            RecruitTimeRemaining = snapped;
-            var timerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
-            if (timerDisplay != lastRecruitTimerDisplay)
-            {
-                lastRecruitTimerDisplay = timerDisplay;
+                RecruitTimeRemaining = snapped;
+                lastRecruitTimerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
                 StateChanged?.Invoke();
+                return;
             }
+
+            if (!recruitTimerInitializedFromServer)
+            {
+                RecruitTimeRemaining = snapped;
+                recruitTimerInitializedFromServer = true;
+            }
+            else if (snapped < RecruitTimeRemaining - 0.05f)
+            {
+                RecruitTimeRemaining = snapped;
+            }
+
+            NotifyRecruitTimerDisplayChanged();
+        }
+
+        private void NotifyRecruitTimerDisplayChanged()
+        {
+            var timerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
+            if (timerDisplay == lastRecruitTimerDisplay)
+            {
+                return;
+            }
+
+            lastRecruitTimerDisplay = timerDisplay;
+            StateChanged?.Invoke();
         }
 
         public bool TryBuyFromShop(int shopIndex, out string message) =>
@@ -820,9 +850,14 @@ namespace DreamGate.Battlegrounds.Core
 
             humanPlayerId = localSlotIndex;
             Turn = snapshot.turn;
+            var previousPhase = Phase;
             Phase = (MatchPhase)snapshot.phase;
-            RecruitTimeRemaining = snapshot.recruitTimeRemaining;
-            lastRecruitTimerDisplay = Mathf.CeilToInt(RecruitTimeRemaining);
+            if (previousPhase != Phase)
+            {
+                recruitTimerInitializedFromServer = false;
+            }
+
+            ApplyRecruitTimerFromServer(snapshot.recruitTimeRemaining);
 
             foreach (var playerSnapshot in snapshot.players)
             {
