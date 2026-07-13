@@ -282,7 +282,7 @@ namespace DreamGate.Battlegrounds.Players
 
             if (sellIndex >= 0 && weakest <= 4 && random.NextDouble() < 0.65)
             {
-                ShopSystem.TrySellFromBoard(bot, sellIndex, out _);
+                ShopSystem.TrySell(bot, sellIndex, out _);
             }
         }
 

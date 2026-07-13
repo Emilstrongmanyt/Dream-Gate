@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+#if !SERVER_BUILD
 using DreamGate.Battlegrounds.Campaign;
+#endif
 using DreamGate.Battlegrounds.Cards;
 using DreamGate.Battlegrounds.Combat;
 using DreamGate.Battlegrounds.Economy;
@@ -88,7 +90,9 @@ namespace DreamGate.Battlegrounds.Core
         private int lastRecruitTimerDisplay = -1;
         private int pendingHumanPlayerId = -1;
         private bool recruitTimerInitializedFromServer;
+#if !SERVER_BUILD
         private CampaignMissionDefinition activeCampaignMission;
+#endif
 
         public void Initialize(int humanId = 0)
         {
@@ -165,6 +169,7 @@ namespace DreamGate.Battlegrounds.Core
             BeginRecruitPhase();
         }
 
+#if !SERVER_BUILD
         public void InitializeCampaign(int humanId, int matchSeed, CampaignMissionDefinition mission)
         {
             CardRegistry.Initialize();
@@ -242,6 +247,7 @@ namespace DreamGate.Battlegrounds.Core
 
             return mission?.bossDisplayName ?? "Campaign Boss";
         }
+#endif
 
         public PlayerState GetPlayer(int playerId) =>
             players.FirstOrDefault(p => p.playerId == playerId);
@@ -652,7 +658,14 @@ namespace DreamGate.Battlegrounds.Core
 
             foreach (var bot in players.Where(p => !p.isHuman && !p.isEliminated))
             {
-                BotPlayerController.TakeRecruitTurn(bot, Turn, matchRandom.Next(), activeCampaignMission);
+                BotPlayerController.TakeRecruitTurn(
+                    bot,
+                    Turn,
+                    matchRandom.Next()
+#if !SERVER_BUILD
+                    , activeCampaignMission
+#endif
+                    );
             }
 
             Post($"Turn {Turn} | {humanPlayer.heroName} | Gold: {humanPlayer.gold} | Tavern {humanPlayer.tavernTier} | Timer: {Mathf.CeilToInt(RecruitTimeRemaining)}s");
@@ -841,8 +854,10 @@ namespace DreamGate.Battlegrounds.Core
                 damageDealt = humanPlayer.damageDealt,
                 damageTaken = humanPlayer.damageTaken,
                 heroName = humanPlayer.heroName,
+#if !SERVER_BUILD
                 campaignMissionLevel = activeCampaignMission?.level ?? 0,
                 campaignUnlockHeroId = playerWon ? activeCampaignMission?.unlockHeroId : null
+#endif
             };
             FinalResult.eliminationOrder.AddRange(eliminationOrder);
 

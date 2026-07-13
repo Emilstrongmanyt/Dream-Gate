@@ -7,6 +7,7 @@
     <DefineConstants>SERVER_BUILD</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\Assets\Project\Scripts\Campaign\CampaignMissionDefinition.cs" Link="Simulation\Campaign\CampaignMissionDefinition.cs" />
     <Compile Include="..\..\Assets\Project\Scripts\Cards\AbilitySystem.cs" Link="Simulation\Cards\AbilitySystem.cs" />
     <Compile Include="..\..\Assets\Project\Scripts\Cards\AbilityType.cs" Link="Simulation\Cards\AbilityType.cs" />
     <Compile Include="..\..\Assets\Project\Scripts\Cards\CardKind.cs" Link="Simulation\Cards\CardKind.cs" />
