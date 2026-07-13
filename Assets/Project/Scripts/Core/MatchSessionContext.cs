@@ -1,3 +1,4 @@
+using DreamGate.Battlegrounds.Campaign;
 using DreamGate.Battlegrounds.Services;
 
 namespace DreamGate.Battlegrounds.Core
@@ -16,6 +17,7 @@ namespace DreamGate.Battlegrounds.Core
         public static bool UsedBotFill { get; private set; }
         public static string MatchServerUrl { get; private set; }
         public static MatchSlot[] Slots { get; private set; } = System.Array.Empty<MatchSlot>();
+        public static CampaignMissionDefinition ActiveCampaignMission { get; private set; }
 
         public static void BeginPractice()
         {
@@ -27,6 +29,21 @@ namespace DreamGate.Battlegrounds.Core
             HumanCount = 1;
             UsedBotFill = false;
             MatchServerUrl = null;
+            Slots = System.Array.Empty<MatchSlot>();
+            ActiveCampaignMission = null;
+        }
+
+        public static void BeginCampaign(CampaignMissionDefinition mission)
+        {
+            Mode = MatchMode.Campaign;
+            MatchSeed = mission != null ? mission.level * 10007 : -1;
+            LobbyId = null;
+            HumanPlayerMmr = 1500;
+            HumanSlotIndex = 0;
+            HumanCount = 1;
+            UsedBotFill = false;
+            MatchServerUrl = null;
+            ActiveCampaignMission = mission;
             Slots = System.Array.Empty<MatchSlot>();
         }
 
@@ -41,6 +58,7 @@ namespace DreamGate.Battlegrounds.Core
             UsedBotFill = result?.usedBotFill ?? true;
             MatchServerUrl = result?.matchServerUrl;
             Slots = result?.slots ?? System.Array.Empty<MatchSlot>();
+            ActiveCampaignMission = null;
         }
 
         public static void Clear()

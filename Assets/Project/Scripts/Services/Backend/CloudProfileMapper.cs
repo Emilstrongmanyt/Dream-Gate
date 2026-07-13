@@ -1,3 +1,5 @@
+using DreamGate.Battlegrounds.Heroes;
+
 namespace DreamGate.Battlegrounds.Services.Backend
 {
     public static class CloudProfileMapper
@@ -17,7 +19,10 @@ namespace DreamGate.Battlegrounds.Services.Backend
                 top4Finishes = ApiJson.TryGetInt(json, "top4_finishes"),
                 currentWinStreak = ApiJson.TryGetInt(json, "current_win_streak"),
                 bestWinStreak = ApiJson.TryGetInt(json, "best_win_streak"),
-                totalDamageDealt = ApiJson.TryGetInt(json, "total_damage_dealt")
+                totalDamageDealt = ApiJson.TryGetInt(json, "total_damage_dealt"),
+                selectedHeroId = ApiJson.TryGetString(json, "selected_hero_id") ?? HeroCollectionService.DefaultHeroId,
+                unlockedHeroIdsCsv = ApiJson.TryGetString(json, "unlocked_hero_ids_csv") ?? HeroCollectionService.DefaultHeroId,
+                campaignHighestLevel = ApiJson.TryGetInt(json, "campaign_highest_level")
             };
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using DreamGate.Battlegrounds.Heroes;
 using UnityEngine;
 
 namespace DreamGate.Battlegrounds.Services.Backend
@@ -460,6 +461,30 @@ namespace DreamGate.Battlegrounds.Services.Backend
 
                 callback(true, string.Empty, CloudProfileMapper.FromRestJson(chunks[0], UserId, UserEmail));
             });
+        }
+
+        public IEnumerator UpdateHeroCollection(
+            string selectedHeroId,
+            string unlockedHeroIdsCsv,
+            int campaignHighestLevel,
+            Action<bool, string> callback)
+        {
+            if (!IsAuthenticated)
+            {
+                callback(false, "Not signed in.");
+                yield break;
+            }
+
+            yield return EnsureValidSession();
+
+            var body = ApiJson.BuildObject(new Dictionary<string, object>
+            {
+                { "selected_hero_id", selectedHeroId ?? HeroCollectionService.DefaultHeroId },
+                { "unlocked_hero_ids_csv", unlockedHeroIdsCsv ?? HeroCollectionService.DefaultHeroId },
+                { "campaign_highest_level", campaignHighestLevel }
+            });
+            var url = $"{settings.EffectiveSupabaseUrl}/rest/v1/player_profiles?id=eq.{UserId}";
+            yield return PatchWithRefresh(url, body, (success, _, error) => callback(success, success ? string.Empty : error));
         }
 
         public IEnumerator UpdateDisplayName(string displayName, Action<bool, string> callback)

@@ -12,6 +12,8 @@ namespace DreamGate.Battlegrounds.Core
         public int damageDealt;
         public int damageTaken;
         public string heroName;
+        public int campaignMissionLevel;
+        public string campaignUnlockHeroId;
         public int mmrBefore;
         public int mmrAfter;
         public int mmrDelta;

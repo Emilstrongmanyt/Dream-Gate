@@ -49,6 +49,14 @@ namespace DreamGate.Battlegrounds.Core
                     deferRecruitStart: true);
                 networkHost = CreateRatedNetworkHost();
             }
+            else if (mode == MatchMode.Campaign)
+            {
+                matchManager.InitializeCampaign(
+                    MatchSessionContext.HumanSlotIndex,
+                    MatchSessionContext.MatchSeed,
+                    MatchSessionContext.ActiveCampaignMission);
+                networkHost = new LocalMatchHost();
+            }
             else
             {
                 MatchSessionContext.BeginPractice();
@@ -112,9 +120,18 @@ namespace DreamGate.Battlegrounds.Core
 
         private void OnMatchEnded()
         {
-            if (matchManager.Mode == MatchMode.Rated && matchManager.FinalResult != null)
+            if (matchManager.FinalResult == null)
+            {
+                return;
+            }
+
+            if (matchManager.Mode == MatchMode.Rated)
             {
                 DreamGateServices.ApplyRatedResult(matchManager.FinalResult);
+            }
+            else if (matchManager.Mode == MatchMode.Campaign)
+            {
+                DreamGateServices.ApplyCampaignResult(matchManager.FinalResult);
             }
         }
 

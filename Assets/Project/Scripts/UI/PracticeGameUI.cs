@@ -129,7 +129,12 @@ namespace DreamGate.Battlegrounds.UI
                 return;
             }
 
-            var modeLabel = matchManager.Mode == MatchMode.Rated ? "RATED" : "PRACTICE";
+            var modeLabel = matchManager.Mode switch
+            {
+                MatchMode.Rated => "RATED",
+                MatchMode.Campaign => "CAMPAIGN",
+                _ => "PRACTICE"
+            };
             var mmrSuffix = matchManager.Mode == MatchMode.Rated &&
                               DreamGateServices.IsInitialized &&
                               DreamGateServices.IsLoggedIn &&
@@ -1064,7 +1069,12 @@ namespace DreamGate.Battlegrounds.UI
             }
 
             hudText.fontSize = 22;
-            var modeLabel = matchManager.Mode == MatchMode.Rated ? "RATED" : "PRACTICE";
+            var modeLabel = matchManager.Mode switch
+            {
+                MatchMode.Rated => "RATED",
+                MatchMode.Campaign => "CAMPAIGN",
+                _ => "PRACTICE"
+            };
             var timerSuffix = matchManager.Phase == MatchPhase.Recruit
                 ? $"  •  {Mathf.CeilToInt(matchManager.RecruitTimeRemaining)}s"
                 : string.Empty;
@@ -1649,6 +1659,12 @@ namespace DreamGate.Battlegrounds.UI
                 return;
             }
 
+            if (matchManager.Mode == MatchMode.Campaign)
+            {
+                SceneNavigator.LoadMainMenu();
+                return;
+            }
+
             MatchSessionContext.BeginPractice();
             SceneNavigator.LoadPracticeGame();
         }
@@ -1675,6 +1691,10 @@ namespace DreamGate.Battlegrounds.UI
             var mmrSection = result.matchMode == MatchMode.Rated
                 ? $"\nMMR: {result.mmrBefore} → {result.mmrAfter} ({FormatMmrDelta(result.mmrDelta)})\n"
                 : string.Empty;
+            var campaignSection = result.matchMode == MatchMode.Campaign && result.playerWon &&
+                                  !string.IsNullOrEmpty(result.campaignUnlockHeroId)
+                ? $"\nUnlocked hero portrait: {HeroCollectionService.GetPortraitDisplayName(result.campaignUnlockHeroId)}\n"
+                : string.Empty;
 
             resultsText.text =
                 $"{outcome}\n\n" +
@@ -1685,10 +1705,15 @@ namespace DreamGate.Battlegrounds.UI
                 $"Damage Dealt: {result.damageDealt}\n" +
                 $"Damage Taken: {result.damageTaken}" +
                 mmrSection +
+                campaignSection +
                 $"\nEliminations:\n{eliminations}";
 
             playAgainButton.GetComponentInChildren<TextMeshProUGUI>().text =
-                result.matchMode == MatchMode.Rated ? "Queue Again" : "Play Again";
+                result.matchMode == MatchMode.Rated
+                    ? "Queue Again"
+                    : result.matchMode == MatchMode.Campaign
+                        ? "Campaign Menu"
+                        : "Play Again";
         }
 
         private static string FormatMmrDelta(int delta)

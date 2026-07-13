@@ -21,7 +21,7 @@ namespace DreamGate.Battlegrounds.Heroes
             "Board Breaker"
         };
 
-        private static readonly string[] PortraitAssets =
+        public static readonly string[] PortraitAssets =
         {
             "Ayan",
             "Evan",
@@ -128,7 +128,7 @@ namespace DreamGate.Battlegrounds.Heroes
         public const string ShopkeeperHeroId = "shopkeeper";
         public const string ShopkeeperHeroName = "Tavern Keeper";
 
-        private static string GetPortraitAssetName(string heroId)
+        public static string GetPortraitAssetName(string heroId)
         {
             if (heroId == ShopkeeperHeroId)
             {

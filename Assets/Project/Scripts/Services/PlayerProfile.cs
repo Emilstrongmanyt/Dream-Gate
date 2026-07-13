@@ -19,5 +19,8 @@ namespace DreamGate.Battlegrounds.Services
         public int bestWinStreak;
         public int totalDamageDealt;
         public int highestMmr = DefaultMmr;
+        public string selectedHeroId = "hero_art_Warrior";
+        public string unlockedHeroIdsCsv = "hero_art_Warrior";
+        public int campaignHighestLevel;
     }
 }

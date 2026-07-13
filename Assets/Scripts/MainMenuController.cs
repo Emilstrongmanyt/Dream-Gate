@@ -1,3 +1,4 @@
+using DreamGate.Battlegrounds.Campaign;
 using DreamGate.Battlegrounds.Core;
 using DreamGate.Battlegrounds.Services;
 using DreamGate.Battlegrounds.UI;
@@ -9,6 +10,9 @@ public class MainMenuController : MonoBehaviour
 {
     [SerializeField] private Button ratedButton;
 
+    private CampaignMissionSelectUI campaignMissionSelect;
+    private Transform menuUiRoot;
+
     private void Start()
     {
         if (!DreamGateServices.IsInitialized)
@@ -18,12 +22,33 @@ public class MainMenuController : MonoBehaviour
 
         UiCanvasSetup.ApplyToScene();
         EnsureFallingCards();
+        menuUiRoot = EnsureMenuUiRoot();
+        campaignMissionSelect = CampaignMissionSelectUI.Create(
+            menuUiRoot,
+            () => campaignMissionSelect.Hide(),
+            StartCampaignMission);
         SetupMenuButtons();
     }
 
     public void StartPracticeGame()
     {
         MatchSessionContext.BeginPractice();
+        SceneNavigator.LoadPracticeGame();
+    }
+
+    public void OpenCampaignMissions()
+    {
+        campaignMissionSelect?.Show();
+    }
+
+    public void StartCampaignMission(CampaignMissionDefinition mission)
+    {
+        if (mission == null)
+        {
+            return;
+        }
+
+        MatchSessionContext.BeginCampaign(mission);
         SceneNavigator.LoadPracticeGame();
     }
 
@@ -77,12 +102,21 @@ public class MainMenuController : MonoBehaviour
         var practiceRect = practiceButton.GetComponent<RectTransform>();
         var parent = practiceButton.transform.parent;
 
+        var campaignButton = CreateSpriteButton(
+            "CampaignButton",
+            parent,
+            practiceRect.anchoredPosition + new Vector2(0f, -130f),
+            practiceRect.sizeDelta,
+            LoadSprite("CampaignButton"),
+            OpenCampaignMissions);
+        EnsureButtonLabel(campaignButton, "Campaign");
+
         if (ratedButton == null)
         {
             ratedButton = CreateSpriteButton(
                 "RatedButton",
                 parent,
-                practiceRect.anchoredPosition + new Vector2(0f, -260f),
+                practiceRect.anchoredPosition + new Vector2(0f, -390f),
                 practiceRect.sizeDelta,
                 LoadSprite("RatedButton"),
                 StartRatedLobby);
@@ -91,9 +125,35 @@ public class MainMenuController : MonoBehaviour
         {
             ratedButton.onClick.RemoveAllListeners();
             ratedButton.onClick.AddListener(StartRatedLobby);
+            ratedButton.GetComponent<RectTransform>().anchoredPosition = practiceRect.anchoredPosition + new Vector2(0f, -390f);
         }
 
         CreateBackButton(parent);
+    }
+
+    private static Transform EnsureMenuUiRoot()
+    {
+        var canvas = Object.FindAnyObjectByType<Canvas>();
+        if (canvas == null)
+        {
+            return null;
+        }
+
+        var existing = canvas.transform.Find("MainMenuUI");
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        var uiRoot = new GameObject("MainMenuUI", typeof(RectTransform));
+        uiRoot.transform.SetParent(canvas.transform, false);
+        var rect = uiRoot.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        UiCanvasSetup.ApplySafeArea(rect);
+        return uiRoot.transform;
     }
 
     private void CreateBackButton(Transform parent)
@@ -168,6 +228,7 @@ public class MainMenuController : MonoBehaviour
 
     private static void CleanupRuntimeButtons()
     {
+        DestroyIfExists("CampaignButton");
         DestroyIfExists("RatedButton");
         DestroyIfExists("BackButton");
     }
@@ -190,6 +251,36 @@ public class MainMenuController : MonoBehaviour
         }
     }
 
+    private static void EnsureButtonLabel(Button button, string label)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        var existing = button.transform.Find("Text");
+        if (existing != null)
+        {
+            return;
+        }
+
+        var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textGo.transform.SetParent(button.transform, false);
+        var textRect = textGo.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        var text = textGo.GetComponent<TextMeshProUGUI>();
+        text.text = label;
+        text.fontSize = 30;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = Color.white;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 18;
+        text.fontSizeMax = 30;
+    }
+
     private static Sprite LoadSprite(string resourceName)
     {
         var sprites = Resources.LoadAll<Sprite>(resourceName);
@@ -207,7 +298,7 @@ public class MainMenuController : MonoBehaviour
         var buttons = FindObjectsByType<Button>();
         foreach (var button in buttons)
         {
-            if (button.gameObject.name is "RatedButton" or "BackButton")
+            if (button.gameObject.name is "RatedButton" or "CampaignButton" or "BackButton")
             {
                 continue;
             }

@@ -3,6 +3,7 @@ namespace DreamGate.Battlegrounds.Core
     public enum MatchMode
     {
         Practice,
-        Rated
+        Rated,
+        Campaign
     }
 }

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DreamGate.Battlegrounds.Core;
+using DreamGate.Battlegrounds.Heroes;
 using DreamGate.Battlegrounds.Services.Backend;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
@@ -72,8 +73,18 @@ namespace DreamGate.Battlegrounds.Services
                 }
             }
 
+            HeroCollectionService.EnsureStarterCollection();
             IsInitialized = true;
         }
+
+        public static void SetGuestProfile(PlayerProfile profile)
+        {
+            Profile = profile;
+            HeroCollectionService.EnsureStarterCollection();
+            NotifyProfileChanged();
+        }
+
+        public static void NotifyProfileChangedPublic() => NotifyProfileChanged();
 
         public static bool TryRegister(string displayName, string email, string password, string confirmPassword, out string message)
         {
@@ -535,6 +546,52 @@ namespace DreamGate.Battlegrounds.Services
                 });
 
             callback(success, message);
+        }
+
+        public static void ApplyCampaignResult(MatchResult result)
+        {
+            if (!IsInitialized || result == null || result.matchMode != MatchMode.Campaign || !result.playerWon)
+            {
+                return;
+            }
+
+            HeroCollectionService.EnsureStarterCollection();
+            HeroCollectionService.CompleteCampaignMission(result.campaignMissionLevel, result.campaignUnlockHeroId);
+        }
+
+        public static void SaveHeroCollection(PlayerProfile profile)
+        {
+            if (profile == null)
+            {
+                return;
+            }
+
+            Profile = profile;
+            if (UseCloudBackend && CloudClient != null && CloudClient.IsAuthenticated)
+            {
+                CloudCoroutineHost.Instance.Run(CoSaveHeroCollection(profile));
+                return;
+            }
+
+            ProfileStore.Save(profile);
+            NotifyProfileChanged();
+        }
+
+        private static IEnumerator CoSaveHeroCollection(PlayerProfile profile)
+        {
+            var success = false;
+            yield return CloudClient.UpdateHeroCollection(
+                profile.selectedHeroId,
+                profile.unlockedHeroIdsCsv,
+                profile.campaignHighestLevel,
+                (ok, _) => success = ok);
+
+            if (!success)
+            {
+                ProfileStore.Save(profile);
+            }
+
+            NotifyProfileChanged();
         }
 
         public static void ApplyRatedResult(MatchResult result)

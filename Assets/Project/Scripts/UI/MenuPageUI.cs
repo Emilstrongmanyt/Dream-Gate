@@ -344,11 +344,16 @@ namespace DreamGate.Battlegrounds.UI
     {
         private readonly GameObject root;
         private readonly GameObject logoutButton;
+        private readonly HeroSelectionGridUI heroSelectionGrid;
 
-        private SettingsPageView(GameObject root, GameObject logoutButton)
+        private SettingsPageView(
+            GameObject root,
+            GameObject logoutButton,
+            HeroSelectionGridUI heroSelectionGrid)
         {
             this.root = root;
             this.logoutButton = logoutButton;
+            this.heroSelectionGrid = heroSelectionGrid;
         }
 
         public static SettingsPageView Create(Transform parent, Action onBack, Action onLogout = null)
@@ -358,21 +363,33 @@ namespace DreamGate.Battlegrounds.UI
             MenuPageUI.CreateBody(
                 root.transform,
                 "SettingsDescription",
-                "Adjust audio and feedback preferences. Changes are saved automatically.",
-                620f,
-                80f);
+                "Adjust audio, choose your hero portrait, and tune feedback preferences.",
+                700f,
+                60f);
+            MenuPageUI.CreateBody(
+                root.transform,
+                "HeroCollectionLabel",
+                "Hero Portrait",
+                610f,
+                32f).fontSize = 24;
 
-            MenuPageUI.CreateSliderRow(root.transform, "Music Volume", 420f, GameSettings.MusicVolume, v =>
+            var heroGrid = HeroSelectionGridUI.Create(
+                root.transform,
+                new Vector2(0f, 360f),
+                new Vector2(900f, 360f),
+                _ => { });
+
+            MenuPageUI.CreateSliderRow(root.transform, "Music Volume", 120f, GameSettings.MusicVolume, v =>
             {
                 GameSettings.MusicVolume = v;
                 GameSettings.ApplyAudio();
             });
-            MenuPageUI.CreateSliderRow(root.transform, "SFX Volume", 300f, GameSettings.SfxVolume, v =>
+            MenuPageUI.CreateSliderRow(root.transform, "SFX Volume", 0f, GameSettings.SfxVolume, v =>
             {
                 GameSettings.SfxVolume = v;
                 GameSettings.ApplyAudio();
             });
-            MenuPageUI.CreateToggleRow(root.transform, "Haptic Feedback", 180f, GameSettings.HapticsEnabled, v =>
+            MenuPageUI.CreateToggleRow(root.transform, "Haptic Feedback", -120f, GameSettings.HapticsEnabled, v =>
             {
                 GameSettings.HapticsEnabled = v;
             });
@@ -380,17 +397,18 @@ namespace DreamGate.Battlegrounds.UI
             GameObject logoutButton = null;
             if (onLogout != null)
             {
-                logoutButton = MenuPageUI.CreateActionButton(root.transform, "Log Out", new Vector2(0, -40), onLogout).gameObject;
+                logoutButton = MenuPageUI.CreateActionButton(root.transform, "Log Out", new Vector2(0, -240f), onLogout).gameObject;
             }
 
-            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke());
+            MenuPageUI.CreateBackButton(root.transform, () => onBack?.Invoke(), -380f);
             root.SetActive(false);
-            return new SettingsPageView(root, logoutButton);
+            return new SettingsPageView(root, logoutButton, heroGrid);
         }
 
         public void Show()
         {
             GameSettings.ApplyAudio();
+            heroSelectionGrid?.Refresh();
             if (logoutButton != null)
             {
                 logoutButton.SetActive(DreamGateServices.IsLoggedIn);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DreamGate.Battlegrounds.Campaign;
 using DreamGate.Battlegrounds.Cards;
 using DreamGate.Battlegrounds.Combat;
 using DreamGate.Battlegrounds.Economy;
@@ -40,7 +41,7 @@ namespace DreamGate.Battlegrounds.Core
         public const int TripleGoldReward = 3;
 
         public const int BaseRecruitSeconds = 20;
-        public const int RecruitSecondsPerTurn = 5;
+        public const int RecruitSecondsPerTurn = 2;
         public const int MaxRecruitSeconds = 60;
 
         public const int StartingTavernTier = 1;
@@ -87,6 +88,7 @@ namespace DreamGate.Battlegrounds.Core
         private int lastRecruitTimerDisplay = -1;
         private int pendingHumanPlayerId = -1;
         private bool recruitTimerInitializedFromServer;
+        private CampaignMissionDefinition activeCampaignMission;
 
         public void Initialize(int humanId = 0)
         {
@@ -161,6 +163,84 @@ namespace DreamGate.Battlegrounds.Core
             }
 
             BeginRecruitPhase();
+        }
+
+        public void InitializeCampaign(int humanId, int matchSeed, CampaignMissionDefinition mission)
+        {
+            CardRegistry.Initialize();
+            HeroCollectionService.EnsureStarterCollection();
+            players.Clear();
+            eliminationOrder.Clear();
+            Turn = 1;
+            Phase = MatchPhase.Recruit;
+            Mode = MatchMode.Campaign;
+            humanPlayerId = humanId;
+            lastCombatOpponentId = -1;
+            nextPlacement = MatchConfig.MaxPlayers;
+            FinalResult = null;
+            PendingHumanCombat = null;
+            PendingOpponent = null;
+            activeCampaignMission = mission;
+            matchRandom = matchSeed >= 0 ? new System.Random(matchSeed) : new System.Random();
+
+            var opponentCount = Mathf.Clamp(mission?.opponentCount ?? 1, 1, 2);
+            for (var i = 0; i < MatchConfig.MaxPlayers; i++)
+            {
+                var isLocalHuman = i == humanId;
+                var isCampaignOpponent = i > 0 && i <= opponentCount;
+                var isActive = isLocalHuman || isCampaignOpponent;
+                var player = new PlayerState
+                {
+                    playerId = i,
+                    displayName = isLocalHuman ? "You" : mission?.bossDisplayName ?? $"Opponent {i}",
+                    heroName = isLocalHuman
+                        ? HeroCollectionService.GetPortraitDisplayName(HeroCollectionService.SelectedHeroId)
+                        : ResolveCampaignOpponentName(i, mission),
+                    isHuman = isLocalHuman,
+                    heroHealth = isActive ? MatchConfig.StartingHeroHealth : 0,
+                    tavernTier = MatchConfig.StartingTavernTier,
+                    isEliminated = !isActive
+                };
+
+                if (isLocalHuman)
+                {
+                    player.heroId = HeroCollectionService.SelectedHeroId;
+                }
+                else if (isCampaignOpponent)
+                {
+                    player.heroId = i == 1
+                        ? mission?.bossHeroId
+                        : mission?.allyBossHeroId ?? mission?.bossHeroId;
+                    if (i == 2 && !string.IsNullOrEmpty(mission?.allyBossDisplayName))
+                    {
+                        player.displayName = mission.allyBossDisplayName;
+                        player.heroName = mission.allyBossDisplayName;
+                    }
+                }
+                else
+                {
+                    player.placement = nextPlacement--;
+                    eliminationOrder.Add(player.displayName);
+                }
+
+                players.Add(player);
+                if (isLocalHuman)
+                {
+                    humanPlayer = player;
+                }
+            }
+
+            BeginRecruitPhase();
+        }
+
+        private static string ResolveCampaignOpponentName(int slotIndex, CampaignMissionDefinition mission)
+        {
+            if (slotIndex == 2 && !string.IsNullOrEmpty(mission?.allyBossDisplayName))
+            {
+                return mission.allyBossDisplayName;
+            }
+
+            return mission?.bossDisplayName ?? "Campaign Boss";
         }
 
         public PlayerState GetPlayer(int playerId) =>
@@ -572,7 +652,7 @@ namespace DreamGate.Battlegrounds.Core
 
             foreach (var bot in players.Where(p => !p.isHuman && !p.isEliminated))
             {
-                BotPlayerController.TakeRecruitTurn(bot, Turn, matchRandom.Next());
+                BotPlayerController.TakeRecruitTurn(bot, Turn, matchRandom.Next(), activeCampaignMission);
             }
 
             Post($"Turn {Turn} | {humanPlayer.heroName} | Gold: {humanPlayer.gold} | Tavern {humanPlayer.tavernTier} | Timer: {Mathf.CeilToInt(RecruitTimeRemaining)}s");
@@ -760,7 +840,9 @@ namespace DreamGate.Battlegrounds.Core
                 finalHeroHealth = humanPlayer.heroHealth,
                 damageDealt = humanPlayer.damageDealt,
                 damageTaken = humanPlayer.damageTaken,
-                heroName = humanPlayer.heroName
+                heroName = humanPlayer.heroName,
+                campaignMissionLevel = activeCampaignMission?.level ?? 0,
+                campaignUnlockHeroId = playerWon ? activeCampaignMission?.unlockHeroId : null
             };
             FinalResult.eliminationOrder.AddRange(eliminationOrder);
 
