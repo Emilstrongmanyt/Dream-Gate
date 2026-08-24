@@ -1,0 +1,15 @@
+id: ck_tycoon
+name: Coal Tycoon
+chorus: cinderkin
+depth: 4
+atk: 5
+hp: 5
+keywords: []
+effects:
+  - trigger: OnBuy
+    persist: Player
+    once: ThisRecruit
+    actions:
+      - type: SetFlag
+        flag: TycoonFreeReroll
+        duration: ThisRecruit

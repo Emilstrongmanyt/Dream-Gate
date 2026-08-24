@@ -1,0 +1,14 @@
+id: gt_grub
+name: Grub
+chorus: gutterlings
+depth: 1
+atk: 1
+hp: 1
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: Summon
+        unit: tok_grub
+        count: 1

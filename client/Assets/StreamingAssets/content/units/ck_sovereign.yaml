@@ -1,0 +1,14 @@
+id: ck_sovereign
+name: Ember Sovereign
+chorus: cinderkin
+depth: 6
+atk: 8
+hp: 8
+keywords: []
+effects:
+  - trigger: EndOfRecruit
+    persist: Player
+    actions:
+      - type: PendingEmbersFromCounter
+        counter: RerollsThisRecruit
+        max: 3

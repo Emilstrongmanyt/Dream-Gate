@@ -1,0 +1,4 @@
+id: cap_glass
+name: Glass Saint
+wick: 30
+passives: [GlassKindleLeftAegis]

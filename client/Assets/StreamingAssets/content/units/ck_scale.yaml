@@ -1,0 +1,14 @@
+id: ck_scale
+name: Scale Thief
+chorus: cinderkin
+depth: 2
+atk: 2
+hp: 3
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    when: { op: EmbersGte, n: 6 }
+    actions:
+      - type: GainEmbers
+        amount: 1

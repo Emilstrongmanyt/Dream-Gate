@@ -1,0 +1,17 @@
+id: gt_queen
+name: Needle Queen
+chorus: gutterlings
+depth: 4
+atk: 5
+hp: 4
+keywords: [Venom]
+effects:
+  - trigger: OnVenomKill
+    persist: Player
+    when: { op: Always }
+    filter: { select: Self }
+    actions:
+      - type: BuffStats
+        atk: 2
+        hp: 1
+        duration: Permanent

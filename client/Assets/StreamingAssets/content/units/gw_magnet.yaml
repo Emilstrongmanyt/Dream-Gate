@@ -1,0 +1,14 @@
+id: gw_magnet
+name: Magnet Monk
+chorus: gearwights
+depth: 3
+atk: 3
+hp: 3
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: AttachLatch
+        unit: tok_cog_latch
+        filter: { select: Self }

@@ -1,0 +1,14 @@
+{
+  "name": "Kindling.Client",
+  "rootNamespace": "Kindling.Client",
+  "references": [
+    "Kindling.Sim",
+    "UnityEngine.UI",
+    "UnityEngine.InputLegacyModule"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

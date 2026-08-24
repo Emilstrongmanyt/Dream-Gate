@@ -1,0 +1,13 @@
+id: ne_echoist
+name: Echoist
+chorus: neutral
+depth: 3
+atk: 3
+hp: 4
+keywords: []
+effects:
+  - trigger: Aura
+    persist: CombatCopy
+    actions:
+      - type: SetEchoTimesBonus
+        amount: 1

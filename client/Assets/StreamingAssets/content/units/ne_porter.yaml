@@ -1,0 +1,16 @@
+id: ne_porter
+name: Porter
+chorus: neutral
+depth: 1
+atk: 2
+hp: 2
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    filter: { select: RandomN }
+    actions:
+      - type: BuffStats
+        atk: 1
+        hp: 1
+        duration: Permanent

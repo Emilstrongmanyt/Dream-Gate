@@ -1,0 +1,8 @@
+id: ne_wall
+name: Market Wall
+chorus: neutral
+depth: 3
+atk: 2
+hp: 8
+keywords: [Ward]
+effects: []

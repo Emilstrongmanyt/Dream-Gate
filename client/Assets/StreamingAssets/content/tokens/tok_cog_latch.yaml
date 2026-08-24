@@ -1,0 +1,9 @@
+id: tok_cog_latch
+name: Cogling Latch
+chorus: gearwights
+depth: 1
+atk: 2
+hp: 2
+keywords: [Latch]
+token: true
+latchHost: Gearwights

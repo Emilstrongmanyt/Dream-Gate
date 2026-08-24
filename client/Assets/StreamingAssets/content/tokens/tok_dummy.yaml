@@ -1,0 +1,8 @@
+id: tok_dummy
+name: Cinder Dummy
+chorus: neutral
+depth: 1
+atk: 2
+hp: 2
+keywords: []
+token: true

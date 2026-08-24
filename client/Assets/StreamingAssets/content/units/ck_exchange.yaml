@@ -1,0 +1,15 @@
+id: ck_exchange
+name: Exchange Heart
+chorus: cinderkin
+depth: 5
+atk: 6
+hp: 6
+keywords: []
+effects:
+  - trigger: OnReroll
+    persist: Player
+    actions:
+      - type: AddToHandFromPool
+        chorus: cinderkin
+        depthMax: 3
+        consume: true

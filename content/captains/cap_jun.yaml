@@ -1,0 +1,13 @@
+id: cap_jun
+name: Hollow Jun
+wick: 30
+edict:
+  cost: 0
+  target: Board
+  actions:
+    - type: DamageWick
+      amount: 1
+    - type: BuffStats
+      atk: 1
+      hp: 1
+      duration: Permanent

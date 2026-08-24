@@ -1,0 +1,16 @@
+id: gw_coloss
+name: Coloss Frame
+chorus: gearwights
+depth: 4
+atk: 6
+hp: 8
+keywords: [Ward]
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: BuffStatsScaled
+        counter: LatchPlaysThisMatch
+        atk: 2
+        hp: 2
+        duration: Permanent

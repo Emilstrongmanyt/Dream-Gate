@@ -1,0 +1,392 @@
+# Kindling iOS TestFlight — reuses Dream Gate App Store / TestFlight identity.
+# Bundle ID stays com.solodreams.dreamgate so this binary replaces Dream Gate.
+# Personal license: UNITY_SERIAL (F-prefix) + UNITY_EMAIL + UNITY_PASSWORD.
+
+name: iOS TestFlight
+
+permissions:
+  contents: read
+  actions: read
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      sign_only:
+        description: Skip Unity build and reuse build-iOS artifact from a prior run
+        required: false
+        default: false
+        type: boolean
+      artifact_run_id:
+        description: Run ID to download build-iOS artifact from (sign_only only)
+        required: false
+        default: '28780309888'
+
+env:
+  UNITY_VERSION: 6000.5.2f1
+  PROJECT_PATH: client
+  BUILD_NAME: Kindling
+  BUNDLE_ID: com.solodreams.dreamgate
+
+jobs:
+  build-unity-ios:
+    name: Build Unity iOS project
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.sign_only }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: client/Library
+          key: Library-kindling-iOS-v1-${{ hashFiles('client/Assets/**', 'client/Packages/**', 'client/ProjectSettings/**', 'sim/**') }}
+          restore-keys: |
+            Library-kindling-iOS-v1-
+            Library-kindling-iOS-
+
+      - name: Set iOS build number from CI run
+        run: |
+          python3 <<'PY'
+          import os, re
+          run_no = os.environ["GITHUB_RUN_NUMBER"]
+          path = "client/ProjectSettings/ProjectSettings.asset"
+          text = open(path, encoding="utf-8").read()
+          patched, count = re.subn(r"(\s+iPhone: )\d+", rf"\g<1>{run_no}", text, count=1)
+          if count != 1:
+              raise SystemExit(f"Failed to patch iPhone build number in {path}")
+          open(path, "w", encoding="utf-8").write(patched)
+          print(f"Set iPhone build number to {run_no}")
+          PY
+
+      - name: Build iOS Xcode project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          targetPlatform: iOS
+          projectPath: ${{ env.PROJECT_PATH }}
+          buildName: ${{ env.BUILD_NAME }}
+          versioning: None
+          allowDirtyBuild: true
+          customParameters: -bundleVersion 1.0 -buildNumber ${{ github.run_number }}
+
+      - name: Upload Xcode project artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-iOS
+          path: build/iOS
+          if-no-files-found: error
+
+  upload-testflight:
+    name: Sign IPA and upload TestFlight
+    runs-on: macos-latest
+    needs: build-unity-ios
+    if: ${{ always() && (needs.build-unity-ios.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.sign_only)) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Select Xcode 26
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "Xcode 26 not found. Installed Xcode apps:"
+            ls /Applications | grep Xcode || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcodebuild -showsdks | grep iphoneos
+
+      - name: Download Xcode project
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.sign_only }}
+        uses: actions/download-artifact@v4
+        with:
+          name: build-iOS
+          path: build/iOS
+
+      - name: Download Xcode project from prior run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_only }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.artifact_run_id }}" -n build-iOS -D build/iOS --repo "${{ github.repository }}"
+          find build/iOS -maxdepth 4 -type d | head -20
+
+      - name: Import signing certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_P12_PASSWORD }}
+          keychain: build
+
+      - name: Install provisioning profile
+        env:
+          IOS_MOBILEPROVISION_BASE64: ${{ secrets.IOS_MOBILEPROVISION_BASE64 }}
+        run: |
+          PROFILE_PATH=$RUNNER_TEMP/DreamGate.mobileprovision
+          printf '%s' "$IOS_MOBILEPROVISION_BASE64" | base64 --decode > "$PROFILE_PATH"
+          PROFILE_PLIST=$(security cms -D -i "$PROFILE_PATH")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin <<< "$PROFILE_PLIST")
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$PROFILE_UUID".mobileprovision
+
+      - name: Build signed IPA
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
+          PROFILE_NAME: ${{ env.PROFILE_NAME }}
+          PROFILE_UUID: ${{ env.PROFILE_UUID }}
+        run: |
+          XCODE_DIR=$(find build/iOS -name Unity-iPhone.xcodeproj -print -quit | xargs dirname)
+          if [ -z "$XCODE_DIR" ]; then
+            echo "Unity-iPhone.xcodeproj not found under build/iOS"
+            find build -maxdepth 4 -type d
+            exit 1
+          fi
+          echo "Using Xcode project at $XCODE_DIR"
+          export XCODE_DIR
+          find "$XCODE_DIR" -type f \( -name "*.sh" -o -name "usymtool*" \) -exec chmod +x {} \;
+          ls -la "$XCODE_DIR"/process_symbols.sh "$XCODE_DIR"/usymtool* 2>/dev/null || true
+          ENTITLEMENTS_SRC="client/Assets/Plugins/iOS/DreamGate.entitlements"
+          ENTITLEMENTS_DST="$XCODE_DIR/DreamGate.entitlements"
+          if [ -f "$ENTITLEMENTS_SRC" ]; then
+            cp "$ENTITLEMENTS_SRC" "$ENTITLEMENTS_DST"
+            echo "Copied Sign in with Apple entitlements to $ENTITLEMENTS_DST"
+          else
+            echo "Warning: entitlements file not found at $ENTITLEMENTS_SRC"
+          fi
+          EXPORT_PLIST=$RUNNER_TEMP/ExportOptions.plist
+          python3 - <<'PY'
+          import os, plistlib
+          path = os.path.join(os.environ["RUNNER_TEMP"], "ExportOptions.plist")
+          payload = {
+              "method": "app-store-connect",
+              "teamID": os.environ["APPLE_TEAM_ID"],
+              "signingStyle": "manual",
+              "provisioningProfiles": {os.environ["BUNDLE_ID"]: os.environ["PROFILE_NAME"]},
+              "uploadSymbols": True,
+          }
+          with open(path, "wb") as f:
+              plistlib.dump(payload, f)
+          print(f"Wrote {path}")
+          PY
+          security find-identity -v -p codesigning
+          PBXPROJ="$XCODE_DIR/Unity-iPhone.xcodeproj/project.pbxproj"
+          python3 - <<'PY'
+          import os, re, sys
+          path = os.path.join(os.environ["XCODE_DIR"], "Unity-iPhone.xcodeproj/project.pbxproj")
+          text = open(path, encoding="utf-8").read()
+          team = os.environ["APPLE_TEAM_ID"]
+          uuid = os.environ["PROFILE_UUID"]
+          name = os.environ["PROFILE_NAME"]
+          identity = "iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN"
+
+          def ensure_setting(block, key, value):
+              if key in block:
+                  return block
+              return block.replace(
+                  "\t\t\tbuildSettings = {\n",
+                  f"\t\t\tbuildSettings = {{\n\t\t\t\t{key} = {value};\n",
+                  1,
+              )
+
+          def patch_config(match):
+              block = match.group(0)
+              block = ensure_setting(block, "ENABLE_USER_SCRIPT_SANDBOXING", "NO")
+              if "PRODUCT_BUNDLE_IDENTIFIER = com.solodreams.dreamgate;" not in block:
+                  return block
+              block = block.replace('DEVELOPMENT_TEAM = "";', f'DEVELOPMENT_TEAM = {team};')
+              block = block.replace('CODE_SIGN_IDENTITY = "iPhone Developer";', f'CODE_SIGN_IDENTITY = "{identity}";')
+              block = block.replace(
+                  '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";',
+                  f'"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "{identity}";',
+              )
+              block = block.replace('PROVISIONING_PROFILE_APP = "";', f'PROVISIONING_PROFILE_APP = {uuid};')
+              block = block.replace(
+                  'PROVISIONING_PROFILE_SPECIFIER = "$(PROVISIONING_PROFILE_SPECIFIER_APP)";',
+                  f'PROVISIONING_PROFILE_SPECIFIER = "{name}";',
+              )
+              if "CODE_SIGN_ENTITLEMENTS" not in block and os.path.isfile(os.path.join(os.environ["XCODE_DIR"], "DreamGate.entitlements")):
+                  block = block.replace(
+                      "\t\t\tbuildSettings = {\n",
+                      "\t\t\tbuildSettings = {\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = DreamGate.entitlements;\n",
+                      1,
+                  )
+              if "CODE_SIGN_STYLE" not in block:
+                  block = block.replace(
+                      "\t\t\tbuildSettings = {\n",
+                      "\t\t\tbuildSettings = {\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n",
+                      1,
+                  )
+              return block
+
+          patched = re.sub(
+              r"\t\t[A-F0-9]+ /\* [^*]+ \*/ = \{.*?\n\t\t\};",
+              patch_config,
+              text,
+              flags=re.DOTALL,
+          )
+          if patched == text:
+              print("No Unity-iPhone signing blocks were patched", file=sys.stderr)
+              sys.exit(1)
+          open(path, "w", encoding="utf-8").write(patched)
+          print(f"Patched Unity-iPhone signing in {path}")
+          PY
+          ICON_SET="$XCODE_DIR/Unity-iPhone/Images.xcassets/AppIcon.appiconset"
+          if [ ! -d "$ICON_SET" ]; then
+            echo "App icon set not found at $ICON_SET"
+            find "$XCODE_DIR" -name AppIcon.appiconset -maxdepth 6
+            exit 1
+          fi
+          ICON_SRC=".github/ios/AppIcon-1024.png"
+          file "$ICON_SRC"
+          ls -la "$ICON_SRC"
+          sips -g pixelWidth -g pixelHeight "$ICON_SRC"
+          cp "$ICON_SRC" "$ICON_SET/Icon-1024.png"
+          python3 - <<'PY'
+          import json, os
+          icon_set = os.path.join(os.environ["XCODE_DIR"], "Unity-iPhone/Images.xcassets/AppIcon.appiconset")
+          contents_path = os.path.join(icon_set, "Contents.json")
+          data = {
+              "images": [
+                  {
+                      "filename": "Icon-1024.png",
+                      "idiom": "universal",
+                      "platform": "ios",
+                      "size": "1024x1024",
+                  }
+              ],
+              "info": {"author": "xcode", "version": 1},
+          }
+          with open(contents_path, "w", encoding="utf-8") as f:
+              json.dump(data, f, indent="\t")
+              f.write("\n")
+          print(f"Wrote single-size app icon catalog to {contents_path}")
+          PY
+          cd "$XCODE_DIR"
+          ARCHIVE_LOG=$RUNNER_TEMP/xcodebuild-archive.log
+          set +e
+          xcodebuild -allowProvisioningUpdates \
+            -scheme Unity-iPhone \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath $RUNNER_TEMP/DreamGate.xcarchive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            Unity-iPhone_CODE_SIGN_STYLE=Manual \
+            Unity-iPhone_CODE_SIGN_IDENTITY="iPhone Distribution: EMIL VON LILLIENSKJOLD JENSEN" \
+            Unity-iPhone_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            Unity-iPhone_PROVISIONING_PROFILE="$PROFILE_UUID" \
+            Unity-iPhone_PROVISIONING_PROFILE_APP="$PROFILE_UUID" \
+            Unity-iPhone_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            Unity-iPhone_PROVISIONING_PROFILE_SPECIFIER_APP="$PROFILE_NAME" \
+            UnityFramework_CODE_SIGN_STYLE=Automatic \
+            UnityFramework_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            GameAssembly_CODE_SIGNING_ALLOWED=NO \
+            GameAssembly_CODE_SIGN_STYLE=Manual \
+            GameAssembly_DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            archive 2>&1 | tee "$ARCHIVE_LOG"
+          ARCHIVE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$ARCHIVE_STATUS" -ne 0 ]; then
+            echo "xcodebuild archive failed with exit code $ARCHIVE_STATUS"
+            echo "---- last 120 lines of archive log ----"
+            tail -120 "$ARCHIVE_LOG"
+            echo "---- errors/warnings in archive log ----"
+            grep -E "error:|fatal error:|ARCHIVE FAILED|Code Sign error|Provisioning profile" "$ARCHIVE_LOG" | tail -40 || true
+            exit "$ARCHIVE_STATUS"
+          fi
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/DreamGate.xcarchive \
+            -exportPath $RUNNER_TEMP/export \
+            -exportOptionsPlist "$EXPORT_PLIST"
+          ls -la $RUNNER_TEMP/export
+
+      - name: Upload to TestFlight
+        env:
+          APPLE_CONNECT_KEY: ${{ secrets.APPLE_CONNECT_KEY }}
+          APPLE_CONNECT_KEY_ID: ${{ secrets.APPLE_CONNECT_KEY_ID }}
+          APPLE_CONNECT_ISSUER_ID: ${{ secrets.APPLE_CONNECT_ISSUER_ID }}
+          DEVELOPER_DIR: ${{ env.DEVELOPER_DIR }}
+        run: |
+          xcodebuild -version
+          KEY_PATH=$RUNNER_TEMP/AuthKey.p8
+          printf '%s' "$APPLE_CONNECT_KEY" | base64 --decode > "$KEY_PATH"
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
+            echo "Decoded App Store Connect API key is invalid (missing PEM header)."
+            exit 1
+          fi
+          API_KEY_JSON=$RUNNER_TEMP/api_key.json
+          python3 - <<'PY'
+          import json, os
+          key_path = os.path.join(os.environ["RUNNER_TEMP"], "AuthKey.p8")
+          with open(key_path, "r", encoding="utf-8") as f:
+              key = f.read().strip()
+          payload = {
+              "key_id": os.environ["APPLE_CONNECT_KEY_ID"].strip(),
+              "issuer_id": os.environ["APPLE_CONNECT_ISSUER_ID"].strip(),
+              "key": key,
+              "duration": 1200,
+              "in_house": False,
+          }
+          out = os.path.join(os.environ["RUNNER_TEMP"], "api_key.json")
+          with open(out, "w", encoding="utf-8") as f:
+              json.dump(payload, f)
+          print(f"Wrote {out}")
+          PY
+          IPA_PATH=$(find "$RUNNER_TEMP/export" -name '*.ipa' | head -1)
+          if [ -z "$IPA_PATH" ]; then
+            echo "No IPA found in $RUNNER_TEMP/export"
+            exit 1
+          fi
+          echo "Uploading $IPA_PATH"
+          gem install fastlane --no-document
+          UPLOAD_OK=0
+          for attempt in 1 2 3; do
+            echo "TestFlight upload attempt $attempt/3"
+            if fastlane pilot upload \
+              --api_key_path "$RUNNER_TEMP/api_key.json" \
+              --ipa "$IPA_PATH" \
+              --skip_waiting_for_build_processing true; then
+              UPLOAD_OK=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Upload failed; retrying in 30s..."
+              sleep 30
+            fi
+          done
+          if [ "$UPLOAD_OK" -ne 1 ]; then
+            echo "TestFlight upload failed after 3 attempts."
+            echo "If the error mentions invalid bearer token, verify APPLE_CONNECT_KEY_ID,"
+            echo "APPLE_CONNECT_ISSUER_ID, and APPLE_CONNECT_KEY secrets in GitHub."
+            exit 1
+          fi

@@ -1,0 +1,13 @@
+id: ne_oracle
+name: Oracle
+chorus: neutral
+depth: 5
+atk: 5
+hp: 5
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: Glimpse
+        depthMode: Current

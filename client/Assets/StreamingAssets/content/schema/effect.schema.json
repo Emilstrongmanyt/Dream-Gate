@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kindling.local/schema/effect.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trigger", "actions"],
+  "properties": {
+    "trigger": { "type": "string", "enum": [
+      "Arrival","Echo","Kindle","OnAttack","OnKill","OnDamaged","OnDamageDealt",
+      "OnVenomKill","OnBuy","OnSell","OnReroll","OnLatch","OnUpgrade","OnAwaken",
+      "StartOfRecruit","EndOfRecruit","Aura"] },
+    "priority": { "type": "integer", "default": 0 },
+    "once": { "type": "string", "enum": ["Never","ThisRecruit","ThisCombat","ThisMatch","PerInstance"], "default": "Never" },
+    "persist": { "type": "string", "enum": ["Player","CombatCopy"] },
+    "when": { "$ref": "#/$defs/condition" },
+    "filter": { "$ref": "#/$defs/filter" },
+    "echoTimes": { "type": "integer", "minimum": 1, "default": 1 },
+    "actions": {
+      "type": "array", "minItems": 1,
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": { "enum": ["Always","EmbersGte","DepthGte","BoughtThisRecruitGte",
+          "RerollsThisRecruitGte","HasFlag","ChorusIs","IsAwakened","WickGte",
+          "BoardCountGte","HandNotFull","SourceIsChorus"] },
+        "n": { "type": "integer" },
+        "flag": { "type": "string" },
+        "chorus": { "type": "string" }
+      }
+    },
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "select": { "enum": ["Self","Friendly","Enemy","All","RandomN","Adjacent",
+          "Leftmost","Rightmost","Host","BoughtUnit","Other","Source"] },
+        "n": { "type": "integer", "default": 1 },
+        "chorus": { "type": "string" },
+        "keyword": { "type": "string" },
+        "excludeSelf": { "type": "boolean", "default": false }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": [
+          "BuffStats","BuffStatsScaled","Summon","SummonFill","SummonFromGraveyard",
+          "DealDamage","GrantKeyword","RemoveKeyword",
+          "GainEmbers","PendingEmbers","PendingEmbersFromCounter",
+          "SetFlag","ClearFlag","ModifyCost",
+          "RerollStall","SetHold","AddToHand","AddToHandFromPool","CopyOwnedToHand",
+          "Glimpse","GiveCinder","CopyArrival","AttachLatch","GiveEchoSummon",
+          "DamageWick","SetStallSizeDelta","SetEchoTimesBonus","NoOp"] },
+        "atk": { "type": "integer" },
+        "hp": { "type": "integer" },
+        "duration": { "enum": ["Permanent","ThisRecruit","ThisCombat","ThisMatch","NextRecruit"] },
+        "unit": { "type": "string" },
+        "count": { "type": "integer", "default": 1 },
+        "position": { "enum": ["Rightmost","Leftmost","SameSlot"], "default": "Rightmost" },
+        "fireArrival": { "type": "boolean", "default": false },
+        "amount": { "type": "integer" },
+        "keyword": { "type": "string" },
+        "flag": { "type": "string" },
+        "depth": { "type": "integer" },
+        "depthMax": { "type": "integer" },
+        "depthMode": { "enum": ["Fixed","Current","TriplePlusOne"] },
+        "echoUnit": { "type": "string" },
+        "latchHost": { "enum": ["Gearwights","Any"] },
+        "max": { "type": "integer" },
+        "counter": { "enum": ["LatchPlaysThisMatch","RerollsThisRecruit","BoughtThisRecruit"] },
+        "chorus": { "type": "string" },
+        "consume": { "type": "boolean" },
+        "consumePool": { "type": "boolean" },
+        "shopLegalOnly": { "type": "boolean" },
+        "baseCatalog": { "type": "boolean" },
+        "hasEcho": { "type": "boolean" }
+      }
+    }
+  }
+}

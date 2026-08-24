@@ -1,0 +1,14 @@
+id: ck_cashier
+name: Ember Cashier
+chorus: cinderkin
+depth: 3
+atk: 3
+hp: 4
+keywords: []
+effects:
+  - trigger: EndOfRecruit
+    persist: Player
+    when: { op: BoughtThisRecruitGte, n: 2 }
+    actions:
+      - type: PendingEmbers
+        amount: 1

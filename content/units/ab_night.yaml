@@ -1,0 +1,15 @@
+id: ab_night
+name: Night of Ash
+chorus: ashbound
+depth: 6
+atk: 7
+hp: 7
+keywords: []
+effects:
+  - trigger: Echo
+    persist: CombatCopy
+    actions:
+      - type: SummonFill
+        unit: tok_ash_mote
+        atk: 2
+        hp: 2

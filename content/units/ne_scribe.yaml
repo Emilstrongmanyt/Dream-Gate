@@ -1,0 +1,14 @@
+id: ne_scribe
+name: Stall Scribe
+chorus: neutral
+depth: 2
+atk: 2
+hp: 3
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: Glimpse
+        depthMode: Fixed
+        depth: 1

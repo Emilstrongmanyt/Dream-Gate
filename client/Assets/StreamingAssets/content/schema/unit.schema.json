@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kindling.local/schema/unit.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "chorus", "depth", "atk", "hp"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "chorus": { "type": "string", "enum": ["cinderkin", "gearwights", "ashbound", "gutterlings", "neutral"] },
+    "depth": { "type": "integer", "minimum": 1, "maximum": 6 },
+    "atk": { "type": "integer" },
+    "hp": { "type": "integer" },
+    "keywords": { "type": "array", "items": { "type": "string" } },
+    "effects": { "type": "array", "items": { "$ref": "effect.schema.json" } },
+    "awakenedEffects": { "type": "array" },
+    "token": { "type": "boolean" },
+    "echoOnSell": { "type": "boolean" },
+    "afterglowKeepsKeywords": { "type": "boolean" },
+    "latchHost": { "type": "string", "enum": ["Gearwights", "Any"] },
+    "onLatched": {
+      "type": "object",
+      "properties": {
+        "statMulN": { "type": "integer" },
+        "statMulD": { "type": "integer" }
+      }
+    },
+    "copyLimit": { "type": "integer" },
+    "tokenDamageDepth": { "type": "integer" }
+  }
+}

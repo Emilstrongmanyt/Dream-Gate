@@ -1,0 +1,14 @@
+id: ab_veil
+name: Veil Walker
+chorus: ashbound
+depth: 2
+atk: 2
+hp: 3
+keywords: [Afterglow]
+effects:
+  - trigger: Echo
+    persist: CombatCopy
+    actions:
+      - type: Summon
+        unit: tok_ash_mote
+        count: 1

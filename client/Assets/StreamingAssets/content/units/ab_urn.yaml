@@ -1,0 +1,16 @@
+id: ab_urn
+name: Urn Kin
+chorus: ashbound
+depth: 2
+atk: 3
+hp: 2
+keywords: []
+effects:
+  - trigger: Echo
+    persist: CombatCopy
+    filter: { select: RandomN }
+    actions:
+      - type: BuffStats
+        atk: 2
+        hp: 2
+        duration: Permanent

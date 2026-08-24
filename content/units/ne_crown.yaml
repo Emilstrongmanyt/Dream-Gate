@@ -1,0 +1,14 @@
+id: ne_crown
+name: Crown of Cinders
+chorus: neutral
+depth: 6
+atk: 6
+hp: 8
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    filter: { select: Friendly }
+    actions:
+      - type: GiveCinder
+        amount: 2

@@ -1,0 +1,4 @@
+id: cap_vesper
+name: Captain Vesper
+wick: 30
+passives: [VesperFirstRerollFree]

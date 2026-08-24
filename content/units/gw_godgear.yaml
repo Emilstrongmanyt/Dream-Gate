@@ -1,0 +1,9 @@
+id: gw_godgear
+name: Godgear
+chorus: gearwights
+depth: 6
+atk: 8
+hp: 12
+keywords: [Ward, Afterglow]
+onLatched: { statMulN: 3, statMulD: 2 }
+effects: []

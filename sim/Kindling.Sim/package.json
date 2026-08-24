@@ -1,0 +1,8 @@
+{
+  "name": "com.kindling.sim",
+  "version": "0.1.0",
+  "displayName": "Kindling Sim",
+  "unity": "6000.0",
+  "type": "library",
+  "description": "Deterministic Kindling match simulation (netstandard2.1, no engine references)."
+}

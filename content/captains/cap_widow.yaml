@@ -1,0 +1,12 @@
+id: cap_widow
+name: Widow Ash
+wick: 30
+edict:
+  cost: 1
+  target: Board
+  actions:
+    - type: GrantKeyword
+      keyword: Echo
+      duration: Permanent
+    - type: GiveEchoSummon
+      echoUnit: tok_ash_mote

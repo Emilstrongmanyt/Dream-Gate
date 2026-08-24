@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kindling.local/schema/captain.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "wick"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "wick": { "type": "integer" },
+    "passives": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "VesperFirstRerollFree",
+          "DebtGrantPlus1",
+          "DredgerNextGrantPlus2",
+          "KettleStallPlus1",
+          "CandleAwakenPlus2",
+          "GlassKindleLeftAegis",
+          "SkivGutterlingOnBuyPlus1Atk"
+        ]
+      }
+    },
+    "edict": {
+      "type": "object",
+      "properties": {
+        "cost": { "type": "integer" },
+        "target": { "type": "string" },
+        "needsTarget": { "type": "boolean" },
+        "actions": { "type": "array" }
+      }
+    }
+  }
+}

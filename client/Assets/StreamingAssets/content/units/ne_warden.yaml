@@ -1,0 +1,8 @@
+id: ne_warden
+name: Gate Warden
+chorus: neutral
+depth: 1
+atk: 1
+hp: 4
+keywords: [Ward]
+effects: []

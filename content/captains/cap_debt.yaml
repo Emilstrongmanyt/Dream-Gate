@@ -1,0 +1,4 @@
+id: cap_debt
+name: Ledger of Debt
+wick: 25
+passives: [DebtGrantPlus1]

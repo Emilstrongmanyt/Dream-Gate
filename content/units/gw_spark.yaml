@@ -1,0 +1,14 @@
+id: gw_spark
+name: Spark Bit
+chorus: gearwights
+depth: 2
+atk: 2
+hp: 2
+keywords: [Latch]
+effects:
+  - trigger: Kindle
+    persist: CombatCopy
+    filter: { select: RandomN }
+    actions:
+      - type: DealDamage
+        amount: 1

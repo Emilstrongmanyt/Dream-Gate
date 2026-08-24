@@ -1,0 +1,13 @@
+id: ck_tally
+name: Tally Rat
+chorus: cinderkin
+depth: 1
+atk: 1
+hp: 2
+keywords: []
+effects:
+  - trigger: Echo
+    persist: Player
+    actions:
+      - type: PendingEmbers
+        amount: 1

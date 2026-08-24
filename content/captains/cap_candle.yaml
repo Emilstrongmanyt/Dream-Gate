@@ -1,0 +1,4 @@
+id: cap_candle
+name: Ninth Candle
+wick: 30
+passives: [CandleAwakenPlus2]

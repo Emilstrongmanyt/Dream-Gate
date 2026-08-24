@@ -1,0 +1,16 @@
+id: gw_chassis
+name: Chassis
+chorus: gearwights
+depth: 3
+atk: 4
+hp: 6
+keywords: [Ward]
+effects:
+  - trigger: OnLatch
+    persist: Player
+    filter: { select: Self }
+    actions:
+      - type: BuffStats
+        atk: 1
+        hp: 1
+        duration: Permanent

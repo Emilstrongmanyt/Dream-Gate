@@ -1,0 +1,14 @@
+id: ne_smelter
+name: Smelter
+chorus: neutral
+depth: 4
+atk: 3
+hp: 5
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    filter: { select: Self }
+    actions:
+      - type: GiveCinder
+        amount: 2

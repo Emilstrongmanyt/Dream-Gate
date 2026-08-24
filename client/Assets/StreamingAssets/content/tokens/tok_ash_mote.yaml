@@ -1,0 +1,8 @@
+id: tok_ash_mote
+name: Ash Mote
+chorus: ashbound
+depth: 1
+atk: 1
+hp: 1
+keywords: [Afterglow]
+token: true

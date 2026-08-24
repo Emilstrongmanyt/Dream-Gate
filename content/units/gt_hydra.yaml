@@ -1,0 +1,14 @@
+id: gt_hydra
+name: Gutter Hydra
+chorus: gutterlings
+depth: 6
+atk: 7
+hp: 7
+keywords: [Venom, Afterglow]
+effects:
+  - trigger: Echo
+    persist: CombatCopy
+    actions:
+      - type: Summon
+        unit: tok_venom_grub
+        count: 2

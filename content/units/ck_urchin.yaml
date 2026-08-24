@@ -1,0 +1,14 @@
+id: ck_urchin
+name: Coal Urchin
+chorus: cinderkin
+depth: 1
+atk: 2
+hp: 1
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: SetFlag
+        flag: NextRerollFree
+        duration: ThisRecruit

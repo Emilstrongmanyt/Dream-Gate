@@ -1,0 +1,17 @@
+id: ab_harrow
+name: Harrower
+chorus: ashbound
+depth: 5
+atk: 6
+hp: 6
+keywords: []
+effects:
+  - trigger: Echo
+    persist: CombatCopy
+    filter: { select: Friendly, keyword: Echo, excludeSelf: true }
+    actions:
+      - type: SummonFromGraveyard
+        count: 2
+        atk: 1
+        hp: 1
+        hasEcho: true

@@ -1,0 +1,15 @@
+id: gw_rivet
+name: Rivet Host
+chorus: gearwights
+depth: 2
+atk: 3
+hp: 4
+keywords: []
+effects:
+  - trigger: OnLatch
+    persist: Player
+    filter: { select: Self }
+    actions:
+      - type: GrantKeyword
+        keyword: Aegis
+        duration: Permanent

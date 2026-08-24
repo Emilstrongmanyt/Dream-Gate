@@ -1,0 +1,4 @@
+id: cap_dredger
+name: Dredger Mo
+wick: 30
+passives: [DredgerNextGrantPlus2]

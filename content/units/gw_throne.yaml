@@ -1,0 +1,16 @@
+id: gw_throne
+name: Iron Throne
+chorus: gearwights
+depth: 5
+atk: 7
+hp: 10
+keywords: [Ward]
+effects:
+  - trigger: Aura
+    persist: CombatCopy
+    filter: { select: Adjacent }
+    actions:
+      - type: BuffStats
+        atk: 2
+        hp: 2
+        duration: ThisCombat

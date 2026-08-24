@@ -1,0 +1,19 @@
+id: gw_kit
+name: Field Kit
+chorus: gearwights
+depth: 4
+atk: 2
+hp: 2
+keywords: [Latch]
+effects:
+  - trigger: OnLatch
+    persist: Player
+    filter: { select: Host }
+    actions:
+      - type: GrantKeyword
+        keyword: Aegis
+        duration: Permanent
+      - type: BuffStats
+        atk: 3
+        hp: 3
+        duration: Permanent

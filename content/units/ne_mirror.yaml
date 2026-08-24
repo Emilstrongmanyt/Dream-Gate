@@ -1,0 +1,15 @@
+id: ne_mirror
+name: Mirror Broker
+chorus: neutral
+depth: 6
+atk: 6
+hp: 6
+keywords: []
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: CopyOwnedToHand
+        shopLegalOnly: true
+        baseCatalog: true
+        consumePool: false

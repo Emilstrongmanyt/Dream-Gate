@@ -1,0 +1,21 @@
+id: ab_pyre
+name: Pyre Saint
+chorus: ashbound
+depth: 4
+atk: 4
+hp: 6
+keywords: []
+effects:
+  - trigger: Echo
+    persist: CombatCopy
+    actions:
+      - type: Summon
+        unit: tok_ash_mote_aw
+        count: 1
+  - trigger: Kindle
+    persist: CombatCopy
+    filter: { select: RandomN }
+    actions:
+      - type: GrantKeyword
+        keyword: Afterglow
+        duration: ThisCombat

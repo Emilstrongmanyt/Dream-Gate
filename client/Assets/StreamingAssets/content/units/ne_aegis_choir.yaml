@@ -1,0 +1,15 @@
+id: ne_aegis_choir
+name: Aegis Choir
+chorus: neutral
+depth: 5
+atk: 4
+hp: 7
+keywords: []
+effects:
+  - trigger: Kindle
+    persist: CombatCopy
+    filter: { select: Friendly }
+    actions:
+      - type: GrantKeyword
+        keyword: Aegis
+        duration: ThisCombat
