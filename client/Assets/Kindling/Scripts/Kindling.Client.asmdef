@@ -2,9 +2,8 @@
   "name": "Kindling.Client",
   "rootNamespace": "Kindling.Client",
   "references": [
-    "Kindling.Sim",
-    "UnityEngine.UI",
-    "UnityEngine.InputLegacyModule"
+    "GUID:5832295c2db9cdc428d2cf926ecc92b2",
+    "GUID:2bafac87e7f4b9b418d9448d219b01ab"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

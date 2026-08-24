@@ -14,8 +14,6 @@ artifacts/
 
 ## NuGet
 *.nupkg
-**/packages/*
-!**/packages/build/
 
 ## Unity
 [Ll]ibrary/
