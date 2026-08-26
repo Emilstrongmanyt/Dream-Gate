@@ -24,7 +24,7 @@ Wick and place, and exits 0 when places `1..8` are assigned.
 
 ## Layout
 
-- `sim/Kindling.Sim` — UPM `com.kindling.sim`, no UnityEngine
+- `sim/Kindling.Sim` — UPM `com.kindling.sim`, no UnityEngine. Includes `MatchSession` (protocol v1, snapshots, server timer). Sockets/Redis not wired yet.
 - `sim/Kindling.Sim.Tests` — goldens and match-loop tests
 - `content/` — YAML catalog (canonical) + JSON schemas
 - `tools/HeadlessAlpha` — console runner
