@@ -19,6 +19,14 @@ Runs `Kindling.Sim.Tests` (net8, xUnit) against `Kindling.Sim` (netstandard2.1).
 dotnet run --project tools/HeadlessAlpha
 ```
 
+## Local match host (Phase 3)
+
+```bash
+dotnet run --project tools/MatchHost
+```
+
+Listens on `http://127.0.0.1:5080/`. `POST /v1/queue` starts a 1v7 Casual match immediately. WebSocket ` /v1/match?id=&seat=&token=` speaks protocol v1. Checkpoints are JSON in-process (Redis later).
+
 Loads `content/`, fills all eight seats with heuristic bots, prints round-by-round
 Wick and place, and exits 0 when places `1..8` are assigned.
 

@@ -123,6 +123,11 @@ namespace Kindling.Sim.Match
             return i + 4 <= json.Length && json.Substring(i, 4) == "true";
         }
 
+        public static int[] ReadIntArrayPublic(string json, string key)
+        {
+            return ReadIntArray(json, key);
+        }
+
         static int[] ReadIntArray(string json, string key)
         {
             string needle = "\"" + key + "\":";
@@ -156,6 +161,33 @@ namespace Kindling.Sim.Match
                 i++;
             }
             return v * sign;
+        }
+
+        public static System.Collections.Generic.List<string> ExtractObjects(string json, string key)
+        {
+            var list = new System.Collections.Generic.List<string>();
+            if (string.IsNullOrEmpty(json)) return list;
+            string needle = "\"" + key + "\":";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return list;
+            i = json.IndexOf('[', i);
+            if (i < 0) return list;
+            i++;
+            while (i < json.Length)
+            {
+                while (i < json.Length && json[i] != '{' && json[i] != ']') i++;
+                if (i >= json.Length || json[i] == ']') break;
+                int start = i;
+                int depth = 0;
+                do
+                {
+                    if (json[i] == '{') depth++;
+                    else if (json[i] == '}') depth--;
+                    i++;
+                } while (i < json.Length && depth > 0);
+                list.Add(json.Substring(start, i - start));
+            }
+            return list;
         }
 
         static int SkipWs(string s, int i)

@@ -86,6 +86,8 @@ namespace Kindling.Sim.Match
                 return SnapshotFor(seat, 0);
             if (json != null && json.IndexOf("\"op\":\"Join\"", StringComparison.Ordinal) >= 0)
                 return Welcome(seat);
+            if (json != null && json.IndexOf("\"op\":\"Reconnect\"", StringComparison.Ordinal) >= 0)
+                return SnapshotFor(seat, LastSeq[seat]);
             RecruitAction a = Protocol.Parse(json, seat);
             if (a == null) return Error("BAD_ACTION", 0);
             if (a.Seq > 0 && a.Seq <= LastSeq[seat])
