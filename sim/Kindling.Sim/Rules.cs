@@ -19,6 +19,17 @@ namespace Kindling.Sim
         public const int CaptainOfferCount = 3;
         public const int GlimpseOfferCount = 3;
         public const int DummyGhostCount = 3;
+        public const int CaptainPickSeconds = 20;
+        public const int CombatPlaybackCapSeconds = 12;
+        public const int CombatAutoContinueSeconds = 2;
+
+        /// <summary>Round 1 is 15s; round 5 and later are 60s. Linear in between.</summary>
+        public static int RecruitSeconds(int round)
+        {
+            if (round < 1) round = 1;
+            if (round >= 5) return 60;
+            return 15 + ((round - 1) * 45) / 4;
+        }
 
         public static readonly int[] StallSizeByDepth = { 0, 3, 3, 4, 4, 5, 6 };
         public static readonly int[] CopyLimitByDepth = { 0, 16, 15, 13, 11, 9, 7 };

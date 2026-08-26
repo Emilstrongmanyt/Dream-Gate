@@ -159,17 +159,18 @@ namespace Kindling.Sim.Model
 
     public enum LatchHost
     {
-        Gearwights,
+        Humanoid,
         Any
     }
 
     public enum Chorus
     {
         Neutral = 0,
-        Cinderkin = 1,
-        Gearwights = 2,
-        Ashbound = 3,
-        Gutterlings = 4
+        Undead = 1,
+        Beast = 2,
+        Humanoid = 3,
+        Dragon = 4,
+        Spirit = 5
     }
 
     public enum CaptainPassive
@@ -181,7 +182,7 @@ namespace Kindling.Sim.Model
         KettleStallPlus1,
         CandleAwakenPlus2,
         GlassKindleLeftAegis,
-        SkivGutterlingOnBuyPlus1Atk
+        SkivBeastOnBuyPlus1Atk
     }
 
     public enum Phase

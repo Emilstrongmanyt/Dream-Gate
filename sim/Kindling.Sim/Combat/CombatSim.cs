@@ -177,6 +177,7 @@ namespace Kindling.Sim.Combat
             }
             rt.First = rt.FirstP.Board;
             rt.Second = rt.SecondP.Board;
+            CaptureOpening(rt.Result, origA, origB, rt.A, rt.B);
 
             AuraRefresh(rt);
             rt.Log(CombatOp.KindleStart, rt.FirstP.Seat, rt.SecondP.Seat, 0, 0, 0, 0, 0, 0, 0, null, "first");
@@ -547,6 +548,41 @@ namespace Kindling.Sim.Combat
             {
                 if (board[i].Hp <= 0) board[i].DeathProcessed = true;
             }
+        }
+
+        static void CaptureOpening(CombatResult res, PlayerState origA, PlayerState origB, PlayerState a, PlayerState b)
+        {
+            res.SeatA = origA.Seat;
+            res.SeatB = origB.Seat;
+            res.NameA = origA.DisplayName ?? "";
+            res.NameB = origB.DisplayName ?? "";
+            res.DepthA = origA.Depth;
+            res.DepthB = origB.GhostRingDepth > 0 ? origB.GhostRingDepth : origB.Depth;
+            res.WickA = origA.Wick;
+            res.WickB = origB.Wick >= 100000 ? 0 : origB.Wick;
+            res.BoardA = SnapBoard(a.Board, origA.Seat);
+            res.BoardB = SnapBoard(b.Board, origB.Seat);
+        }
+
+        static System.Collections.Generic.List<CombatPiece> SnapBoard(System.Collections.Generic.List<UnitInstance> board, int seat)
+        {
+            var list = new System.Collections.Generic.List<CombatPiece>(board.Count);
+            for (int i = 0; i < board.Count; i++)
+            {
+                UnitInstance u = board[i];
+                list.Add(new CombatPiece
+                {
+                    InstanceId = u.InstanceId,
+                    CatalogId = u.CatalogId,
+                    Atk = u.EffectiveAtk,
+                    Hp = u.Hp,
+                    MaxHp = u.MaxHp,
+                    Keywords = u.Keywords,
+                    Awakened = u.Awakened,
+                    Seat = seat
+                });
+            }
+            return list;
         }
 
         static void AuraRefresh(CombatRuntime rt)

@@ -19,17 +19,70 @@ namespace Kindling.Client
         public static readonly Color Selected = Hex("ffe27a");
 
         public static Font Font;
+        static readonly Sprite[] PatternCache = new Sprite[8];
 
         public static Color ChorusColor(Chorus c)
         {
             switch (c)
             {
-                case Chorus.Cinderkin: return Hex("c45c12");
-                case Chorus.Gearwights: return Hex("4a6d8c");
-                case Chorus.Ashbound: return Hex("6b3a8c");
-                case Chorus.Gutterlings: return Hex("3d7a3a");
+                case Chorus.Undead: return Hex("6b3a8c");
+                case Chorus.Beast: return Hex("3d7a3a");
+                case Chorus.Humanoid: return Hex("c45c12");
+                case Chorus.Dragon: return Hex("a33b2b");
+                case Chorus.Spirit: return Hex("5aa0c8");
                 default: return Hex("6e5b3a");
             }
+        }
+
+        public static Sprite ChorusPattern(Chorus c)
+        {
+            int i = (int)c;
+            if (i < 0 || i >= PatternCache.Length) return null;
+            if (PatternCache[i] != null) return PatternCache[i];
+            PatternCache[i] = MakePattern(c);
+            return PatternCache[i];
+        }
+
+        static Sprite MakePattern(Chorus c)
+        {
+            const int n = 16;
+            var tex = new Texture2D(n, n, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Point;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            Color on = new Color(1f, 1f, 1f, 0.42f);
+            Color off = new Color(1f, 1f, 1f, 0f);
+            for (int y = 0; y < n; y++)
+            {
+                for (int x = 0; x < n; x++)
+                {
+                    bool lit = false;
+                    switch (c)
+                    {
+                        case Chorus.Undead:
+                            lit = ((x + y) % 4) == 0;
+                            break;
+                        case Chorus.Beast:
+                            lit = (x % 5 == 2) && (y % 5 == 2);
+                            break;
+                        case Chorus.Humanoid:
+                            lit = (x % 4) == 0;
+                            break;
+                        case Chorus.Dragon:
+                            {
+                                int dx = x - 7, dy = y - 7;
+                                int d = dx * dx + dy * dy;
+                                lit = d >= 20 && d <= 36;
+                                break;
+                            }
+                        case Chorus.Spirit:
+                            lit = (y % 4) == 0;
+                            break;
+                    }
+                    tex.SetPixel(x, y, lit ? on : off);
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), n);
         }
 
         public static Sprite Pixel(Color color)
@@ -135,6 +188,82 @@ namespace Kindling.Client
             if ((k & Keyword.Venom) != 0) s += "Venom ";
             if ((k & Keyword.Latch) != 0) s += "Latch ";
             return s.Trim();
+        }
+
+        public static string Inspect(UnitDef def, UnitInstance live)
+        {
+            if (def == null) return "";
+            var sb = new System.Text.StringBuilder();
+            sb.Append(def.Name).AppendLine();
+            sb.Append(def.Chorus);
+            if (def.Spell) sb.Append("  Spell");
+            sb.Append("  D").Append(def.Depth).AppendLine();
+            if (def.Spell)
+                sb.AppendLine("Play from hand to cast.");
+            else
+            {
+                int atk = live != null ? live.EffectiveAtk : def.Atk;
+                int hp = live != null ? live.Hp : def.Hp;
+                sb.Append(atk).Append(" / ").Append(hp).AppendLine();
+            }
+            string kw = Keywords(live != null ? live.Keywords : def.Keywords, live != null && live.Awakened);
+            if (kw.Length > 0) sb.AppendLine(kw);
+            sb.Append(MechanicalLine(def));
+            return sb.ToString();
+        }
+
+        public static string MechanicalLine(UnitDef def)
+        {
+            if (def == null) return "";
+            if (def.Spell) return TriggersOf(def);
+            string t = TriggersOf(def);
+            if (t.Length == 0) return "Text comes later.";
+            return t;
+        }
+
+        static string TriggersOf(UnitDef def)
+        {
+            if (def.Effects == null || def.Effects.Count == 0) return "";
+            var seen = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < def.Effects.Count; i++)
+            {
+                string n = def.Effects[i].Trigger.ToString();
+                bool hit = false;
+                for (int s = 0; s < seen.Count; s++)
+                    if (seen[s] == n) { hit = true; break; }
+                if (!hit) seen.Add(n);
+            }
+            if (seen.Count == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < seen.Count; i++)
+            {
+                if (i > 0) sb.Append(" · ");
+                sb.Append(seen[i]);
+            }
+            return sb.ToString();
+        }
+
+        public static string ChorusTags(PlayerState p, Catalog cat)
+        {
+            if (p == null || cat == null) return "";
+            var seen = new System.Collections.Generic.List<Chorus>();
+            void add(UnitInstance u)
+            {
+                UnitDef d = cat.GetUnit(u.CatalogId);
+                if (d == null || d.Chorus == Chorus.Neutral) return;
+                for (int i = 0; i < seen.Count; i++)
+                    if (seen[i] == d.Chorus) return;
+                seen.Add(d.Chorus);
+            }
+            for (int i = 0; i < p.Board.Count; i++) add(p.Board[i]);
+            if (seen.Count == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < seen.Count; i++)
+            {
+                if (i > 0) sb.Append("  ");
+                sb.Append(seen[i]);
+            }
+            return sb.ToString();
         }
     }
 }

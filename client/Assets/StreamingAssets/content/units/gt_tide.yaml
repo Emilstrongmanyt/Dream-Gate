@@ -1,6 +1,6 @@
 id: gt_tide
 name: Tide Peck
-chorus: gutterlings
+chorus: beast
 depth: 2
 atk: 2
 hp: 4
@@ -8,7 +8,7 @@ keywords: []
 effects:
   - trigger: OnBuy
     persist: Player
-    when: { op: SourceIsChorus, chorus: gutterlings }
+    when: { op: SourceIsChorus, chorus: beast }
     filter: { select: Self }
     actions:
       - type: BuffStats

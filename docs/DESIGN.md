@@ -51,7 +51,7 @@ Greenfield means every path, package, and convention below is a proposal to crea
 | Match-node death | Eight players lose a run | Checkpoint every action; abort-without-MMR if resume fails |
 | Seasonal rewrite | Live-ops dies if Relics fork combat | `ISeasonModule` slot |
 | P2W season pass | Store rejection + community death | Cosmetics only; Ranked always 3 captain offers |
-| Boiling-the-ocean content | 245-unit catalog before a playable loop | MVP: 4 Choruses, ~48 shop units, 12 captains |
+| Boiling-the-ocean content | 245-unit catalog before a playable loop | MVP: 5 Choruses, ~48 shop units, stall spells, 12 captains |
 
 ---
 
@@ -123,6 +123,7 @@ After the Sundering, a traveling night-market called **The Ember Exchange** appe
 | Start-of-combat analog | Kindle | `Kindle` |
 | Magnetic analog | Latch | `Latch` |
 | Permanent buff gem | Cinder | `Cinder` |
+| Stall spell | Spell | `UnitDef.Spell` (buy to hand, Play casts, no board) |
 | Spell analog (post-MVP) | Charm | `Charm` |
 
 UI, code, and catalog **always say Reroll**, never Refresh.
@@ -282,19 +283,18 @@ function RecruitEnd(match, p):
 | 7 | 9 | 4 |
 | 8+ | 10 | 4–6 |
 
-**Recruit timer curve** (seconds, server wall-clock)
+**Recruit timer curve** (seconds, server wall-clock). Timeout **auto-Ready** and starts combat. Client does not pause for Glimpse.
 
 | Round | Seconds |
 |---|---|
 | Captain pick | 20 |
-| Recruit 1 | 45 |
-| Recruit 2 | 50 |
-| Recruit 3 | 55 |
-| Recruit 4–5 | 60 |
-| Recruit 6–7 | 75 |
-| Recruit 8+ | 90 |
+| Recruit 1 | 15 |
+| Recruit 2 | 26 |
+| Recruit 3 | 37 |
+| Recruit 4 | 48 |
+| Recruit 5+ | 60 |
 
-Client displays `serverEndUnixMs - now`. A 3s local grace after timeout is **rejected**.
+`RecruitSeconds(r) = r >= 5 ? 60 : 15 + (r-1)*45/4`. Client displays remaining time. A 3s local grace after timeout is **rejected**. Combat playback is capped at **12s** then Skip; next Recruit auto-continues after **2s** unless the match is over.
 
 ### 3. Core loop (player-facing)
 
@@ -313,7 +313,7 @@ Embers are granted by GrantEmbers and **burn at Recruit end** (after EndOfRecrui
 
 | Action | Cost | Notes |
 |---|---|---|
-| Buy stall unit → hand or board | 3 | `destIndex` is an insert index into the **dense** list: board `0..Count` (Count means append), requiring `Count < 7` for board or `Count < 10` for hand. Visual empty slots are client-only. If both full, action illegal. |
+| Buy stall unit → **hand only** | 3 | Purchases always insert into hand (`HAND_FULL` if 10). Arrival does **not** fire on buy. Play from hand → board is a separate action (`destIndex` into dense board `0..Count`). |
 | Sell board or hand unit | gain 1 | Returns **base** catalog copy to pool. Latch attachments destroyed, not refunded. Cinders lost. |
 | Reroll | 1 (or 0) | Unbought stall units return to pool; new stall drawn; **`Hold = false`**. |
 | Hold / un-Hold | 0 | `Hold=true` means those stall slots are not returned on round transition. |
@@ -717,7 +717,7 @@ No additional keywords in MVP. New text composes from these + the closed action 
 | **Kindle** | `Kindle` | Start of combat, once per combat instance. |
 | **Latch** | `Latch` | Modular attach. See the single targeting rule. |
 
-**Latch — one targeting sentence.** A Latch unit in **hand** may be attached to **any** legal host on the board; a Latch unit **on the board** may be attached only to an **adjacent** legal host. Default host filter: `host.Chorus == Gearwights`, unless the Latch catalog sets `latchHost: Any`. Consume the Latch unit; add its Atk/Hp to the host; union keywords (Flags OR); if `latchTransferEffects: true` (MVP default true), append the Latch unit’s Echo/Kindle effects onto the host for this match.
+**Latch — one targeting sentence.** A Latch unit in **hand** may be attached to **any** legal host on the board; a Latch unit **on the board** may be attached only to an **adjacent** legal host. Default host filter: `host.Chorus == Humanoid`, unless the Latch catalog sets `latchHost: Any`. Consume the Latch unit; add its Atk/Hp to the host; union keywords (Flags OR); if `latchTransferEffects: true` (MVP default true), append the Latch unit’s Echo/Kindle effects onto the host for this match.
 
 From stall: Buy then Latch are two actions.
 
@@ -731,16 +731,19 @@ Awakened Latch: the consumed body’s stats are the Awakened stats (then multipl
 
 ### 9. Choruses (factions)
 
-MVP ships **four** Choruses + Neutrals. Four more names are reserved.
+MVP ships **five** Choruses. Roster target is **10–12 shop units per Chorus** plus stall spells. Current YAML is a seed: names, art, and authored effect text wait on content. Do not stub fake units or flavor copy to fill the count. More Choruses only if a tribe has a distinct shop identity.
 
-| Chorus | Color / pattern | Identity | Internal analog (docs only) |
+| Chorus | Color / pattern | Identity | Notes |
 |---|---|---|---|
-| **Cinderkin** | Copper / stripe | Economy / stall-cycle | Shop-cycle |
-| **Gearwights** | Brass / ring | Modular Latch bodies | Magnetic |
-| **Ashbound** | Violet / hatch | Echo / Afterglow recursion | Deathrattle + reborn |
-| **Gutterlings** | Sickle-green / dot | Venom, tokens, scam | Poison swarm |
+| **Undead** | Violet / hatch | Echo / Afterglow recursion | Former Ashbound bodies |
+| **Beast** | Sickle-green / dot | Venom, tokens, scam | Former Gutterlings |
+| **Humanoid** | Copper / stripe | Economy, Latch hosts and Latch pieces | Default Latch host. Former Cinderkin + Gearwights |
+| **Dragon** | Ember-red / ring | Kindle, Aegis, Cinder payload | Seeded from big/kindle Neutrals |
+| **Spirit** | Ice-blue / dot | Glimpse, Echo aura, copy | Seeded from oracle/scribe/mirror Neutrals |
 
-Post-MVP reserved: **Leywyrms** (Kindle scaling), **Thornkin** (self-Wick), **Spellweirs** (Charm engines), **Runebeasts** (Cinder plan). Do not implement units in MVP.
+Stall **spells** are a shop type, not a sixth Chorus: buy to hand, Play casts Arrival then discards, never occupy the board, never Awaken. Neutral remains as a tag for spells and dummy tokens.
+
+Post-MVP reserved (only if identity is worth a shop tag): **Thornkin** (self-Wick), **Spellweirs** (Charm engines), **Runebeasts** (Cinder plan). Do not implement extra tribes in this slice.
 
 ### 10. MVP catalog — Captains (12)
 
@@ -748,10 +751,10 @@ All active Edicts are once per Recruit. `cost` is Embers. Duplicate Captains **a
 
 | Id | Name | Wick | Edict / passive | Role |
 |---|---|---|---|---|
-| `cap_vesper` | Captain Vesper | 30 | Passive: first Reroll each Recruit costs 0 (`Flags.VesperFreeReroll`). | Cinderkin |
-| `cap_mere` | Iron Mere | 30 | Cost 1: `AddToHand` `tok_scrap` (2/1 Latch). | Gearwight |
-| `cap_widow` | Widow Ash | 30 | Cost 1: target friendly unit GrantKeyword Echo + attached `Summon tok_ash_mote`. | Ashbound |
-| `cap_skiv` | Skiv the Gutter | 30 | Passive: OnBuy, if bought unit Chorus==Gutterlings, BuffStats +1 Atk Permanent on that unit. | Gutterling |
+| `cap_vesper` | Captain Vesper | 30 | Passive: first Reroll each Recruit costs 0 (`Flags.VesperFreeReroll`). | Humanoid |
+| `cap_mere` | Iron Mere | 30 | Cost 1: `AddToHand` `tok_scrap` (2/1 Latch). | Humanoid |
+| `cap_widow` | Widow Ash | 30 | Cost 1: target friendly unit GrantKeyword Echo + attached `Summon tok_ash_mote`. | Undead |
+| `cap_skiv` | Skiv the Gutter | 30 | Passive: OnBuy, if bought unit Chorus==Beast, BuffStats +1 Atk Permanent on that unit. | Beast |
 | `cap_debt` | Ledger of Debt | 25 | Passive: inside GrantEmbers (see §2.1). | Economy |
 | `cap_sable` | Sable Coil | 30 | Cost 2: Glimpse at **current** Depth (not +1). | Value |
 | `cap_jun` | **Hollow Jun** | 30 | Cost 0 once: if Wick > 1, Wick -= 1, BuffStats +1/+1 Permanent on target. Illegal at Wick==1. | Tempo |
@@ -775,79 +778,79 @@ Stats are **base**. Designers edit YAML; engineers do not hardcode stats. Englis
 
 | Id | Name | Chorus | Atk/Hp | Text |
 |---|---|---|---|---|
-| `ck_urchin` | Coal Urchin | Cinderkin | 2/1 | Arrival: next Reroll this Recruit costs 0. |
-| `ck_tally` | Tally Rat | Cinderkin | 1/2 | Echo: `PendingEmbers += 1` (**persist Player**). |
-| `gw_cog` | Cogling | Gearwights | 2/2 | Latch. |
-| `gw_washer` | Washer | Gearwights | 1/3 | Latch. Ward. |
-| `ab_cinderling` | Cinderling | Ashbound | 2/1 | Afterglow. |
-| `ab_bell` | Grave Bell | Ashbound | 1/2 | Echo: Summon `tok_ash_mote`. |
-| `gt_skulk` | Skulker | Gutterlings | 2/1 | Venom. |
-| `gt_grub` | Grub | Gutterlings | 1/1 | Arrival: Summon `tok_grub` if board space. |
-| `ne_warden` | Gate Warden | Neutral | 1/4 | Ward. |
-| `ne_porter` | Porter | Neutral | 2/2 | Arrival: +1/+1 Permanent to a random friendly. |
+| `ck_urchin` | Coal Urchin | Humanoid | 2/1 | Arrival: next Reroll this Recruit costs 0. |
+| `ck_tally` | Tally Rat | Humanoid | 1/2 | Echo: `PendingEmbers += 1` (**persist Player**). |
+| `gw_cog` | Cogling | Humanoid | 2/2 | Latch. |
+| `gw_washer` | Washer | Humanoid | 1/3 | Latch. Ward. |
+| `ab_cinderling` | Cinderling | Undead | 2/1 | Afterglow. |
+| `ab_bell` | Grave Bell | Undead | 1/2 | Echo: Summon `tok_ash_mote`. |
+| `gt_skulk` | Skulker | Beast | 2/1 | Venom. |
+| `gt_grub` | Grub | Beast | 1/1 | Arrival: Summon `tok_grub` if board space. |
+| `ne_warden` | Gate Warden | Humanoid | 1/4 | Ward. |
+| `ne_porter` | Porter | Humanoid | 2/2 | Arrival: +1/+1 Permanent to a random friendly. |
 
 #### Depth 2 (10)
 
 | Id | Name | Chorus | Atk/Hp | Text |
 |---|---|---|---|---|
-| `ck_brokerling` | Brokerling | Cinderkin | 3/3 | OnReroll: self +1/+1 Permanent. |
-| `ck_scale` | Scale Thief | Cinderkin | 2/3 | Arrival: if Embers ≥ 6 **after** paying the buy, GainEmbers 1. |
-| `gw_rivet` | Rivet Host | Gearwights | 3/4 | OnLatch (this is host): GrantKeyword Aegis Permanent. |
-| `gw_spark` | Spark Bit | Gearwights | 2/2 | Latch. Kindle: DealDamage 1 random enemy. |
-| `ab_urn` | Urn Kin | Ashbound | 3/2 | Echo: +2/+2 Permanent to a random **combat-copy** friendly (does **not** persist to Recruit). |
-| `ab_veil` | Veil Walker | Ashbound | 2/3 | Afterglow. Echo: Summon `tok_ash_mote`. |
-| `gt_needle` | Needle Fin | Gutterlings | 3/1 | Venom. Arrival: +1 Atk Permanent to another Gutterling. |
-| `gt_tide` | Tide Peck | Gutterlings | 2/4 | OnBuy (any Gutterling): self +1/+1 Permanent. |
-| `ne_scribe` | Stall Scribe | Neutral | 2/3 | Arrival: Glimpse Depth 1 (fixed). |
-| `ne_lantern` | Lantern | Neutral | 3/3 | Kindle: adjacent +1 Atk ThisCombat. |
+| `ck_brokerling` | Brokerling | Humanoid | 3/3 | OnReroll: self +1/+1 Permanent. |
+| `ck_scale` | Scale Thief | Humanoid | 2/3 | Arrival: if Embers ≥ 6 **after** paying the buy, GainEmbers 1. |
+| `gw_rivet` | Rivet Host | Humanoid | 3/4 | OnLatch (this is host): GrantKeyword Aegis Permanent. |
+| `gw_spark` | Spark Bit | Humanoid | 2/2 | Latch. Kindle: DealDamage 1 random enemy. |
+| `ab_urn` | Urn Kin | Undead | 3/2 | Echo: +2/+2 Permanent to a random **combat-copy** friendly (does **not** persist to Recruit). |
+| `ab_veil` | Veil Walker | Undead | 2/3 | Afterglow. Echo: Summon `tok_ash_mote`. |
+| `gt_needle` | Needle Fin | Beast | 3/1 | Venom. Arrival: +1 Atk Permanent to another Beast. |
+| `gt_tide` | Tide Peck | Beast | 2/4 | OnBuy (any Beast): self +1/+1 Permanent. |
+| `ne_scribe` | Stall Scribe | Spirit | 2/3 | Arrival: Glimpse Depth 1 (fixed). |
+| `ne_lantern` | Lantern | Dragon | 3/3 | Kindle: adjacent +1 Atk ThisCombat. |
 
 #### Depth 3 (8)
 
 | Id | Name | Chorus | Atk/Hp | Text |
 |---|---|---|---|---|
-| `ck_cashier` | Ember Cashier | Cinderkin | 3/4 | EndOfRecruit: if `BoughtThisRecruit >= 2`, `PendingEmbers += 1`. |
-| `ck_barker` | Barker | Cinderkin | 4/4 | OnReroll: +1/+1 Permanent to a random friendly Cinderkin. |
-| `gw_chassis` | Chassis | Gearwights | 4/6 | Ward. OnLatch (you played a Latch): self +1/+1 Permanent. |
-| `gw_magnet` | Magnet Monk | Gearwights | 3/3 | Arrival: AttachLatch a 2/2 Cogling token onto self (no pool). |
-| `ab_choir` | Ash Choir | Ashbound | 3/4 | Echo: Summon two `tok_ash_mote`. Afterglow. |
-| `gt_duke` | Gutter Duke | Gutterlings | 4/3 | Venom. Kindle: GrantKeyword Venom ThisCombat to a random other Gutterling. |
-| `ne_echoist` | Echoist | Neutral | 3/4 | Aura: `SetEchoTimesBonus` amount=1. Dispatcher Echo count = `1 + sum(bonuses)` on the side. YAML `echoTimes` stays default 1. Afterglow is not Echo. |
-| `ne_wall` | Market Wall | Neutral | 2/8 | Ward. |
+| `ck_cashier` | Ember Cashier | Humanoid | 3/4 | EndOfRecruit: if `BoughtThisRecruit >= 2`, `PendingEmbers += 1`. |
+| `ck_barker` | Barker | Humanoid | 4/4 | OnReroll: +1/+1 Permanent to a random friendly Humanoid. |
+| `gw_chassis` | Chassis | Humanoid | 4/6 | Ward. OnLatch (you played a Latch): self +1/+1 Permanent. |
+| `gw_magnet` | Magnet Monk | Humanoid | 3/3 | Arrival: AttachLatch a 2/2 Cogling token onto self (no pool). |
+| `ab_choir` | Ash Choir | Undead | 3/4 | Echo: Summon two `tok_ash_mote`. Afterglow. |
+| `gt_duke` | Gutter Duke | Beast | 4/3 | Venom. Kindle: GrantKeyword Venom ThisCombat to a random other Beast. |
+| `ne_echoist` | Echoist | Spirit | 3/4 | Aura: `SetEchoTimesBonus` amount=1. Dispatcher Echo count = `1 + sum(bonuses)` on the side. YAML `echoTimes` stays default 1. Afterglow is not Echo. |
+| `ne_wall` | Market Wall | Humanoid | 2/8 | Ward. |
 
 #### Depth 4 (8)
 
 | Id | Name | Chorus | Atk/Hp | Text |
 |---|---|---|---|---|
-| `ck_tycoon` | Coal Tycoon | Cinderkin | 5/5 | OnBuy: SetFlag `TycoonFreeReroll` Once ThisRecruit; next Reroll costs 0. |
-| `gw_coloss` | Coloss Frame | Gearwights | 6/8 | Ward. Arrival: `BuffStatsScaled` `{counter: LatchPlaysThisMatch, atk:2, hp:2, duration: Permanent}`. |
-| `ab_pyre` | Pyre Saint | Ashbound | 4/6 | Echo: Summon `tok_ash_mote_aw`. Kindle: GrantKeyword Afterglow ThisCombat to a random friendly. |
-| `gt_queen` | Needle Queen | Gutterlings | 5/4 | Venom. OnVenomKill (friendly source): self +2/+1 Permanent, `persist: Player` (keeps across combats). |
-| `ne_doubler` | Arrival Twin | Neutral | 4/4 | Arrival: copy another friendly unit’s Arrival this Recruit, **target chosen**, once. No legal target → no-op. Cannot self-target. Copying a Glimpse Arrival fires Glimpse again. |
-| `ne_smelter` | Smelter | Neutral | 3/5 | Arrival: GiveCinder 2 to target unit. |
-| `ck_investor` | Investor | Cinderkin | 4/4 | StartOfRecruit, `when: DepthGte 4`: GainEmbers 1. **Not** a GrantEmbers special case. |
-| `gw_kit` | Field Kit | Gearwights | 2/2 | Latch. On attach: host Aegis + +3/+3 Permanent. |
+| `ck_tycoon` | Coal Tycoon | Humanoid | 5/5 | OnBuy: SetFlag `TycoonFreeReroll` Once ThisRecruit; next Reroll costs 0. |
+| `gw_coloss` | Coloss Frame | Humanoid | 6/8 | Ward. Arrival: `BuffStatsScaled` `{counter: LatchPlaysThisMatch, atk:2, hp:2, duration: Permanent}`. |
+| `ab_pyre` | Pyre Saint | Undead | 4/6 | Echo: Summon `tok_ash_mote_aw`. Kindle: GrantKeyword Afterglow ThisCombat to a random friendly. |
+| `gt_queen` | Needle Queen | Beast | 5/4 | Venom. OnVenomKill (friendly source): self +2/+1 Permanent, `persist: Player` (keeps across combats). |
+| `ne_doubler` | Arrival Twin | Humanoid | 4/4 | Arrival: copy another friendly unit’s Arrival this Recruit, **target chosen**, once. No legal target → no-op. Cannot self-target. Copying a Glimpse Arrival fires Glimpse again. |
+| `ne_smelter` | Smelter | Humanoid | 3/5 | Arrival: GiveCinder 2 to target unit. |
+| `ck_investor` | Investor | Humanoid | 4/4 | StartOfRecruit, `when: DepthGte 4`: GainEmbers 1. **Not** a GrantEmbers special case. |
+| `gw_kit` | Field Kit | Humanoid | 2/2 | Latch. On attach: host Aegis + +3/+3 Permanent. |
 
 #### Depth 5 (6)
 
 | Id | Name | Chorus | Atk/Hp | Text |
 |---|---|---|---|---|
-| `ck_exchange` | Exchange Heart | Cinderkin | 6/6 | OnReroll: `AddToHandFromPool` chorus=cinderkin depthMax=3 consume=true. RandomN uses **Stream.Recruit**. HandFull → skip add. |
-| `gw_throne` | Iron Throne | Gearwights | 7/10 | Ward. Aura: adjacent +2/+2. |
-| `ab_harrow` | Harrower | Ashbound | 6/6 | Echo: `SummonFromGraveyard` count=2 atk=1 hp=1, filter friendly+hasEcho. |
-| `gt_bloom` | Venom Bloom | Gutterlings | 6/5 | Venom. Kindle: all friendly Gutterlings +2 Atk ThisCombat. |
-| `ne_oracle` | Oracle | Neutral | 5/5 | Arrival: Glimpse current Depth. |
-| `ne_aegis_choir` | Aegis Choir | Neutral | 4/7 | Kindle: all friendly Aegis ThisCombat. |
+| `ck_exchange` | Exchange Heart | Humanoid | 6/6 | OnReroll: `AddToHandFromPool` chorus=humanoid depthMax=3 consume=true. RandomN uses **Stream.Recruit**. HandFull → skip add. |
+| `gw_throne` | Iron Throne | Humanoid | 7/10 | Ward. Aura: adjacent +2/+2. |
+| `ab_harrow` | Harrower | Undead | 6/6 | Echo: `SummonFromGraveyard` count=2 atk=1 hp=1, filter friendly+hasEcho. |
+| `gt_bloom` | Venom Bloom | Beast | 6/5 | Venom. Kindle: all friendly Beasts +2 Atk ThisCombat. |
+| `ne_oracle` | Oracle | Spirit | 5/5 | Arrival: Glimpse current Depth. |
+| `ne_aegis_choir` | Aegis Choir | Dragon | 4/7 | Kindle: all friendly Aegis ThisCombat. |
 
 #### Depth 6 (6)
 
 | Id | Name | Chorus | Atk/Hp | Text |
 |---|---|---|---|---|
-| `ck_sovereign` | Ember Sovereign | Cinderkin | 8/8 | EndOfRecruit: `PendingEmbersFromCounter` `{counter: RerollsThisRecruit, max: 3}` before burn. |
-| `gw_godgear` | Godgear | Gearwights | 8/12 | Ward. Afterglow. `onLatched: {statMulN: 3, statMulD: 2}`. |
-| `ab_night` | Night of Ash | Ashbound | 7/7 | Echo: `SummonFill` `tok_ash_mote` (2/2 Afterglow) until occupancy 7. |
-| `gt_hydra` | Gutter Hydra | Gutterlings | 7/7 | Venom. Afterglow. Echo: two `tok_venom_grub`. |
-| `ne_crown` | Crown of Cinders | Neutral | 6/8 | Arrival: GiveCinder 2 to all friendly. |
-| `ne_mirror` | Mirror Broker | Neutral | 6/6 | Arrival: `CopyOwnedToHand` `{shopLegalOnly: true, baseCatalog: true, consumePool: false}`. Stream.Recruit. HandFull → no-op. |
+| `ck_sovereign` | Ember Sovereign | Humanoid | 8/8 | EndOfRecruit: `PendingEmbersFromCounter` `{counter: RerollsThisRecruit, max: 3}` before burn. |
+| `gw_godgear` | Godgear | Humanoid | 8/12 | Ward. Afterglow. `onLatched: {statMulN: 3, statMulD: 2}`. |
+| `ab_night` | Night of Ash | Undead | 7/7 | Echo: `SummonFill` `tok_ash_mote` (2/2 Afterglow) until occupancy 7. |
+| `gt_hydra` | Gutter Hydra | Beast | 7/7 | Venom. Afterglow. Echo: two `tok_venom_grub`. |
+| `ne_crown` | Crown of Cinders | Dragon | 6/8 | Arrival: GiveCinder 2 to all friendly. |
+| `ne_mirror` | Mirror Broker | Spirit | 6/6 | Arrival: `CopyOwnedToHand` `{shopLegalOnly: true, baseCatalog: true, consumePool: false}`. Stream.Recruit. HandFull → no-op. |
 
 #### Tokens (not in pool)
 
@@ -860,6 +863,20 @@ Stats are **base**. Designers edit YAML; engineers do not hardcode stats. Englis
 | `tok_cog_latch` | Cogling Latch | 2/2 | Latch |
 | `tok_scrap` | Scrap | 2/1 | Latch (Mere) |
 | `tok_dummy` | Cinder Dummy | 2/2 | Ghost fallback |
+
+#### Stall spells (shop type, not a Chorus)
+
+Buy cost is still 3 Embers; Play from hand casts Arrival then discards. No board slot. Does not Awaken. Glimpse never offers a spell.
+
+| Id | Name | Depth | Text |
+|---|---|---|---|
+| `sp_whet` | Whetstone | 1 | +1 Atk Permanent to all friendly. |
+| `sp_mark` | Broker's Mark | 1 | Next Reroll this Recruit costs 0. |
+| `sp_salve` | Cinder Salve | 2 | +1/+1 Permanent to all friendly. |
+| `sp_foresight` | Foresight | 3 | Glimpse at current Depth. |
+| `sp_oil` | Ember Oil | 4 | GiveCinder 1 to all friendly. |
+| `sp_hymn` | Warding Hymn | 5 | +2/+2 Permanent to all friendly. |
+| `sp_market` | Night Market | 6 | GainEmbers 5. |
 
 #### 11.1 Persist table (Player vs CombatCopy)
 
@@ -1270,7 +1287,7 @@ Condition operators (closed): `Always`, `EmbersGte`, `DepthGte`, `BoughtThisRecr
         "depthMax": { "type": "integer" },
         "depthMode": { "enum": ["Fixed","Current","TriplePlusOne"] },
         "echoUnit": { "type": "string" },
-        "latchHost": { "enum": ["Gearwights","Any"] },
+        "latchHost": { "enum": ["Humanoid","Any"] },
         "max": { "type": "integer" },
         "counter": { "enum": ["LatchPlaysThisMatch","RerollsThisRecruit","BoughtThisRecruit"] },
         "chorus": { "type": "string" },
@@ -1433,7 +1450,7 @@ public sealed class MatchState {
 ```yaml
 id: ck_tycoon
 name: Coal Tycoon
-chorus: cinderkin
+chorus: humanoid
 depth: 4
 atk: 5
 hp: 5
@@ -1453,7 +1470,7 @@ effects:
 ```yaml
 id: ne_echoist
 name: Echoist
-chorus: neutral
+chorus: spirit
 depth: 3
 atk: 3
 hp: 4
@@ -1473,7 +1490,7 @@ Dispatcher: Echo `times = 1 + sum(SetEchoTimesBonus on the side)`. YAML `echoTim
 ```yaml
 id: gw_magnet
 name: Magnet Monk
-chorus: gearwights
+chorus: humanoid
 depth: 3
 atk: 3
 hp: 3
@@ -1492,7 +1509,7 @@ effects:
 ```yaml
 id: ab_harrow
 name: Harrower
-chorus: ashbound
+chorus: undead
 depth: 5
 atk: 6
 hp: 6
@@ -1514,7 +1531,7 @@ effects:
 ```yaml
 id: gt_queen
 name: Needle Queen
-chorus: gutterlings
+chorus: beast
 depth: 4
 atk: 5
 hp: 4
@@ -1548,7 +1565,7 @@ Captain passives that are not generic actions (`StallSizeDelta`, `DredgerBonus`,
 enum CaptainPassive:
   VesperFirstRerollFree, DebtGrantPlus1, DredgerNextGrantPlus2,
   KettleStallPlus1, CandleAwakenPlus2, GlassKindleLeftAegis,
-  SkivGutterlingOnBuyPlus1Atk
+  SkivBeastOnBuyPlus1Atk
 ```
 
 They still do not get unique C# subclasses; a `switch` on this closed enum lives in `CaptainPassives.Apply`. That switch is allowed because the set is 12 and frozen. Units may not use it.
@@ -1579,7 +1596,7 @@ effects:
     persist: Player
     actions:
       - type: AddToHandFromPool
-        chorus: cinderkin
+        chorus: humanoid
         depthMax: 3
         consume: true
 # ne_mirror
@@ -1681,7 +1698,7 @@ URL: `wss://match-{region}.kindling.game/m/{matchId}?token=`
     "flags": [],
     "glimpse": null
   },
-  "public": [{ "seat": 0, "displayName": "Ada", "wick": 22, "depth": 3, "alive": true, "chorusTags": ["gearwights"] }]
+  "public": [{ "seat": 0, "displayName": "Ada", "wick": 22, "depth": 3, "alive": true, "chorusTags": ["humanoid"] }]
 }
 ```
 
@@ -2035,7 +2052,7 @@ Removed from Open Questions (now locked): Glimpse consume; 4th offer in Ranked; 
 | # | Decision | Rationale |
 |---|---|---|
 | K1 | Original IP **Kindling**; glossary mandatory; CI grep competitor strings | Legal + voice |
-| K2 | MVP content = 8-player solo, 4 Choruses, 48 shop units, 12 captains, Depth 1–6; **calendar done = closed alpha** | Shippable loop; 20-week store is false |
+| K2 | MVP content = 8-player solo, 5 Choruses at 10–12 shop units each (seed now), stall spells, 12 captains, Depth 1–6; **calendar done = closed alpha** | Shippable loop; 20-week store is false |
 | K3 | Dedicated .NET 8 match session + shared `Kindling.Sim` | Authority, tests |
 | K4 | Burn Embers; GrantEmbers opener (PendingEmbers added after hardCap, never eaten); Investor is StartOfRecruit YAML; DredgerBonus set on Upgrade, spent next grant | One numeric story |
 | K5 | Combat: `Run(PlayerState, PlayerState, MatchRng, Catalog)` consumes evolving `Stream.Combat` with **no per-pair reseed**; Fire never drains and never AuraRefresh; `AuraRefresh` after every DrainDeaths including both Kindle drains; OnKill on lethal unshielded | One algorithm, one RNG |

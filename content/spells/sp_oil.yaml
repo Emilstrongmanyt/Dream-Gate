@@ -1,0 +1,15 @@
+id: sp_oil
+name: Ember Oil
+chorus: neutral
+depth: 4
+atk: 0
+hp: 0
+spell: true
+copyLimit: 6
+effects:
+  - trigger: Arrival
+    persist: Player
+    filter: { select: Friendly }
+    actions:
+      - type: GiveCinder
+        amount: 1

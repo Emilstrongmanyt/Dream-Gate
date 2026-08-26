@@ -1,6 +1,6 @@
 id: gt_bloom
 name: Venom Bloom
-chorus: gutterlings
+chorus: beast
 depth: 5
 atk: 6
 hp: 5
@@ -8,7 +8,7 @@ keywords: [Venom]
 effects:
   - trigger: Kindle
     persist: CombatCopy
-    filter: { select: Friendly, chorus: gutterlings }
+    filter: { select: Friendly, chorus: beast }
     actions:
       - type: BuffStats
         atk: 2

@@ -644,7 +644,7 @@ namespace Kindling.Sim.Effects
             {
                 PoolEntry e = m.Pool[i];
                 UnitDef def = ctx.Cat.GetUnit(e.Id);
-                if (def == null || def.Token || def.Disabled) continue;
+                if (def == null || def.Token || def.Spell || def.Disabled) continue;
                 if (def.Chorus != ch) continue;
                 if (def.Depth > depthMax) continue;
                 cand.Add(e);
@@ -692,7 +692,7 @@ namespace Kindling.Sim.Effects
             {
                 UnitDef d = cat.GetUnit(u.CatalogId);
                 if (d == null) return;
-                if (shopLegalOnly && d.Token) return;
+                if (shopLegalOnly && (d.Token || d.Spell)) return;
                 cand.Add(u);
             }
             for (int i = 0; i < p.Board.Count; i++) add(p.Board[i]);

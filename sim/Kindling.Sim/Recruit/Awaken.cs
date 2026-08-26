@@ -19,8 +19,8 @@ namespace Kindling.Sim.Recruit
         public static bool TryAwakenOnce(MatchState m, PlayerState p, Catalog.Catalog cat)
         {
             var counts = new List<CountRow>();
-            Tally(p.Board, counts);
-            Tally(p.Hand, counts);
+            Tally(p.Board, counts, cat);
+            Tally(p.Hand, counts, cat);
             CountRow best = default;
             bool found = false;
             for (int i = 0; i < counts.Count; i++)
@@ -116,10 +116,13 @@ namespace Kindling.Sim.Recruit
             public int Count;
         }
 
-        static void Tally(List<UnitInstance> list, List<CountRow> counts)
+        static void Tally(List<UnitInstance> list, List<CountRow> counts, Catalog.Catalog cat)
         {
             for (int i = 0; i < list.Count; i++)
             {
+                if (list[i] == null) continue;
+                UnitDef def = cat != null ? cat.GetUnit(list[i].CatalogId) : null;
+                if (def != null && (def.Spell || def.Token)) continue;
                 UnitId id = list[i].CatalogId;
                 bool hit = false;
                 for (int c = 0; c < counts.Count; c++)

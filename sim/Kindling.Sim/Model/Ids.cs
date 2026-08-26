@@ -179,11 +179,51 @@ namespace Kindling.Sim.Model
         public string Note;
     }
 
+    public sealed class CombatPiece
+    {
+        public ulong InstanceId;
+        public UnitId CatalogId;
+        public int Atk;
+        public int Hp;
+        public int MaxHp;
+        public Keyword Keywords;
+        public bool Awakened;
+        public int Seat;
+
+        public UnitInstance ToUnit()
+        {
+            return new UnitInstance
+            {
+                InstanceId = InstanceId,
+                CatalogId = CatalogId,
+                Atk = Atk,
+                Hp = Hp,
+                MaxHp = MaxHp > 0 ? MaxHp : Hp,
+                Keywords = Keywords,
+                Awakened = Awakened,
+                CombatSeat = Seat,
+                AttackCharges = 1
+            };
+        }
+    }
+
     public sealed class CombatResult
     {
         public int WinnerSeat = -1;
         public bool Draw;
         public int Damage;
+        public int SeatA;
+        public int SeatB;
+        public string NameA = "";
+        public string NameB = "";
+        public int DepthA;
+        public int DepthB;
+        public int WickA;
+        public int WickB;
+        public System.Collections.Generic.List<CombatPiece> BoardA =
+            new System.Collections.Generic.List<CombatPiece>();
+        public System.Collections.Generic.List<CombatPiece> BoardB =
+            new System.Collections.Generic.List<CombatPiece>();
         public System.Collections.Generic.List<CombatEvent> Events =
             new System.Collections.Generic.List<CombatEvent>();
         public int RemainingA;

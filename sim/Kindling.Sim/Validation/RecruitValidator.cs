@@ -73,28 +73,16 @@ namespace Kindling.Sim.Validation
             if (a.StallIndex < 0 || a.StallIndex >= p.Stall.Count) return SimResult.Fail("BAD_INDEX");
             UnitInstance u = p.Stall[a.StallIndex];
             if (u == null) return SimResult.Fail("EMPTY_SLOT");
-            DestLoc dest = a.Dest;
+            if (p.Hand.Count >= Rules.HandMax) return SimResult.Fail("HAND_FULL");
             int destIndex = a.DestIndex;
-            if (dest == DestLoc.Board)
-            {
-                if (p.Board.Count >= Rules.BoardMax) return SimResult.Fail("BOARD_FULL");
-                if (destIndex < 0 || destIndex > p.Board.Count) destIndex = p.Board.Count;
-                p.Board.Insert(destIndex, u);
-            }
-            else
-            {
-                if (p.Hand.Count >= Rules.HandMax) return SimResult.Fail("HAND_FULL");
-                if (destIndex < 0 || destIndex > p.Hand.Count) destIndex = p.Hand.Count;
-                p.Hand.Insert(destIndex, u);
-            }
+            if (destIndex < 0 || destIndex > p.Hand.Count) destIndex = p.Hand.Count;
+            p.Hand.Insert(destIndex, u);
             p.Stall[a.StallIndex] = null;
             p.Embers -= Rules.BuyCost;
             p.BoughtThisRecruit++;
             m.BoughtUnit = u;
             CaptainPassives.OnBuy(p, cat, u);
             EffectHooks.Fire(m, cat, Trigger.OnBuy, u, p, u);
-            if (dest == DestLoc.Board)
-                EffectHooks.Fire(m, cat, Trigger.Arrival, u, p, null);
             m.BoughtUnit = null;
             Awaken.TryAwaken(m, p, cat);
             return SimResult.Success();
@@ -157,8 +145,15 @@ namespace Kindling.Sim.Validation
             SimResult phase = RequireRecruit(m);
             if (!phase.Ok) return phase;
             if (a.HandIndex < 0 || a.HandIndex >= p.Hand.Count) return SimResult.Fail("BAD_INDEX");
-            if (p.Board.Count >= Rules.BoardMax) return SimResult.Fail("BOARD_FULL");
             UnitInstance u = p.Hand[a.HandIndex];
+            UnitDef def = cat.GetUnit(u.CatalogId);
+            if (def != null && def.Spell)
+            {
+                p.Hand.RemoveAt(a.HandIndex);
+                EffectHooks.Fire(m, cat, Trigger.Arrival, u, p, null);
+                return SimResult.Success();
+            }
+            if (p.Board.Count >= Rules.BoardMax) return SimResult.Fail("BOARD_FULL");
             p.Hand.RemoveAt(a.HandIndex);
             int dest = a.DestIndex;
             if (dest < 0 || dest > p.Board.Count) dest = p.Board.Count;

@@ -62,15 +62,22 @@ namespace Kindling.Sim.Bots
         static bool PlayOneFromHand(MatchState m, int seat, Catalog.Catalog cat)
         {
             PlayerState p = m.Seats[seat];
-            if (p.Hand.Count == 0 || p.Board.Count >= Rules.BoardMax) return false;
-            SimResult r = RecruitValidator.TryApply(m, new RecruitAction
+            if (p.Hand.Count == 0) return false;
+            for (int i = 0; i < p.Hand.Count; i++)
             {
-                Op = RecruitOp.Play,
-                Seat = seat,
-                HandIndex = 0,
-                DestIndex = p.Board.Count
-            }, cat);
-            return r.Ok;
+                UnitDef d = cat.GetUnit(p.Hand[i].CatalogId);
+                bool spell = d != null && d.Spell;
+                if (!spell && p.Board.Count >= Rules.BoardMax) continue;
+                SimResult r = RecruitValidator.TryApply(m, new RecruitAction
+                {
+                    Op = RecruitOp.Play,
+                    Seat = seat,
+                    HandIndex = i,
+                    DestIndex = p.Board.Count
+                }, cat);
+                if (r.Ok) return true;
+            }
+            return false;
         }
 
         static bool TryLatch(MatchState m, int seat, Catalog.Catalog cat)
@@ -100,7 +107,7 @@ namespace Kindling.Sim.Bots
             {
                 if (i == except) continue;
                 UnitDef d = cat.GetUnit(p.Board[i].CatalogId);
-                if (d != null && d.Chorus == Chorus.Gearwights) return i;
+                if (d != null && d.Chorus == Chorus.Humanoid) return i;
             }
             return -1;
         }
@@ -109,9 +116,7 @@ namespace Kindling.Sim.Bots
         {
             PlayerState p = m.Seats[seat];
             if (p.Embers < Rules.BuyCost) return false;
-            bool boardSpace = p.Board.Count < Rules.BoardMax;
-            bool handSpace = p.Hand.Count < Rules.HandMax;
-            if (!boardSpace && !handSpace) return false;
+            if (p.Hand.Count >= Rules.HandMax) return false;
             int best = -1;
             int bestScore = int.MinValue;
             for (int i = 0; i < p.Stall.Count; i++)
@@ -128,14 +133,13 @@ namespace Kindling.Sim.Bots
                 }
             }
             if (best < 0) return false;
-            DestLoc dest = boardSpace ? DestLoc.Board : DestLoc.Hand;
             SimResult r = RecruitValidator.TryApply(m, new RecruitAction
             {
                 Op = RecruitOp.Buy,
                 Seat = seat,
                 StallIndex = best,
-                Dest = dest,
-                DestIndex = dest == DestLoc.Board ? p.Board.Count : p.Hand.Count
+                Dest = DestLoc.Hand,
+                DestIndex = p.Hand.Count
             }, cat);
             return r.Ok;
         }
@@ -178,6 +182,12 @@ namespace Kindling.Sim.Bots
         static int Score(PlayerState p, Catalog.Catalog cat, UnitInstance u)
         {
             UnitDef d = cat.GetUnit(u.CatalogId);
+            if (d != null && d.Spell)
+            {
+                int spellScore = 6 + d.Depth;
+                if (p.Board.Count == 0) spellScore -= 4;
+                return spellScore;
+            }
             int s = u.Atk * 2 + u.Hp;
             if (d == null) return s;
             s += d.Depth;

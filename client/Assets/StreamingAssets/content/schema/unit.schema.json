@@ -7,7 +7,7 @@
   "properties": {
     "id": { "type": "string" },
     "name": { "type": "string" },
-    "chorus": { "type": "string", "enum": ["cinderkin", "gearwights", "ashbound", "gutterlings", "neutral"] },
+    "chorus": { "type": "string", "enum": ["undead", "beast", "humanoid", "dragon", "spirit", "neutral"] },
     "depth": { "type": "integer", "minimum": 1, "maximum": 6 },
     "atk": { "type": "integer" },
     "hp": { "type": "integer" },
@@ -17,7 +17,8 @@
     "token": { "type": "boolean" },
     "echoOnSell": { "type": "boolean" },
     "afterglowKeepsKeywords": { "type": "boolean" },
-    "latchHost": { "type": "string", "enum": ["Gearwights", "Any"] },
+    "latchHost": { "type": "string", "enum": ["Humanoid", "Any"] },
+    "spell": { "type": "boolean" },
     "onLatched": {
       "type": "object",
       "properties": {

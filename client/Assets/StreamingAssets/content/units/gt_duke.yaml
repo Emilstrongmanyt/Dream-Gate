@@ -1,6 +1,6 @@
 id: gt_duke
 name: Gutter Duke
-chorus: gutterlings
+chorus: beast
 depth: 3
 atk: 4
 hp: 3
@@ -8,7 +8,7 @@ keywords: [Venom]
 effects:
   - trigger: Kindle
     persist: CombatCopy
-    filter: { select: RandomN, chorus: gutterlings, excludeSelf: true }
+    filter: { select: RandomN, chorus: beast, excludeSelf: true }
     actions:
       - type: GrantKeyword
         keyword: Venom

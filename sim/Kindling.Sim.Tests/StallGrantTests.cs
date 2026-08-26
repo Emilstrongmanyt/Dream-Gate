@@ -35,6 +35,21 @@ namespace Kindling.Sim.Tests
         }
 
         [Fact]
+        public void Recruit_timer_curve()
+        {
+            Assert.Equal(20, Rules.CaptainPickSeconds);
+            Assert.Equal(15, Rules.RecruitSeconds(1));
+            Assert.Equal(26, Rules.RecruitSeconds(2));
+            Assert.Equal(37, Rules.RecruitSeconds(3));
+            Assert.Equal(48, Rules.RecruitSeconds(4));
+            Assert.Equal(60, Rules.RecruitSeconds(5));
+            Assert.Equal(60, Rules.RecruitSeconds(8));
+            Assert.Equal(60, Rules.RecruitSeconds(20));
+            Assert.Equal(12, Rules.CombatPlaybackCapSeconds);
+            Assert.Equal(2, Rules.CombatAutoContinueSeconds);
+        }
+
+        [Fact]
         public void GrantEmbers_R1_is_3()
         {
             var p = TestSupport.Player();

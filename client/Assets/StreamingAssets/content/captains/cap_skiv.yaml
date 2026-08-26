@@ -1,4 +1,4 @@
 id: cap_skiv
 name: Skiv the Gutter
 wick: 30
-passives: [SkivGutterlingOnBuyPlus1Atk]
+passives: [SkivBeastOnBuyPlus1Atk]

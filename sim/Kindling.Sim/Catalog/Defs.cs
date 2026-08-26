@@ -38,7 +38,7 @@ namespace Kindling.Sim.Catalog
         public int DepthMax;
         public DepthMode DepthMode = DepthMode.Fixed;
         public string EchoUnit;
-        public LatchHost LatchHost = LatchHost.Gearwights;
+        public LatchHost LatchHost = LatchHost.Humanoid;
         public int Max;
         public CounterKind Counter;
         public string Chorus;
@@ -81,9 +81,10 @@ namespace Kindling.Sim.Catalog
         public List<EffectDef> Effects = new List<EffectDef>();
         public List<EffectDef> AwakenedEffects;
         public bool Token;
+        public bool Spell;
         public bool EchoOnSell;
         public bool AfterglowKeepsKeywords;
-        public LatchHost LatchHost = LatchHost.Gearwights;
+        public LatchHost LatchHost = LatchHost.Humanoid;
         public int OnLatchedMulN = 1;
         public int OnLatchedMulD = 1;
         public bool LatchTransferEffects = true;

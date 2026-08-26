@@ -1,0 +1,15 @@
+id: sp_mark
+name: Broker's Mark
+chorus: neutral
+depth: 1
+atk: 0
+hp: 0
+spell: true
+copyLimit: 8
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: SetFlag
+        flag: NextRerollFree
+        duration: ThisRecruit

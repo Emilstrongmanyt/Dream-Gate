@@ -73,7 +73,7 @@
         "depthMax": { "type": "integer" },
         "depthMode": { "enum": ["Fixed","Current","TriplePlusOne"] },
         "echoUnit": { "type": "string" },
-        "latchHost": { "enum": ["Gearwights","Any"] },
+        "latchHost": { "enum": ["Humanoid","Any"] },
         "max": { "type": "integer" },
         "counter": { "enum": ["LatchPlaysThisMatch","RerollsThisRecruit","BoughtThisRecruit"] },
         "chorus": { "type": "string" },

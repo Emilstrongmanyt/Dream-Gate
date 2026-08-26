@@ -105,9 +105,9 @@ namespace Kindling.Sim.Recruit
 
         public static bool LegalHost(UnitDef latchDef, UnitInstance host, UnitDef hostDef)
         {
-            LatchHost rule = latchDef != null ? latchDef.LatchHost : LatchHost.Gearwights;
+            LatchHost rule = latchDef != null ? latchDef.LatchHost : LatchHost.Humanoid;
             if (rule == LatchHost.Any) return true;
-            if (hostDef != null) return hostDef.Chorus == Chorus.Gearwights;
+            if (hostDef != null) return hostDef.Chorus == Chorus.Humanoid;
             return false;
         }
 

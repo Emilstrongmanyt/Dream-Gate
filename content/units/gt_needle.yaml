@@ -1,6 +1,6 @@
 id: gt_needle
 name: Needle Fin
-chorus: gutterlings
+chorus: beast
 depth: 2
 atk: 3
 hp: 1
@@ -8,7 +8,7 @@ keywords: [Venom]
 effects:
   - trigger: Arrival
     persist: Player
-    filter: { select: Other, chorus: gutterlings }
+    filter: { select: Other, chorus: beast }
     actions:
       - type: BuffStats
         atk: 1

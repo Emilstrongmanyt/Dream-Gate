@@ -1,8 +1,9 @@
 # Kindling (The Ember Exchange)
 
 Original-IP 8-player auto-battler. Captains recruit Kindled at the Ember Exchange
-and fight in the Ash Ring. This repository currently ships the deterministic
-simulation library, catalog, and a headless 8-bot match.
+and fight in the Ash Ring. Choruses in this slice: Undead, Beast, Humanoid,
+Dragon, Spirit, plus stall spells. This repository currently ships the
+deterministic simulation library, catalog, and a headless 8-bot match.
 
 ## Build and test
 
@@ -36,6 +37,9 @@ Unity **6000.5.2f1**. Placeholder Hearthstone-like cards; real art later.
 
 1. Open `client/` in the Unity Hub (editor `6000.5.2f1`).
 2. Press Play. Empty seats fill with bots. Choose a Captain, buy from the stall, Ready to fight.
+   Recruit timer auto-starts combat (15s round 1, up to 60s from round 5). Ash Ring playback
+   caps at 12s then the next recruit starts. Tap a card for tribe and keywords; authored names
+   and effect text wait on content.
 
 Catalog is loaded from `../content` (walk-up from `Assets`).
 

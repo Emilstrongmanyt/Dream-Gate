@@ -1,0 +1,14 @@
+id: sp_foresight
+name: Foresight
+chorus: neutral
+depth: 3
+atk: 0
+hp: 0
+spell: true
+copyLimit: 6
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: Glimpse
+        depthMode: Current

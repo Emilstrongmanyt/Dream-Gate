@@ -21,6 +21,10 @@ namespace Kindling.Sim.Tests
             Assert.Equal(0, r.Damage);
             Assert.Equal(0, r.RemainingA);
             Assert.Equal(0, r.RemainingB);
+            Assert.Single(r.BoardA);
+            Assert.Single(r.BoardB);
+            Assert.Equal(0, r.SeatA);
+            Assert.Equal(1, r.SeatB);
         }
 
         [Fact]
@@ -88,6 +92,52 @@ namespace Kindling.Sim.Tests
             Assert.False(venom);
             Assert.False(r.Draw);
             Assert.Equal(b.Seat, r.WinnerSeat);
+        }
+
+        [Fact]
+        public void Empty_board_loses_and_takes_ring_damage()
+        {
+            var rng = new MatchRng(5UL);
+            var a = TestSupport.Player(0);
+            var b = TestSupport.Player(1);
+            b.Board.Add(Units.Create(TestSupport.Cat, rng, new UnitId("ne_porter")));
+            CombatResult r = CombatSim.Run(a, b, rng, TestSupport.Cat);
+            Assert.False(r.Draw);
+            Assert.Equal(b.Seat, r.WinnerSeat);
+            Assert.Equal(0, r.RemainingA);
+            Assert.Equal(1, r.RemainingB);
+            Assert.Equal(1 + 1, r.Damage);
+        }
+
+        [Fact]
+        public void Venom_kills_through_high_hp()
+        {
+            var rng = new MatchRng(6UL);
+            var a = TestSupport.Player(0);
+            var b = TestSupport.Player(1);
+            a.Board.Add(Units.CreateRaw(rng, "gt_skulk", 2, 4, Keyword.Venom));
+            b.Board.Add(Units.CreateRaw(rng, "ne_wall", 0, 20, Keyword.None));
+            CombatResult r = CombatSim.Run(a, b, rng, TestSupport.Cat);
+            bool venom = false;
+            for (int i = 0; i < r.Events.Count; i++)
+                if (r.Events[i].Op == CombatOp.Venom) venom = true;
+            Assert.True(venom);
+            Assert.Equal(a.Seat, r.WinnerSeat);
+        }
+
+        [Fact]
+        public void Afterglow_leaves_a_body()
+        {
+            var rng = new MatchRng(7UL);
+            var a = TestSupport.Player(0);
+            var b = TestSupport.Player(1);
+            a.Board.Add(Units.CreateRaw(rng, "ab_cinderling", 1, 1, Keyword.Afterglow));
+            b.Board.Add(Units.CreateRaw(rng, "ne_wall", 5, 5, Keyword.None));
+            CombatResult r = CombatSim.Run(a, b, rng, TestSupport.Cat);
+            bool ag = false;
+            for (int i = 0; i < r.Events.Count; i++)
+                if (r.Events[i].Op == CombatOp.Afterglow) ag = true;
+            Assert.True(ag);
         }
     }
 }

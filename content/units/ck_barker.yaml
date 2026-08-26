@@ -1,6 +1,6 @@
 id: ck_barker
 name: Barker
-chorus: cinderkin
+chorus: humanoid
 depth: 3
 atk: 4
 hp: 4
@@ -8,7 +8,7 @@ keywords: []
 effects:
   - trigger: OnReroll
     persist: Player
-    filter: { select: RandomN, chorus: cinderkin }
+    filter: { select: RandomN, chorus: humanoid }
     actions:
       - type: BuffStats
         atk: 1

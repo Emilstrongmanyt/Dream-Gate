@@ -1,0 +1,14 @@
+id: sp_market
+name: Night Market
+chorus: neutral
+depth: 6
+atk: 0
+hp: 0
+spell: true
+copyLimit: 4
+effects:
+  - trigger: Arrival
+    persist: Player
+    actions:
+      - type: GainEmbers
+        amount: 5

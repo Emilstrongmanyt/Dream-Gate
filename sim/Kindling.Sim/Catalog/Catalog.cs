@@ -10,6 +10,7 @@ namespace Kindling.Sim.Catalog
         public string ContentVersion = "0.1.0";
         public readonly List<UnitDef> Units = new List<UnitDef>();
         public readonly List<UnitDef> Tokens = new List<UnitDef>();
+        public readonly List<UnitDef> Spells = new List<UnitDef>();
         public readonly List<CaptainDef> Captains = new List<CaptainDef>();
         public SeasonDef Season = new SeasonDef();
 
@@ -50,6 +51,10 @@ namespace Kindling.Sim.Catalog
             {
                 if (!Units[i].Token && !Units[i].Disabled) yield return Units[i];
             }
+            for (int i = 0; i < Spells.Count; i++)
+            {
+                if (!Spells[i].Disabled) yield return Spells[i];
+            }
         }
 
         public void AddUnit(UnitDef def)
@@ -59,6 +64,7 @@ namespace Kindling.Sim.Catalog
                 throw new InvalidOperationException("duplicate unit id " + def.Id.Value);
             _units[def.Id.Value] = def;
             if (def.Token) Tokens.Add(def);
+            else if (def.Spell) Spells.Add(def);
             else Units.Add(def);
         }
 
@@ -75,6 +81,7 @@ namespace Kindling.Sim.Catalog
         {
             Units.Sort((a, b) => a.Id.CompareTo(b.Id));
             Tokens.Sort((a, b) => a.Id.CompareTo(b.Id));
+            Spells.Sort((a, b) => a.Id.CompareTo(b.Id));
             Captains.Sort((a, b) => a.Id.CompareTo(b.Id));
         }
 
@@ -84,8 +91,9 @@ namespace Kindling.Sim.Catalog
                 throw new DirectoryNotFoundException("content root not found: " + contentRoot);
 
             var cat = new Catalog();
-            LoadUnitsDir(cat, Path.Combine(contentRoot, "units"), token: false);
-            LoadUnitsDir(cat, Path.Combine(contentRoot, "tokens"), token: true);
+            LoadUnitsDir(cat, Path.Combine(contentRoot, "units"), token: false, spell: false);
+            LoadUnitsDir(cat, Path.Combine(contentRoot, "tokens"), token: true, spell: false);
+            LoadUnitsDir(cat, Path.Combine(contentRoot, "spells"), token: false, spell: true);
             LoadCaptainsDir(cat, Path.Combine(contentRoot, "captains"));
             string seasonPath = Path.Combine(contentRoot, "seasons", "none.yaml");
             if (File.Exists(seasonPath))
@@ -118,7 +126,7 @@ namespace Kindling.Sim.Catalog
             return null;
         }
 
-        static void LoadUnitsDir(Catalog cat, string dir, bool token)
+        static void LoadUnitsDir(Catalog cat, string dir, bool token, bool spell)
         {
             if (!Directory.Exists(dir)) return;
             string[] files = Directory.GetFiles(dir, "*.yaml");
@@ -128,6 +136,7 @@ namespace Kindling.Sim.Catalog
                 YamlNode n = TinyYaml.Parse(File.ReadAllText(files[i]));
                 UnitDef def = ParseUnit(n);
                 def.Token = token || def.Token;
+                def.Spell = spell || def.Spell;
                 cat.AddUnit(def);
             }
         }
@@ -155,6 +164,7 @@ namespace Kindling.Sim.Catalog
                 Atk = n.GetInt("atk"),
                 Hp = n.GetInt("hp"),
                 Token = n.GetBool("token"),
+                Spell = n.GetBool("spell"),
                 EchoOnSell = n.GetBool("echoOnSell"),
                 AfterglowKeepsKeywords = n.GetBool("afterglowKeepsKeywords"),
                 LatchTransferEffects = true,
@@ -346,10 +356,17 @@ namespace Kindling.Sim.Catalog
             if (s == null) return Chorus.Neutral;
             switch (s.Trim().ToLowerInvariant())
             {
-                case "cinderkin": return Chorus.Cinderkin;
-                case "gearwights": return Chorus.Gearwights;
-                case "ashbound": return Chorus.Ashbound;
-                case "gutterlings": return Chorus.Gutterlings;
+                case "undead":
+                case "ashbound": return Chorus.Undead;
+                case "beast":
+                case "gutterlings": return Chorus.Beast;
+                case "humanoid":
+                case "cinderkin":
+                case "gearwights": return Chorus.Humanoid;
+                case "dragon":
+                case "dragons": return Chorus.Dragon;
+                case "spirit":
+                case "spirits": return Chorus.Spirit;
                 default: return Chorus.Neutral;
             }
         }
@@ -387,7 +404,7 @@ namespace Kindling.Sim.Catalog
         {
             if (s != null && s.Trim().Equals("Any", StringComparison.OrdinalIgnoreCase))
                 return LatchHost.Any;
-            return LatchHost.Gearwights;
+            return LatchHost.Humanoid;
         }
 
         static Trigger ParseTrigger(string s)
@@ -446,6 +463,8 @@ namespace Kindling.Sim.Catalog
 
         static CaptainPassive ParsePassive(string s)
         {
+            if (s == "SkivGutterlingOnBuyPlus1Atk" || s == "SkivBeastOnBuyPlus1Atk")
+                return CaptainPassive.SkivBeastOnBuyPlus1Atk;
             if (Enum.TryParse(s, true, out CaptainPassive p)) return p;
             return CaptainPassive.None;
         }

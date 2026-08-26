@@ -38,7 +38,7 @@ namespace Kindling.Sim.Recruit
                 PoolEntry e = m.Pool[i];
                 if (e.Remaining <= 0) continue;
                 UnitDef def = cat.GetUnit(e.Id);
-                if (def == null || def.Token || def.Disabled) continue;
+                if (def == null || def.Token || def.Spell || def.Disabled) continue;
                 if (def.Depth == depth) candidates.Add(e.Id);
             }
             if (candidates.Count < Rules.GlimpseOfferCount)
@@ -48,7 +48,7 @@ namespace Kindling.Sim.Recruit
                     PoolEntry e = m.Pool[i];
                     if (e.Remaining <= 0) continue;
                     UnitDef def = cat.GetUnit(e.Id);
-                    if (def == null || def.Token || def.Disabled) continue;
+                    if (def == null || def.Token || def.Spell || def.Disabled) continue;
                     if (def.Depth <= depth && !ContainsId(candidates, e.Id))
                         candidates.Add(e.Id);
                 }

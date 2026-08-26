@@ -37,9 +37,9 @@ namespace Kindling.Sim.Captains
         public static void OnBuy(PlayerState p, Catalog.Catalog cat, UnitInstance bought)
         {
             if (bought == null) return;
-            if (!Has(p, cat, CaptainPassive.SkivGutterlingOnBuyPlus1Atk)) return;
+            if (!Has(p, cat, CaptainPassive.SkivBeastOnBuyPlus1Atk)) return;
             UnitDef def = cat.GetUnit(bought.CatalogId);
-            if (def != null && def.Chorus == Chorus.Gutterlings)
+            if (def != null && def.Chorus == Chorus.Beast)
                 Units.BuffPermanent(bought, 1, 0);
         }
 
@@ -86,7 +86,7 @@ namespace Kindling.Sim.Captains
                 case CaptainPassive.DredgerNextGrantPlus2:
                 case CaptainPassive.CandleAwakenPlus2:
                 case CaptainPassive.GlassKindleLeftAegis:
-                case CaptainPassive.SkivGutterlingOnBuyPlus1Atk:
+                case CaptainPassive.SkivBeastOnBuyPlus1Atk:
                     break;
             }
         }

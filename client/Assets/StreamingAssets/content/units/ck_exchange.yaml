@@ -1,6 +1,6 @@
 id: ck_exchange
 name: Exchange Heart
-chorus: cinderkin
+chorus: humanoid
 depth: 5
 atk: 6
 hp: 6
@@ -10,6 +10,6 @@ effects:
     persist: Player
     actions:
       - type: AddToHandFromPool
-        chorus: cinderkin
+        chorus: humanoid
         depthMax: 3
         consume: true
