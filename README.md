@@ -25,7 +25,18 @@ dotnet run --project tools/HeadlessAlpha
 dotnet run --project tools/MatchHost
 ```
 
-Listens on `http://127.0.0.1:5080/`. `POST /v1/queue` starts a 1v7 Casual match immediately. WebSocket ` /v1/match?id=&seat=&token=` speaks protocol v1. Checkpoints are JSON in-process (Redis later).
+Listens on `http://127.0.0.1:5080/` (or `PORT` in Docker/Fly).
+
+- `POST /v1/auth/device` — anonymous account + HMAC token
+- `POST /v1/queue` — 1v7 Casual (Bearer token optional, 1 req / 2s)
+- `WS /v1/match?id=&seat=&token=` — protocol v1
+- Checkpoints: file store, or Redis when `REDIS_URL` is set
+
+Unity stays offline unless `KINDLING_HOST` or PlayerPrefs `kindling.host` is set (e.g. `http://127.0.0.1:5080`).
+
+```bash
+docker compose -f infra/docker-compose.yml up --build matchhost redis
+```
 
 Loads `content/`, fills all eight seats with heuristic bots, prints round-by-round
 Wick and place, and exits 0 when places `1..8` are assigned.

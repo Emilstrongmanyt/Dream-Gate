@@ -37,6 +37,8 @@ namespace Kindling.Sim.Model
         public int PlayerSeq;
         public List<string> Logs = new List<string>();
         public int GhostRingDepth;
+        public double Rating = 1500;
+        public double Rd = 350;
 
         public bool Alive => Wick > 0;
 

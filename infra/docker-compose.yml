@@ -15,5 +15,18 @@ services:
     ports:
       - "6379:6379"
 
+  matchhost:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "5080:8080"
+    environment:
+      PORT: "8080"
+      REDIS_URL: redis:6379
+      KINDLING_PEPPER: kindling-dev-pepper
+    depends_on:
+      - redis
+
 volumes:
   kindling_pg:

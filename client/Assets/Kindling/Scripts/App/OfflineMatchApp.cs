@@ -51,6 +51,7 @@ namespace Kindling.Client
         GameObject _helpPanel;
         Text _helpText;
         int _helpStep;
+        NetMatchClient _net;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -85,6 +86,14 @@ namespace Kindling.Client
             _loop.AutoPickBotCaptains();
             BuildUi();
             ArmTimer(Rules.CaptainPickSeconds);
+            string host = NetMatchClient.ResolveHost();
+            if (!string.IsNullOrEmpty(host))
+            {
+                _net = gameObject.AddComponent<NetMatchClient>();
+                _net.OnSnapshot = OnNetSnapshot;
+                StartCoroutine(_net.Connect(host));
+                Toast("Connecting " + host);
+            }
             Refresh();
         }
 
@@ -613,8 +622,26 @@ namespace Kindling.Client
             Refresh();
         }
 
+        void OnNetSnapshot(string json)
+        {
+            if (_loop == null || string.IsNullOrEmpty(json)) return;
+            SnapshotApply.Apply(_loop.State, _loop.HumanSeat, _cat, json);
+            int t = Protocol.ReadInt(json, "timer");
+            if (t > 0)
+            {
+                _timerArmed = true;
+                _timerEnd = Time.unscaledTime + t;
+            }
+            Refresh();
+        }
+
         SimResult Apply(RecruitAction a)
         {
+            if (_net != null && _net.Connected)
+            {
+                _net.SendAction(a);
+                return SimResult.Success();
+            }
             SimResult r = _loop.Try(a);
             if (!r.Ok) Toast(r.Code ?? "illegal");
             else if (_loop.State.AwakenEvents > _awakenSeen)

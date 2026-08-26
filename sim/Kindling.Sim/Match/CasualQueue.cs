@@ -12,6 +12,7 @@ namespace Kindling.Sim.Match
     {
         readonly object _gate = new object();
         readonly Dictionary<string, MatchSession> _live = new Dictionary<string, MatchSession>(StringComparer.Ordinal);
+        public IMatchStore Store;
 
         public int LiveCount
         {
@@ -21,12 +22,16 @@ namespace Kindling.Sim.Match
         public MatchSession Enqueue(Catalog.Catalog cat, string displayName, uint salt)
         {
             if (cat == null) throw new ArgumentNullException(nameof(cat));
+            CatForRestore = cat;
             Guid id = Guid.NewGuid();
             MatchSession s = MatchSession.Create(cat, id, salt, humanSeats: 1);
             if (!string.IsNullOrEmpty(displayName))
                 s.Loop.State.Seats[0].DisplayName = displayName;
+            Telemetry.MatchActive++;
+            string key = id.ToString("D");
             lock (_gate)
-                _live[id.ToString("D")] = s;
+                _live[key] = s;
+            Persist(s);
             return s;
         }
 
@@ -35,9 +40,16 @@ namespace Kindling.Sim.Match
             if (string.IsNullOrEmpty(matchId)) return null;
             lock (_gate)
             {
-                _live.TryGetValue(matchId, out MatchSession s);
-                return s;
+                if (_live.TryGetValue(matchId, out MatchSession s))
+                    return s;
             }
+            if (Store == null || CatForRestore == null) return null;
+            string blob = Store.GetMatch(matchId);
+            if (string.IsNullOrEmpty(blob)) return null;
+            MatchSession loaded = CheckpointMatch.Load(CatForRestore, blob);
+            lock (_gate)
+                _live[matchId] = loaded;
+            return loaded;
         }
 
         public MatchSession GetByToken(string token)
@@ -68,9 +80,22 @@ namespace Kindling.Sim.Match
             }
             for (int i = 0; i < snap.Length; i++)
             {
-                if (snap[i].Tick(utcNow)) n++;
+                if (snap[i].Tick(utcNow))
+                {
+                    n++;
+                    Persist(snap[i]);
+                }
             }
             return n;
+        }
+
+        public Catalog.Catalog CatForRestore;
+
+        public void Persist(MatchSession s)
+        {
+            if (Store == null || s == null) return;
+            Store.PutMatch(s.Loop.State.MatchId.ToString("D"), CheckpointMatch.Save(s));
+            Telemetry.CheckpointWrites++;
         }
     }
 }

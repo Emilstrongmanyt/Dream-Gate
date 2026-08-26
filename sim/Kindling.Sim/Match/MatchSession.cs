@@ -68,7 +68,9 @@ namespace Kindling.Sim.Match
             {
                 Loop.ResolveRecruitAndCombat();
                 SnapshotVersion++;
-                if (!Loop.State.MatchOver)
+                if (Loop.State.MatchOver)
+                    Finish();
+                else
                 {
                     Loop.ContinueToNextRecruit();
                     ArmTimer(Rules.RecruitSeconds(Loop.State.Round));
@@ -88,12 +90,18 @@ namespace Kindling.Sim.Match
                 return Welcome(seat);
             if (json != null && json.IndexOf("\"op\":\"Reconnect\"", StringComparison.Ordinal) >= 0)
                 return SnapshotFor(seat, LastSeq[seat]);
+            if (json != null && json.IndexOf("\"op\":\"Abandon\"", StringComparison.Ordinal) >= 0)
+                return Abandon(seat);
             RecruitAction a = Protocol.Parse(json, seat);
             if (a == null) return Error("BAD_ACTION", 0);
             if (a.Seq > 0 && a.Seq <= LastSeq[seat])
                 return Error("DUP", a.Seq);
             SimResult r = Loop.Try(a);
-            if (!r.Ok) return Error(r.Code ?? "FAIL", a.Seq);
+            if (!r.Ok)
+            {
+                Telemetry.RecruitReject++;
+                return Error(r.Code ?? "FAIL", a.Seq);
+            }
             if (a.Seq > LastSeq[seat]) LastSeq[seat] = a.Seq;
             SnapshotVersion++;
             if (a.Op == RecruitOp.CaptainPick && Loop.State.Phase == Phase.CaptainPick)
@@ -108,6 +116,32 @@ namespace Kindling.Sim.Match
                 }
             }
             return SnapshotFor(seat, a.Seq);
+        }
+
+        string Abandon(int seat)
+        {
+            PlayerState p = Loop.State.Seats[seat];
+            if (p == null || !p.Alive) return SnapshotFor(seat, LastSeq[seat]);
+            p.Wick = -999;
+            p.RingDamageTaken += 9999;
+            Telemetry.AbandonTotal++;
+            Loop.PlaceNewlyDead();
+            if (Loop.State.AliveCount() <= 1)
+            {
+                Loop.State.MatchOver = true;
+                Loop.State.Phase = Phase.MatchOver;
+                Finish();
+            }
+            SnapshotVersion++;
+            return SnapshotFor(seat, LastSeq[seat]);
+        }
+
+        public void Finish()
+        {
+            if (!Loop.State.MatchOver) return;
+            Glicko2.ApplyPlaces(Loop.State.Seats);
+            Telemetry.MatchFinished++;
+            Telemetry.MatchActive = Telemetry.MatchActive > 0 ? Telemetry.MatchActive - 1 : 0;
         }
 
         public string Welcome(int seat)
@@ -136,8 +170,11 @@ namespace Kindling.Sim.Match
             sb.Append(",\"phase\":\"").Append(Loop.State.Phase).Append('"');
             sb.Append(",\"round\":").Append(Loop.State.Round);
             sb.Append(",\"timer\":").Append(SecondsLeft(DateTime.UtcNow));
+            sb.Append(",\"matchOver\":").Append(Loop.State.MatchOver ? "true" : "false");
             sb.Append(",\"you\":{");
             WriteYou(sb, you);
+            sb.Append(",\"rating\":").Append(you.Rating.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            sb.Append(",\"rd\":").Append(you.Rd.ToString(System.Globalization.CultureInfo.InvariantCulture));
             sb.Append("},\"public\":[");
             for (int i = 0; i < Loop.State.Seats.Length; i++)
             {

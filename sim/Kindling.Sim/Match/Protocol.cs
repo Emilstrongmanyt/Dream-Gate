@@ -163,6 +163,25 @@ namespace Kindling.Sim.Match
             return v * sign;
         }
 
+        public static string ExtractObject(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json)) return "";
+            string needle = "\"" + key + "\":";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return "";
+            i = json.IndexOf('{', i);
+            if (i < 0) return "";
+            int start = i;
+            int depth = 0;
+            do
+            {
+                if (json[i] == '{') depth++;
+                else if (json[i] == '}') depth--;
+                i++;
+            } while (i < json.Length && depth > 0);
+            return json.Substring(start, i - start);
+        }
+
         public static System.Collections.Generic.List<string> ExtractObjects(string json, string key)
         {
             var list = new System.Collections.Generic.List<string>();
