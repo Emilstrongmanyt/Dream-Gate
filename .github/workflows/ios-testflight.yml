@@ -53,6 +53,43 @@ jobs:
           lfs: true
           fetch-depth: 0
 
+      - name: Verify Unity meta GUIDs
+        run: |
+          python3 <<'PY'
+          import os, re, sys
+          roots = ["client/Assets", "sim/Kindling.Sim"]
+          guid_re = re.compile(r"^guid:\s*([0-9a-fA-F]+)\s*$", re.M)
+          bad = []
+          guids = {}
+          for root in roots:
+              if not os.path.isdir(root):
+                  bad.append(f"missing {root}")
+                  continue
+              for dirpath, _, files in os.walk(root):
+                  for name in files:
+                      path = os.path.join(dirpath, name)
+                      if name.endswith(".cs") and not os.path.exists(path + ".meta"):
+                          bad.append(f"{path}: missing .meta")
+                      if not name.endswith(".meta"):
+                          continue
+                      text = open(path, encoding="utf-8").read()
+                      m = guid_re.search(text)
+                      if not m:
+                          bad.append(f"{path}: no guid")
+                          continue
+                      g = m.group(1)
+                      if len(g) != 32:
+                          bad.append(f"{path}: guid length {len(g)}")
+                      if g in guids:
+                          bad.append(f"{path}: duplicate guid with {guids[g]}")
+                      else:
+                          guids[g] = path
+          if bad:
+              print("\n".join(bad))
+              sys.exit(1)
+          print(f"ok {len(guids)} metas")
+          PY
+
       - name: Cache Unity Library
         uses: actions/cache@v4
         with:
