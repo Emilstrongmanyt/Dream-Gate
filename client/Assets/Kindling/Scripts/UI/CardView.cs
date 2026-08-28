@@ -32,7 +32,9 @@ namespace Kindling.Client
             cv.Border.raycastTarget = true;
 
             var inner = HsUi.Panel(rt, "inner", new Vector2(0.05f, 0.05f), new Vector2(0.95f, 0.95f), HsUi.Wood);
+            inner.GetComponent<Image>().raycastTarget = false;
             cv.Art = HsUi.Panel(inner, "art", new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.82f), HsUi.Felt).GetComponent<Image>();
+            cv.Art.raycastTarget = false;
             var pat = HsUi.Panel(cv.Art.transform, "pattern", Vector2.zero, Vector2.one, Color.white);
             cv.Pattern = pat.GetComponent<Image>();
             cv.Pattern.raycastTarget = false;
@@ -87,12 +89,23 @@ namespace Kindling.Client
             UnitDef def = cat.GetUnit(u.CatalogId);
             string name = def != null ? def.Name : u.CatalogId.Value;
             NameLabel.text = name;
+            Border.sprite = HsUi.CardShirt(def != null ? def.Chorus : Chorus.Neutral, false);
+            Border.preserveAspect = true;
+            Border.color = selected ? HsUi.Selected : HsUi.FrameColor;
             Art.color = def != null ? HsUi.ChorusColor(def.Chorus) : HsUi.Felt;
             bool spell = def != null && def.Spell;
             Stats.text = spell ? "Spell" : (u.EffectiveAtk + " / " + u.Hp);
+            Keys.fontSize = 12;
+            Keys.horizontalOverflow = HorizontalWrapMode.Overflow;
             Keys.text = spell ? "Play to cast" : HsUi.Keywords(u.Keywords, u.Awakened);
+            var kRt = Keys.GetComponent<RectTransform>();
+            kRt.anchorMin = new Vector2(0.05f, 0.22f);
+            kRt.anchorMax = new Vector2(0.95f, 0.34f);
+            var stRt = Stats.GetComponent<RectTransform>();
+            stRt.anchorMin = new Vector2(0.05f, 0.02f);
+            stRt.anchorMax = new Vector2(0.95f, 0.22f);
             DepthLabel.text = def != null ? (def.Chorus + " D" + def.Depth) : "";
-            Border.color = selected ? HsUi.Selected : (spell ? HsUi.ChorusColor(Chorus.Spirit) : (u.Awakened ? Color.white : HsUi.Gold));
+            if (u.Awakened) Border.color = Color.white;
             PaintPattern(def, spell);
         }
 
@@ -106,10 +119,26 @@ namespace Kindling.Client
                 return;
             }
             gameObject.SetActive(true);
+            if (Drag != null)
+            {
+                Drag.enabled = true;
+                Drag.Zone = CardZone.Offer;
+            }
             NameLabel.text = def.Name;
-            Art.color = HsUi.Ember;
-            Stats.text = "Wick " + def.Wick;
-            Keys.text = def.HasEdict ? ("Edict " + def.EdictCost) : "Passive";
+            Border.sprite = HsUi.CardShirt(Chorus.Neutral, true);
+            Border.preserveAspect = true;
+            Art.color = HsUi.CaptainTint(def.Id.Value);
+            Stats.text = "Wick " + def.Wick + (def.HasEdict ? ("  ·  Edict " + def.EdictCost) : "  ·  Passive");
+            Keys.text = Kindling.Sim.Captains.CaptainPower.Line(def);
+            Keys.fontSize = 13;
+            Keys.horizontalOverflow = HorizontalWrapMode.Wrap;
+            Keys.verticalOverflow = VerticalWrapMode.Overflow;
+            var kRt = Keys.GetComponent<RectTransform>();
+            kRt.anchorMin = new Vector2(0.06f, 0.04f);
+            kRt.anchorMax = new Vector2(0.94f, 0.32f);
+            var stRt = Stats.GetComponent<RectTransform>();
+            stRt.anchorMin = new Vector2(0.05f, 0.32f);
+            stRt.anchorMax = new Vector2(0.95f, 0.44f);
             DepthLabel.text = "";
             Border.color = selected ? HsUi.Selected : HsUi.Gold;
             if (Pattern != null) Pattern.enabled = false;
@@ -121,8 +150,14 @@ namespace Kindling.Client
             _unit = null;
             gameObject.SetActive(def != null);
             if (def == null) return;
-            if (Drag != null) Drag.enabled = false;
+            if (Drag != null)
+            {
+                Drag.enabled = true;
+                Drag.Zone = CardZone.Offer;
+            }
             NameLabel.text = def.Name;
+            Border.sprite = HsUi.CardShirt(def.Chorus, false);
+            Border.preserveAspect = true;
             Art.color = HsUi.ChorusColor(def.Chorus);
             Stats.text = def.Spell ? "Spell" : (def.Atk + " / " + def.Hp);
             Keys.text = def.Spell ? "Play to cast" : HsUi.Keywords(def.Keywords, false);
@@ -134,7 +169,7 @@ namespace Kindling.Client
         void PaintPattern(UnitDef def, bool spell)
         {
             if (Pattern == null) return;
-            if (def == null || spell || def.Chorus == Chorus.Neutral)
+            if (def == null || spell || (def.Chorus == Chorus.Neutral && !HsUi.ForcePatterns))
             {
                 Pattern.enabled = false;
                 return;

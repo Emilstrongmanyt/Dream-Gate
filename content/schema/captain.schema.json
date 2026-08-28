@@ -8,6 +8,7 @@
     "id": { "type": "string" },
     "name": { "type": "string" },
     "wick": { "type": "integer" },
+    "text": { "type": "string" },
     "passives": {
       "type": "array",
       "items": {
@@ -20,7 +21,9 @@
           "CandleAwakenPlus2",
           "GlassKindleLeftAegis",
           "SkivBeastOnBuyPlus1Atk",
-          "SkivGutterlingOnBuyPlus1Atk"
+          "SkivGutterlingOnBuyPlus1Atk",
+          "FlintKindleRightPlus1Atk",
+          "NollOnBuyPendingEmber"
         ]
       }
     },

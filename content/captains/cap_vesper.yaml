@@ -1,4 +1,5 @@
 id: cap_vesper
 name: Captain Vesper
 wick: 30
+text: "The first Reroll each recruit is free."
 passives: [VesperFirstRerollFree]

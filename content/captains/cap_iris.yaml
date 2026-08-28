@@ -1,0 +1,11 @@
+id: cap_iris
+name: Iris of Veils
+wick: 30
+text: "Edict 1: give a Kindled Aegis."
+edict:
+  cost: 1
+  target: Board
+  actions:
+    - type: GrantKeyword
+      keyword: Aegis
+      duration: Permanent

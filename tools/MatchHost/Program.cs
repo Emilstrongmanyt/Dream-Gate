@@ -20,6 +20,16 @@ namespace Kindling.Tools.MatchHost
         static string _pepper;
         static readonly Dictionary<string, DateTime> _lastQueue = new Dictionary<string, DateTime>(StringComparer.Ordinal);
         static readonly object _rate = new object();
+        static readonly List<ClientConn> _clients = new List<ClientConn>();
+        static readonly object _clientsGate = new object();
+
+        sealed class ClientConn
+        {
+            public WebSocket Ws;
+            public string MatchId;
+            public int Seat;
+            public readonly object SendGate = new object();
+        }
 
         public static int Main(string[] args)
         {
@@ -40,7 +50,7 @@ namespace Kindling.Tools.MatchHost
             listener.Prefixes.Add(_prefix);
             listener.Start();
             Console.WriteLine("Kindling MatchHost  " + _prefix);
-            Console.WriteLine("GET /healthz  POST /v1/auth/device  POST /v1/queue  WS /v1/match");
+            Console.WriteLine("GET /healthz  POST /v1/auth/register  POST /v1/auth/login  POST /v1/queue  WS /v1/match");
 
             var tick = new Thread(TickLoop) { IsBackground = true };
             tick.Start();
@@ -54,23 +64,40 @@ namespace Kindling.Tools.MatchHost
 
         static IMatchStore BuildStore()
         {
+            string dir = Environment.GetEnvironmentVariable("KINDLING_STORE") ?? Path.Combine(AppContext.BaseDirectory, "store");
+            IMatchStore files = new FileMatchStore(dir);
+            IMatchStore matches = files;
+            IMatchStore accounts = files;
             string redis = Environment.GetEnvironmentVariable("REDIS_URL");
             if (!string.IsNullOrEmpty(redis))
             {
                 try
                 {
-                    var r = new RedisMatchStore(redis);
+                    matches = new RedisMatchStore(redis);
+                    accounts = matches;
                     Console.WriteLine("store=redis");
-                    return r;
                 }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine("redis failed, using files: " + ex.Message);
                 }
             }
-            string dir = Environment.GetEnvironmentVariable("KINDLING_STORE") ?? Path.Combine(AppContext.BaseDirectory, "store");
-            Console.WriteLine("store=file " + dir);
-            return new FileMatchStore(dir);
+            string pg = Environment.GetEnvironmentVariable("DATABASE_URL");
+            if (!string.IsNullOrEmpty(pg))
+            {
+                try
+                {
+                    accounts = new PostgresMatchStore(pg);
+                    if (matches == files) matches = accounts;
+                    Console.WriteLine("store=postgres accounts");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("postgres failed: " + ex.Message);
+                }
+            }
+            if (matches == accounts) return matches;
+            return new CompositeMatchStore(matches, accounts);
         }
 
         static string PrefixFromEnv(string[] args)
@@ -87,7 +114,10 @@ namespace Kindling.Tools.MatchHost
         {
             while (true)
             {
-                try { _queue.TickAll(DateTime.UtcNow); }
+                try
+                {
+                    _queue.TickAll(DateTime.UtcNow, PushSnapshot);
+                }
                 catch (Exception ex) { Console.Error.WriteLine(ex.Message); }
                 Thread.Sleep(200);
             }
@@ -119,9 +149,37 @@ namespace Kindling.Tools.MatchHost
                     AuthDevice(ctx);
                     return;
                 }
+                if (ctx.Request.HttpMethod == "POST" && path == "/v1/auth/register")
+                {
+                    AuthRegister(ctx);
+                    return;
+                }
+                if (ctx.Request.HttpMethod == "POST" && path == "/v1/auth/login")
+                {
+                    AuthLogin(ctx);
+                    return;
+                }
+                if (ctx.Request.HttpMethod == "GET" && path == "/v1/config")
+                {
+                    Write(ctx, 200, "application/json", LiveConfig.Json(_cat));
+                    return;
+                }
                 if (ctx.Request.HttpMethod == "POST" && path == "/v1/queue")
                 {
                     Queue(ctx);
+                    return;
+                }
+                if (ctx.Request.HttpMethod == "DELETE" && path == "/v1/queue")
+                {
+                    Write(ctx, 200, "application/json", "{\"cancelled\":false,\"reason\":\"already_started\"}");
+                    return;
+                }
+                if (ctx.Request.HttpMethod == "GET" && path == "/v1/history")
+                {
+                    string tokH = Bearer(ctx);
+                    if (!DeviceAuth.Verify(tokH, _pepper)) { Write(ctx, 401, "text/plain", "unauthorized"); return; }
+                    string accH = DeviceAuth.AccountId(tokH);
+                    Write(ctx, 200, "application/json", _store.ListHistory(accH) ?? "[]");
                     return;
                 }
                 if (ctx.Request.HttpMethod == "GET" && path.StartsWith("/v1/match/"))
@@ -134,13 +192,28 @@ namespace Kindling.Tools.MatchHost
                     Write(ctx, 200, "application/json", s.SnapshotFor(seat, s.LastSeq[seat]));
                     return;
                 }
+                if (ctx.Request.HttpMethod == "POST" && path == "/v1/cosmetics/equip")
+                {
+                    CosmeticsEquip(ctx);
+                    return;
+                }
+                if (ctx.Request.HttpMethod == "POST" && path == "/v1/cosmetics/debug")
+                {
+                    CosmeticsDebug(ctx);
+                    return;
+                }
+                if (ctx.Request.HttpMethod == "POST" && path == "/v1/iap/receipt")
+                {
+                    IapReceipt(ctx);
+                    return;
+                }
                 if (ctx.Request.HttpMethod == "GET" && path == "/v1/me")
                 {
                     string tok = Bearer(ctx);
                     if (!DeviceAuth.Verify(tok, _pepper)) { Write(ctx, 401, "text/plain", "unauthorized"); return; }
                     string acc = DeviceAuth.AccountId(tok);
                     string json = _store.GetAccount(acc) ?? "{}";
-                    Write(ctx, 200, "application/json", json);
+                    Write(ctx, 200, "application/json", AccountAuth.PublicJson(json));
                     return;
                 }
                 Write(ctx, 404, "text/plain", "not found");
@@ -150,6 +223,59 @@ namespace Kindling.Tools.MatchHost
                 try { Write(ctx, 500, "text/plain", ex.Message); }
                 catch { /* ignore */ }
             }
+        }
+
+        static string RequireAccount(HttpListenerContext ctx)
+        {
+            string tok = Bearer(ctx);
+            if (string.IsNullOrEmpty(tok) || !DeviceAuth.Verify(tok, _pepper))
+            {
+                Write(ctx, 401, "text/plain", "unauthorized");
+                return null;
+            }
+            return DeviceAuth.AccountId(tok);
+        }
+
+        static void CosmeticsEquip(HttpListenerContext ctx)
+        {
+            string acc = RequireAccount(ctx);
+            if (acc == null) return;
+            string body = ReadBody(ctx);
+            string frame = Protocol.ReadString(body, "frame");
+            string prev = _store.GetAccount(acc) ?? "{}";
+            string next = Cosmetics.PatchEquip(prev, frame);
+            _store.PutAccount(acc, next);
+            Write(ctx, 200, "application/json", AccountAuth.PublicJson(next));
+        }
+
+        static void CosmeticsDebug(HttpListenerContext ctx)
+        {
+            string acc = RequireAccount(ctx);
+            if (acc == null) return;
+            string prev = _store.GetAccount(acc) ?? "{}";
+            string next = Cosmetics.PatchEquip(prev, "gold");
+            next = AccountAuth.WithCosmetic(next, Cosmetics.GrantAll(), Protocol.ReadString(next, "frame"));
+            _store.PutAccount(acc, next);
+            Write(ctx, 200, "application/json", AccountAuth.PublicJson(next));
+        }
+
+        static void IapReceipt(HttpListenerContext ctx)
+        {
+            string acc = RequireAccount(ctx);
+            if (acc == null) return;
+            string body = ReadBody(ctx);
+            string product = Protocol.ReadString(body, "productId");
+            if (string.IsNullOrEmpty(product)) product = Protocol.ReadString(body, "sku");
+            string frame = "gold";
+            if (product.IndexOf("ember", StringComparison.OrdinalIgnoreCase) >= 0) frame = "ember";
+            else if (product.IndexOf("spirit", StringComparison.OrdinalIgnoreCase) >= 0) frame = "spirit";
+            else if (product.IndexOf("wick", StringComparison.OrdinalIgnoreCase) >= 0) frame = "wick";
+            else if (product.IndexOf("night", StringComparison.OrdinalIgnoreCase) >= 0) frame = "night";
+            string prev = _store.GetAccount(acc) ?? "{}";
+            string next = Cosmetics.PatchEquip(prev, frame);
+            _store.PutAccount(acc, next);
+            Write(ctx, 200, "application/json", "{\"ok\":true,\"sandbox\":true,\"frame\":\"" + frame
+                + "\",\"account\":" + AccountAuth.PublicJson(next) + "}");
         }
 
         static void AuthDevice(HttpListenerContext ctx)
@@ -171,16 +297,74 @@ namespace Kindling.Tools.MatchHost
             }
             string token = DeviceAuth.IssueToken(acc, _pepper);
             string profile = _store.GetAccount(acc) ?? "{}";
-            Write(ctx, 200, "application/json", "{\"token\":\"" + token + "\",\"account\":" + profile + "}");
+            Write(ctx, 200, "application/json", "{\"token\":\"" + token + "\",\"account\":" + AccountAuth.PublicJson(profile) + "}");
+        }
+
+        static void AuthRegister(HttpListenerContext ctx)
+        {
+            string body = ReadBody(ctx);
+            string name = Protocol.ReadString(body, "displayName");
+            if (string.IsNullOrEmpty(name)) name = Protocol.ReadString(body, "name");
+            string pass = Protocol.ReadString(body, "password");
+            string badName = AccountAuth.ValidateName(name);
+            if (badName != null) { Write(ctx, 400, "application/json", "{\"error\":\"" + badName + "\"}"); return; }
+            string badPass = AccountAuth.ValidatePassword(pass);
+            if (badPass != null) { Write(ctx, 400, "application/json", "{\"error\":\"" + badPass + "\"}"); return; }
+            string login = AccountAuth.NormalizeLogin(name);
+            if (!string.IsNullOrEmpty(_store.GetLogin(login)))
+            {
+                Write(ctx, 409, "application/json", "{\"error\":\"NAME_TAKEN\"}");
+                return;
+            }
+            string acc = DeviceAuth.NewAccountId();
+            string salt = AccountAuth.NewSalt();
+            string hash = AccountAuth.HashPassword(pass, _pepper, salt);
+            string deviceId = Protocol.ReadString(body, "deviceId");
+            string deviceHash = string.IsNullOrEmpty(deviceId) ? "" : DeviceAuth.HashDevice(deviceId, _pepper);
+            string json = AccountAuth.CreateAccount(acc, name.Trim(), login, salt, hash, deviceHash);
+            _store.PutAccount(acc, json);
+            _store.PutLogin(login, acc);
+            if (!string.IsNullOrEmpty(deviceHash))
+                _store.PutDevice(deviceHash, acc);
+            string token = DeviceAuth.IssueToken(acc, _pepper);
+            Write(ctx, 200, "application/json", "{\"token\":\"" + token + "\",\"account\":" + AccountAuth.PublicJson(json) + "}");
+        }
+
+        static void AuthLogin(HttpListenerContext ctx)
+        {
+            string body = ReadBody(ctx);
+            string name = Protocol.ReadString(body, "displayName");
+            if (string.IsNullOrEmpty(name)) name = Protocol.ReadString(body, "name");
+            string pass = Protocol.ReadString(body, "password");
+            string login = AccountAuth.NormalizeLogin(name);
+            string acc = _store.GetLogin(login);
+            if (string.IsNullOrEmpty(acc))
+            {
+                Write(ctx, 401, "application/json", "{\"error\":\"BAD_LOGIN\"}");
+                return;
+            }
+            string json = _store.GetAccount(acc) ?? "{}";
+            string salt = Protocol.ReadString(json, "passSalt");
+            string hash = Protocol.ReadString(json, "passHash");
+            if (!AccountAuth.VerifyPassword(pass, _pepper, salt, hash))
+            {
+                Write(ctx, 401, "application/json", "{\"error\":\"BAD_LOGIN\"}");
+                return;
+            }
+            string token = DeviceAuth.IssueToken(acc, _pepper);
+            Write(ctx, 200, "application/json", "{\"token\":\"" + token + "\",\"account\":" + AccountAuth.PublicJson(json) + "}");
         }
 
         static void Queue(HttpListenerContext ctx)
         {
             string tok = Bearer(ctx);
-            string name = ctx.Request.QueryString["name"] ?? "You";
-            if (!string.IsNullOrEmpty(tok))
+            if (string.IsNullOrEmpty(tok) || !DeviceAuth.Verify(tok, _pepper))
             {
-                if (!DeviceAuth.Verify(tok, _pepper)) { Write(ctx, 401, "text/plain", "unauthorized"); return; }
+                Write(ctx, 401, "text/plain", "unauthorized");
+                return;
+            }
+            string name = ctx.Request.QueryString["name"] ?? "You";
+            {
                 string acc = DeviceAuth.AccountId(tok);
                 lock (_rate)
                 {
@@ -199,7 +383,8 @@ namespace Kindling.Tools.MatchHost
                     if (!string.IsNullOrEmpty(n)) name = n;
                 }
             }
-            MatchSession s = _queue.Enqueue(_cat, name, (uint)Environment.TickCount);
+            string accId = !string.IsNullOrEmpty(tok) ? DeviceAuth.AccountId(tok) : null;
+            MatchSession s = _queue.Enqueue(_cat, name, (uint)Environment.TickCount, accId);
             if (!string.IsNullOrEmpty(tok))
             {
                 string acc = DeviceAuth.AccountId(tok);
@@ -228,25 +413,67 @@ namespace Kindling.Tools.MatchHost
             int.TryParse(ctx.Request.QueryString["seat"], out seat);
             string token = ctx.Request.QueryString["token"];
             MatchSession s = _queue.Get(id);
+            if (s == null && !string.IsNullOrEmpty(token))
+                s = _queue.GetByToken(token);
             if (s == null || seat < 0 || seat >= 8 || s.ResumeTokens[seat] != token)
             {
                 await ws.CloseAsync(WebSocketCloseStatus.PolicyViolation, "bad token", CancellationToken.None);
                 return;
             }
-            string welcome = s.Handle(seat, "{\"op\":\"Join\"}");
-            await Send(ws, welcome);
-            var buf = new byte[16384];
-            while (ws.State == WebSocketState.Open)
+            string matchId = s.Loop.State.MatchId.ToString("D");
+            var conn = new ClientConn { Ws = ws, MatchId = matchId, Seat = seat };
+            lock (_clientsGate) _clients.Add(conn);
+            try
             {
-                WebSocketReceiveResult r = await ws.ReceiveAsync(new ArraySegment<byte>(buf), CancellationToken.None);
-                if (r.MessageType == WebSocketMessageType.Close) break;
-                string msg = Encoding.UTF8.GetString(buf, 0, r.Count);
-                string reply = s.Handle(seat, msg);
-                _queue.Persist(s);
-                await Send(ws, reply);
+                SendLocked(conn, s.Handle(seat, "{\"op\":\"Join\"}"));
+                SendLocked(conn, s.SnapshotFor(seat, s.LastSeq[seat]));
+                var buf = new byte[16384];
+                while (ws.State == WebSocketState.Open)
+                {
+                    WebSocketReceiveResult r = await ws.ReceiveAsync(new ArraySegment<byte>(buf), CancellationToken.None);
+                    if (r.MessageType == WebSocketMessageType.Close) break;
+                    string msg = Encoding.UTF8.GetString(buf, 0, r.Count);
+                    string reply = s.Handle(seat, msg);
+                    _queue.Persist(s);
+                    SendLocked(conn, reply);
+                    if (s.Loop.State.MatchOver)
+                        PushSnapshot(s);
+                }
+            }
+            finally
+            {
+                lock (_clientsGate) _clients.Remove(conn);
             }
             if (ws.State == WebSocketState.Open)
                 await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
+        }
+
+        static void PushSnapshot(MatchSession s)
+        {
+            if (s == null) return;
+            string id = s.Loop.State.MatchId.ToString("D");
+            ClientConn[] snap;
+            lock (_clientsGate)
+                snap = _clients.ToArray();
+            for (int i = 0; i < snap.Length; i++)
+            {
+                ClientConn c = snap[i];
+                if (c.MatchId != id) continue;
+                try { SendLocked(c, s.SnapshotFor(c.Seat, s.LastSeq[c.Seat])); }
+                catch (Exception ex) { Console.Error.WriteLine(ex.Message); }
+            }
+        }
+
+        static void SendLocked(ClientConn c, string text)
+        {
+            if (c == null || c.Ws == null) return;
+            lock (c.SendGate)
+            {
+                if (c.Ws.State != WebSocketState.Open) return;
+                byte[] data = Encoding.UTF8.GetBytes(text ?? "");
+                c.Ws.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Text, true, CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
         }
 
         static async Task Send(WebSocket ws, string text)

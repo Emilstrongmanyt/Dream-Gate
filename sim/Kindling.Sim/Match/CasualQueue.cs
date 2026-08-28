@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Kindling.Sim.Catalog;
+using Kindling.Sim.Model;
 
 namespace Kindling.Sim.Match
 {
@@ -19,7 +20,7 @@ namespace Kindling.Sim.Match
             get { lock (_gate) return _live.Count; }
         }
 
-        public MatchSession Enqueue(Catalog.Catalog cat, string displayName, uint salt)
+        public MatchSession Enqueue(Catalog.Catalog cat, string displayName, uint salt, string accountId = null)
         {
             if (cat == null) throw new ArgumentNullException(nameof(cat));
             CatForRestore = cat;
@@ -27,6 +28,8 @@ namespace Kindling.Sim.Match
             MatchSession s = MatchSession.Create(cat, id, salt, humanSeats: 1);
             if (!string.IsNullOrEmpty(displayName))
                 s.Loop.State.Seats[0].DisplayName = displayName;
+            if (!string.IsNullOrEmpty(accountId))
+                s.AccountIds[0] = accountId;
             Telemetry.MatchActive++;
             string key = id.ToString("D");
             lock (_gate)
@@ -66,10 +69,17 @@ namespace Kindling.Sim.Match
                     }
                 }
             }
+            int dash = token.LastIndexOf('-');
+            if (dash == 32)
+            {
+                string n = token.Substring(0, 32);
+                if (Guid.TryParseExact(n, "N", out Guid g))
+                    return Get(g.ToString("D"));
+            }
             return null;
         }
 
-        public int TickAll(DateTime utcNow)
+        public int TickAll(DateTime utcNow, Action<MatchSession> onTicked = null)
         {
             int n = 0;
             MatchSession[] snap;
@@ -84,6 +94,7 @@ namespace Kindling.Sim.Match
                 {
                     n++;
                     Persist(snap[i]);
+                    onTicked?.Invoke(snap[i]);
                 }
             }
             return n;
@@ -96,6 +107,38 @@ namespace Kindling.Sim.Match
             if (Store == null || s == null) return;
             Store.PutMatch(s.Loop.State.MatchId.ToString("D"), CheckpointMatch.Save(s));
             Telemetry.CheckpointWrites++;
+            if (s.Loop.State.MatchOver)
+                WriteRatings(s);
+        }
+
+        public void Drop(string matchId)
+        {
+            if (string.IsNullOrEmpty(matchId)) return;
+            lock (_gate)
+                _live.Remove(matchId);
+        }
+
+        void WriteRatings(MatchSession s)
+        {
+            if (s.RatingsWritten || Store == null) return;
+            s.RatingsWritten = true;
+            for (int i = 0; i < s.AccountIds.Length; i++)
+            {
+                string acc = s.AccountIds[i];
+                if (string.IsNullOrEmpty(acc)) continue;
+                PlayerState p = s.Loop.State.Seats[i];
+                string prev = Store.GetAccount(acc) ?? "{}";
+                string name = Protocol.ReadString(prev, "displayName");
+                if (string.IsNullOrEmpty(name)) name = p.DisplayName ?? "";
+                int matches = Protocol.ReadInt(prev, "matches") + 1;
+                int mmr = (int)Math.Round(p.Rating);
+                int rd = (int)Math.Round(p.Rd);
+                int place = p.Place ?? 0;
+                string json = AccountAuth.PatchRatings(prev, acc, name, mmr, rd, matches, place);
+                Store.PutAccount(acc, json);
+                Store.AppendHistory(acc, "{\"matchId\":\"" + s.Loop.State.MatchId.ToString("D")
+                    + "\",\"place\":" + place + ",\"mmr\":" + mmr + ",\"rd\":" + rd + "}");
+            }
         }
     }
 }

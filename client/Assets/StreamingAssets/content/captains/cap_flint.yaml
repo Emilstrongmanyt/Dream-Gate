@@ -1,0 +1,5 @@
+id: cap_flint
+name: Flint-Tongue
+wick: 30
+text: "Kindle: your rightmost Kindled gains +1 Attack this combat."
+passives: [FlintKindleRightPlus1Atk]

@@ -28,6 +28,27 @@ namespace Kindling.Sim.Match
                 if (!string.IsNullOrEmpty(name)) ps.DisplayName = name;
                 ps.Wick = Protocol.ReadInt(pub[i], "wick");
                 ps.Depth = Protocol.ReadInt(pub[i], "depth");
+                int place = Protocol.ReadInt(pub[i], "place");
+                ps.Place = place > 0 ? (int?)place : ps.Place;
+                if (!Protocol.ReadBool(pub[i], "alive") && ps.Wick > 0 && pub[i].IndexOf("\"alive\":false", System.StringComparison.Ordinal) >= 0)
+                    ps.Wick = 0;
+                string cap = Protocol.ReadString(pub[i], "captain");
+                if (!string.IsNullOrEmpty(cap)) ps.Captain = new CaptainId(cap);
+            }
+            List<string> pairs = Protocol.ExtractObjects(json, "pairings");
+            if (pairs.Count > 0)
+            {
+                m.Pairings = new Pairing[pairs.Count];
+                for (int i = 0; i < pairs.Count; i++)
+                {
+                    m.Pairings[i] = new Pairing
+                    {
+                        PairIndex = i,
+                        SeatA = Protocol.ReadInt(pairs[i], "a"),
+                        SeatB = Protocol.ReadInt(pairs[i], "b"),
+                        Ghost = Protocol.ReadBool(pairs[i], "g")
+                    };
+                }
             }
         }
 
@@ -40,6 +61,35 @@ namespace Kindling.Sim.Match
             p.UpgradeCost = Protocol.ReadInt(you, "upgradeCost");
             p.Hold = Protocol.ReadBool(you, "hold");
             p.Ready = Protocol.ReadBool(you, "ready");
+            p.Flags = (PlayerFlags)(uint)Protocol.ReadInt(you, "flags");
+            int place = Protocol.ReadInt(you, "place");
+            if (place > 0) p.Place = place;
+            string cap = Protocol.ReadString(you, "captain");
+            if (!string.IsNullOrEmpty(cap)) p.Captain = new CaptainId(cap);
+            string[] offers = Protocol.ReadStringArray(you, "captainOffers");
+            if (offers != null && offers.Length > 0)
+            {
+                p.CaptainOffers = new CaptainId[offers.Length];
+                for (int i = 0; i < offers.Length; i++)
+                    p.CaptainOffers[i] = new CaptainId(offers[i]);
+            }
+            if (p.Edict == null) p.Edict = new EdictState();
+            p.Edict.UsedThisRecruit = Protocol.ReadBool(you, "edictUsed");
+            string glimpse = Protocol.ExtractObject(you, "glimpse");
+            p.GlimpseQueue.Clear();
+            p.ClearFlag(PlayerFlags.GlimpseOpen);
+            if (!string.IsNullOrEmpty(glimpse) && Protocol.ReadBool(glimpse, "open"))
+            {
+                p.SetFlag(PlayerFlags.GlimpseOpen);
+                string[] choices = Protocol.ReadStringArray(glimpse, "choices");
+                if (choices != null && choices.Length > 0)
+                {
+                    var ids = new UnitId[choices.Length];
+                    for (int i = 0; i < choices.Length; i++)
+                        ids[i] = new UnitId(choices[i]);
+                    p.GlimpseQueue.Enqueue(new GlimpseOffer { Choices = ids });
+                }
+            }
             p.Board.Clear();
             List<string> board = Protocol.ExtractObjects(you, "board");
             for (int i = 0; i < board.Count; i++)
@@ -74,16 +124,18 @@ namespace Kindling.Sim.Match
             string id = Protocol.ReadString(json, "catalogId");
             if (string.IsNullOrEmpty(id)) id = Protocol.ReadString(json, "id");
             int hp = Protocol.ReadInt(json, "hp");
-            return new UnitInstance
+            var u = new UnitInstance
             {
                 InstanceId = iid,
                 CatalogId = new UnitId(id),
                 Atk = Protocol.ReadInt(json, "atk"),
                 Hp = hp,
                 MaxHp = hp,
+                Keywords = (Keyword)Protocol.ReadInt(json, "kw"),
                 Awakened = Protocol.ReadBool(json, "awakened") || Protocol.ReadBool(json, "aw"),
                 AttackCharges = 1
             };
+            return u;
         }
     }
 }

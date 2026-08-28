@@ -17,9 +17,68 @@ namespace Kindling.Client
         public static readonly Color AtkGem = Hex("c9a227");
         public static readonly Color HpGem = Hex("a33b2b");
         public static readonly Color Selected = Hex("ffe27a");
+        public static bool ForcePatterns;
+        public static Color FrameColor = Gold;
+        static Sprite[] CardShirts;
+
+        public static Sprite CardShirt(Chorus chorus, bool captain)
+        {
+            EnsureCardShirts();
+            if (CardShirts == null || CardShirts.Length == 0) return Pixel(Wood);
+            int i;
+            if (captain) i = CardShirts.Length - 1;
+            else
+            {
+                switch (chorus)
+                {
+                    case Chorus.Humanoid: i = 0; break;
+                    case Chorus.Beast: i = 1; break;
+                    case Chorus.Dragon: i = 2; break;
+                    case Chorus.Spirit: i = 3; break;
+                    case Chorus.Undead: i = 4; break;
+                    default: i = 0; break;
+                }
+            }
+            if (i < 0) i = 0;
+            if (i >= CardShirts.Length) i = CardShirts.Length - 1;
+            return CardShirts[i] != null ? CardShirts[i] : Pixel(Wood);
+        }
+
+        static void EnsureCardShirts()
+        {
+            if (CardShirts != null) return;
+            CardShirts = Resources.LoadAll<Sprite>("CardShirts");
+            if (CardShirts == null) CardShirts = new Sprite[0];
+            System.Array.Sort(CardShirts, (a, b) => string.CompareOrdinal(a != null ? a.name : "", b != null ? b.name : ""));
+        }
+
+        public static Color CosmeticFrame(string id)
+        {
+            if (id == "ember") return Ember;
+            if (id == "spirit") return ChorusColor(Chorus.Spirit);
+            if (id == "wick") return WickRed;
+            if (id == "night") return Hex("2a2040");
+            return Gold;
+        }
 
         public static Font Font;
         static readonly Sprite[] PatternCache = new Sprite[8];
+
+        public static Color CaptainTint(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return Ember;
+            int h = 0;
+            for (int i = 0; i < id.Length; i++) h = (h * 33) ^ id[i];
+            if (h < 0) h = -h;
+            Color[] tints =
+            {
+                Ember, GoldDark, ChorusColor(Chorus.Undead), ChorusColor(Chorus.Beast),
+                ChorusColor(Chorus.Humanoid), ChorusColor(Chorus.Dragon), ChorusColor(Chorus.Spirit),
+                WickRed, Hex("8a5a2b"), Hex("4a6b8c"), Hex("6b4a2a"), Hex("3d5c4a"),
+                Hex("7a3a4a"), Hex("5a4a7a"), Hex("7a6a20"), Hex("2a4a5a")
+            };
+            return tints[h % tints.Length];
+        }
 
         public static Color ChorusColor(Chorus c)
         {
@@ -176,6 +235,32 @@ namespace Kindling.Client
             Label(rt, "cap", caption, 22, TextAnchor.MiddleCenter, Cream);
             btn.onClick.AddListener(() => onClick());
             return btn;
+        }
+
+        public static InputField MakeInput(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, string placeholder, bool password, int characterLimit = 16)
+        {
+            var rt = Panel(parent, name, anchorMin, anchorMax, Hex("2a1a10"));
+            var img = rt.GetComponent<Image>();
+            img.raycastTarget = true;
+            var input = rt.gameObject.AddComponent<InputField>();
+            input.targetGraphic = img;
+            var text = Label(rt, "text", "", 22, TextAnchor.MiddleLeft, Cream);
+            var trt = text.GetComponent<RectTransform>();
+            trt.offsetMin = new Vector2(12, 4);
+            trt.offsetMax = new Vector2(-12, -4);
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.supportRichText = false;
+            var ph = Label(rt, "ph", placeholder ?? "", 22, TextAnchor.MiddleLeft, new Color(0.72f, 0.62f, 0.45f, 0.55f));
+            var prt = ph.GetComponent<RectTransform>();
+            prt.offsetMin = new Vector2(12, 4);
+            prt.offsetMax = new Vector2(-12, -4);
+            input.textComponent = text;
+            input.placeholder = ph;
+            input.lineType = InputField.LineType.SingleLine;
+            input.characterLimit = characterLimit > 0 ? characterLimit : (password ? 64 : 16);
+            input.contentType = password ? InputField.ContentType.Password : InputField.ContentType.Standard;
+            input.caretColor = Gold;
+            return input;
         }
 
         public static string Keywords(Keyword k, bool awakened)

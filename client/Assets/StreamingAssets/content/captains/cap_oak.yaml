@@ -1,0 +1,11 @@
+id: cap_oak
+name: Oak Binder
+wick: 30
+text: "Edict 1: give a Kindled Ward."
+edict:
+  cost: 1
+  target: Board
+  actions:
+    - type: GrantKeyword
+      keyword: Ward
+      duration: Permanent

@@ -128,6 +128,31 @@ namespace Kindling.Sim.Match
             return ReadIntArray(json, key);
         }
 
+        public static string[] ReadStringArray(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(key)) return null;
+            string needle = "\"" + key + "\":";
+            int i = json.IndexOf(needle, StringComparison.Ordinal);
+            if (i < 0) return null;
+            i = json.IndexOf('[', i);
+            if (i < 0) return null;
+            i++;
+            var list = new System.Collections.Generic.List<string>();
+            while (i < json.Length && json[i] != ']')
+            {
+                i = SkipWs(json, i);
+                if (i >= json.Length || json[i] == ']') break;
+                if (json[i] == ',') { i++; continue; }
+                if (json[i] != '"') { i++; continue; }
+                i++;
+                int start = i;
+                while (i < json.Length && json[i] != '"') i++;
+                list.Add(json.Substring(start, i - start));
+                if (i < json.Length && json[i] == '"') i++;
+            }
+            return list.ToArray();
+        }
+
         static int[] ReadIntArray(string json, string key)
         {
             string needle = "\"" + key + "\":";

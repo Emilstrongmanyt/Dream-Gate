@@ -1,4 +1,5 @@
 id: cap_skiv
 name: Skiv the Gutter
 wick: 30
+text: "Beasts you buy gain +1 Attack."
 passives: [SkivBeastOnBuyPlus1Atk]

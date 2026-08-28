@@ -1,0 +1,5 @@
+id: cap_noll
+name: Noll the Tally
+wick: 30
+text: "Each time you buy, bank 1 Ember for next recruit."
+passives: [NollOnBuyPendingEmber]

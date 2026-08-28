@@ -24,9 +24,11 @@ services:
     environment:
       PORT: "8080"
       REDIS_URL: redis:6379
+      DATABASE_URL: postgres://kindling:kindling@postgres:5432/kindling
       KINDLING_PEPPER: kindling-dev-pepper
     depends_on:
       - redis
+      - postgres
 
 volumes:
   kindling_pg:

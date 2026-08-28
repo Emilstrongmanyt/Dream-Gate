@@ -1,4 +1,5 @@
 id: cap_debt
 name: Ledger of Debt
 wick: 25
+text: "25 Wick. You gain 1 extra Ember each recruit."
 passives: [DebtGrantPlus1]

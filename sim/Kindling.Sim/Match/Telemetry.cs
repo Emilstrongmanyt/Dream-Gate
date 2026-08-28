@@ -9,6 +9,7 @@ namespace Kindling.Sim.Match
         public static int GrantEmbersTotal;
         public static int AbandonTotal;
         public static int CheckpointWrites;
+        public static int ReconnectTotal;
 
         public static string Snapshot()
         {
@@ -18,7 +19,8 @@ namespace Kindling.Sim.Match
                 + ",\"glimpse_overflow\":" + GlimpseOverflow
                 + ",\"grant_embers_total\":" + GrantEmbersTotal
                 + ",\"abandon_total\":" + AbandonTotal
-                + ",\"checkpoint_writes\":" + CheckpointWrites + "}";
+                + ",\"checkpoint_writes\":" + CheckpointWrites
+                + ",\"reconnect_total\":" + ReconnectTotal + "}";
         }
     }
 }

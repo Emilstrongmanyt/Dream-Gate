@@ -1,4 +1,5 @@
 id: cap_glass
 name: Glass Saint
 wick: 30
+text: "Kindle: your leftmost Kindled gains Aegis this combat."
 passives: [GlassKindleLeftAegis]

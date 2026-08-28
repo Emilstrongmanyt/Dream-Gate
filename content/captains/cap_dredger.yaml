@@ -1,4 +1,5 @@
 id: cap_dredger
 name: Dredger Mo
 wick: 30
+text: "After you Upgrade, the next Ember grant is +2."
 passives: [DredgerNextGrantPlus2]

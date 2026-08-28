@@ -208,7 +208,8 @@ namespace Kindling.Sim.Catalog
             {
                 Id = new CaptainId(n.GetString("id")),
                 Name = n.GetString("name"),
-                Wick = n.GetInt("wick", Rules.DefaultWick)
+                Wick = n.GetInt("wick", Rules.DefaultWick),
+                Text = n.GetString("text")
             };
             List<string> pass = n.StringList("passives");
             for (int i = 0; i < pass.Count; i++)

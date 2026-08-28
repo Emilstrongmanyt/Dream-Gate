@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -26,6 +27,7 @@ namespace Kindling.Client
         readonly List<CardView> _boardCards = new List<CardView>();
         readonly List<CardView> _handCards = new List<CardView>();
         readonly List<CardView> _offerCards = new List<CardView>();
+        RectTransform _offerRow;
         Text _hud;
         Text _log;
         Text _toastLabel;
@@ -36,6 +38,7 @@ namespace Kindling.Client
         Canvas _canvas;
         DropZone _handZone;
         DropZone _boardZone;
+        DropZone _stallZone;
         CardDrag _activeDrag;
         Transform _dragOriginParent;
         int _dragOriginSibling;
@@ -48,10 +51,32 @@ namespace Kindling.Client
         bool _edictTargeting;
         int _awakenSeen;
         bool _lowTimeWarned;
+        int _netCombatSeq;
+        int _netRound;
+        bool _netReadySent;
+        CombatResult _netCombat;
         GameObject _helpPanel;
         Text _helpText;
         int _helpStep;
         NetMatchClient _net;
+        GameObject _menuRoot;
+        GameObject _authPanel;
+        GameObject _hubPanel;
+        InputField _nameInput;
+        InputField _passInput;
+        InputField _hostInput;
+        Text _hubWelcome;
+        Text _menuStatus;
+        string _authToken;
+        string _displayName;
+        string _accountId;
+        int _mmr;
+        bool _inMatch;
+        GameObject _crownPanel;
+        Text _crownText;
+        Text _historyLabel;
+        string _frameId = "gold";
+        string _matchMode = "practice";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -82,19 +107,14 @@ namespace Kindling.Client
                 return;
             }
             _cat = Catalog.LoadFromDirectory(content);
-            _loop = MatchLoop.Create(_cat, Guid.NewGuid(), (uint)Environment.TickCount, humanSeats: 1);
-            _loop.AutoPickBotCaptains();
             BuildUi();
-            ArmTimer(Rules.CaptainPickSeconds);
-            string host = NetMatchClient.ResolveHost();
-            if (!string.IsNullOrEmpty(host))
-            {
-                _net = gameObject.AddComponent<NetMatchClient>();
-                _net.OnSnapshot = OnNetSnapshot;
-                StartCoroutine(_net.Connect(host));
-                Toast("Connecting " + host);
-            }
-            Refresh();
+            BuildMenu();
+            if (_pickPanel != null) _pickPanel.SetActive(false);
+            if (_glimpsePanel != null) _glimpsePanel.SetActive(false);
+            if (_helpPanel != null) _helpPanel.SetActive(false);
+            if (_playback != null && _playback.Root != null) _playback.Root.SetActive(false);
+            RestoreSession();
+            ShowMenu();
         }
 
         static string FindContent()
@@ -116,12 +136,15 @@ namespace Kindling.Client
             HsUi.Label(HsUi.Panel(canvas.transform, "title", new Vector2(0.01f, 0.94f), new Vector2(0.40f, 0.995f), Color.clear),
                 "t", "KINDLING  ·  The Ember Exchange", 26, TextAnchor.MiddleLeft, HsUi.Gold);
 
-            _hud = HsUi.Label(HsUi.Panel(canvas.transform, "hud", new Vector2(0.40f, 0.94f), new Vector2(0.99f, 0.995f), Color.clear),
+            _hud = HsUi.Label(HsUi.Panel(canvas.transform, "hud", new Vector2(0.40f, 0.94f), new Vector2(0.86f, 0.995f), Color.clear),
                 "hud", "", 22, TextAnchor.MiddleRight, HsUi.Cream);
+            HsUi.MakeButton(canvas.transform, "leave", "MENU", new Vector2(0.87f, 0.94f), new Vector2(0.99f, 0.995f), HsUi.WickRed, LeaveMatch);
 
             // Stall
             var stallBar = HsUi.Panel(canvas.transform, "stallBar", new Vector2(0.02f, 0.70f), new Vector2(0.72f, 0.93f), HsUi.Wood);
-            HsUi.Label(stallBar, "sl", "STALL  ·  drag into hand to buy  ·  timer auto-starts combat", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Label(stallBar, "sl", "STALL  ·  drop onto hand or warband to buy  ·  drop a Kindled here to sell", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            _stallZone = stallBar.gameObject.AddComponent<DropZone>();
+            _stallZone.Init(CardZone.Stall, stallBar.GetComponent<Image>());
             var stallRow = HsUi.Panel(stallBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
             var hlg = stallRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             hlg.spacing = 8; hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -138,7 +161,7 @@ namespace Kindling.Client
 
             // Board
             var boardBar = HsUi.Panel(canvas.transform, "boardBar", new Vector2(0.02f, 0.38f), new Vector2(0.72f, 0.69f), new Color(0.12f, 0.08f, 0.05f, 1));
-            HsUi.Label(boardBar, "bl", "WARBAND  ·  drop from hand to set position", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Label(boardBar, "bl", "WARBAND  ·  drop from hand to play  ·  drop from stall to buy (lands in hand)", 16, TextAnchor.UpperLeft, HsUi.Gold);
             _boardZone = boardBar.gameObject.AddComponent<DropZone>();
             _boardZone.Init(CardZone.Board, boardBar.GetComponent<Image>());
             var boardRow = HsUi.Panel(boardBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
@@ -156,7 +179,7 @@ namespace Kindling.Client
 
             // Hand
             var handBar = HsUi.Panel(canvas.transform, "handBar", new Vector2(0.02f, 0.14f), new Vector2(0.72f, 0.37f), HsUi.Wood);
-            HsUi.Label(handBar, "hl", "HAND  ·  drop from stall to buy", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Label(handBar, "hl", "HAND  ·  drop from stall to buy  ·  drop here to sell", 16, TextAnchor.UpperLeft, HsUi.Gold);
             _handZone = handBar.gameObject.AddComponent<DropZone>();
             _handZone.Init(CardZone.Hand, handBar.GetComponent<Image>());
             var handRow = HsUi.Panel(handBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
@@ -203,30 +226,29 @@ namespace Kindling.Client
             _infoLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
             _infoLabel.verticalOverflow = VerticalWrapMode.Overflow;
 
-            _toastLabel = HsUi.Label(HsUi.Panel(canvas.transform, "toast", new Vector2(0.25f, 0.48f), new Vector2(0.75f, 0.56f), new Color(0, 0, 0, 0.0f)),
-                "toast", "", 24, TextAnchor.MiddleCenter, HsUi.Selected);
+            var toastRt = HsUi.Panel(canvas.transform, "toast", new Vector2(0.25f, 0.48f), new Vector2(0.75f, 0.56f), new Color(0, 0, 0, 0.0f));
+            toastRt.GetComponent<Image>().raycastTarget = false;
+            _toastLabel = HsUi.Label(toastRt, "toast", "", 24, TextAnchor.MiddleCenter, HsUi.Selected);
 
             _recruitRoot = canvas;
 
-            // Captain pick overlay
+            // Captain pick overlay — 3 offers online, full roster in Practice
             _pickPanel = HsUi.Panel(canvas.transform, "pick", Vector2.zero, Vector2.one, new Color(0.05f, 0.03f, 0.02f, 0.92f)).gameObject;
             HsUi.Label(_pickPanel.transform, "pt", "Choose your Captain", 36, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.78f);
-            var offerRow = HsUi.Panel(_pickPanel.transform, "offers", new Vector2(0.12f, 0.28f), new Vector2(0.88f, 0.72f), Color.clear);
-            var oh = offerRow.gameObject.AddComponent<HorizontalLayoutGroup>();
-            oh.spacing = 24; oh.childAlignment = TextAnchor.MiddleCenter;
-            oh.childForceExpandWidth = false; oh.childForceExpandHeight = true;
-            for (int i = 0; i < 3; i++)
-            {
-                int idx = i;
-                var cv = CardView.Create(offerRow, new Vector2(220, 320), CardZone.Offer, idx);
-                cv.OnClicked = () => PickCaptain(idx);
-                var le = cv.gameObject.AddComponent<LayoutElement>();
-                le.preferredWidth = 220; le.preferredHeight = 320;
-                _offerCards.Add(cv);
-            }
-            HsUi.Label(_pickPanel.transform, "hint", "Empty seats are filled with bots. Art is placeholder — import later.", 18, TextAnchor.LowerCenter, HsUi.Cream)
-                .GetComponent<RectTransform>().anchorMax = new Vector2(1, 0.22f);
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.86f);
+            HsUi.Label(_pickPanel.transform, "ps", "Every match. Passive is always on. Edict costs Embers once per recruit.", 18, TextAnchor.UpperCenter, HsUi.Cream)
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.80f);
+            _offerRow = HsUi.Panel(_pickPanel.transform, "offers", new Vector2(0.06f, 0.16f), new Vector2(0.94f, 0.78f), Color.clear);
+            var grid = _offerRow.gameObject.AddComponent<GridLayoutGroup>();
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 4;
+            grid.cellSize = new Vector2(180, 250);
+            grid.spacing = new Vector2(10, 10);
+            grid.childAlignment = TextAnchor.MiddleCenter;
+            grid.padding = new RectOffset(8, 8, 4, 4);
+            EnsureOfferCards(3);
+            HsUi.Label(_pickPanel.transform, "hint", "Tap a Captain to lock them in for this match.", 18, TextAnchor.LowerCenter, HsUi.Cream)
+                .GetComponent<RectTransform>().anchorMax = new Vector2(1, 0.14f);
 
             _playback = new CombatPlayback();
             _playback.Build(canvas.transform, NextAfterCombat);
@@ -260,18 +282,489 @@ namespace Kindling.Client
             _helpText.verticalOverflow = VerticalWrapMode.Overflow;
             HsUi.MakeButton(_helpPanel.transform, "next", "GOT IT", new Vector2(0.55f, 0.06f), new Vector2(0.96f, 0.26f), HsUi.GoldDark, AdvanceHelp);
             HsUi.MakeButton(_helpPanel.transform, "skip", "SKIP", new Vector2(0.04f, 0.06f), new Vector2(0.48f, 0.26f), HsUi.WickRed, SkipHelp);
-            if (PlayerPrefs.GetInt("kindling.help.v1", 0) == 1)
-                _helpPanel.SetActive(false);
+            _helpPanel.SetActive(false);
+
+            _crownPanel = HsUi.Panel(canvas.transform, "crown", Vector2.zero, Vector2.one, new Color(0.05f, 0.03f, 0.02f, 0.96f)).gameObject;
+            HsUi.Label(_crownPanel.transform, "ct", "THE CROWN", 40, TextAnchor.UpperCenter, HsUi.Gold)
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.82f);
+            _crownText = HsUi.Label(_crownPanel.transform, "cs", "", 22, TextAnchor.UpperCenter, HsUi.Cream);
+            var crt = _crownText.GetComponent<RectTransform>();
+            crt.anchorMin = new Vector2(0.15f, 0.22f);
+            crt.anchorMax = new Vector2(0.85f, 0.78f);
+            _crownText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _crownText.verticalOverflow = VerticalWrapMode.Overflow;
+            HsUi.MakeButton(_crownPanel.transform, "ok", "BACK TO MENU", new Vector2(0.35f, 0.06f), new Vector2(0.65f, 0.16f), HsUi.GoldDark, DismissCrown);
+            _crownPanel.SetActive(false);
+        }
+
+        void EnsureOfferCards(int n)
+        {
+            if (_offerRow == null) return;
+            if (n < 1) n = 1;
+            while (_offerCards.Count < n)
+            {
+                int idx = _offerCards.Count;
+                var cv = CardView.Create(_offerRow, new Vector2(180, 250), CardZone.Offer, idx);
+                cv.OnClicked = () => PickCaptain(cv.Drag != null ? cv.Drag.Index : idx);
+                _offerCards.Add(cv);
+            }
+            for (int i = 0; i < _offerCards.Count; i++)
+            {
+                bool on = i < n;
+                _offerCards[i].gameObject.SetActive(on);
+                if (on && _offerCards[i].Drag != null)
+                    _offerCards[i].Drag.Index = i;
+            }
+        }
+
+        void LayoutPickGrid(int n)
+        {
+            if (_offerRow == null) return;
+            var grid = _offerRow.GetComponent<GridLayoutGroup>();
+            if (grid == null) return;
+            if (n <= 3)
+            {
+                grid.constraintCount = n < 1 ? 1 : n;
+                grid.cellSize = new Vector2(240, 340);
+                grid.spacing = new Vector2(18, 12);
+            }
+            else if (n <= 8)
+            {
+                grid.constraintCount = 4;
+                grid.cellSize = new Vector2(200, 280);
+                grid.spacing = new Vector2(12, 10);
+            }
             else
+            {
+                grid.constraintCount = 4;
+                grid.cellSize = new Vector2(170, 240);
+                grid.spacing = new Vector2(8, 8);
+            }
+        }
+
+        void BuildMenu()
+        {
+            _menuRoot = HsUi.Panel(_canvas.transform, "menu", Vector2.zero, Vector2.one, new Color(0.08f, 0.04f, 0.02f, 0.98f)).gameObject;
+            HsUi.Label(_menuRoot.transform, "mt", "KINDLING", 56, TextAnchor.UpperCenter, HsUi.Gold)
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.86f);
+            HsUi.Label(_menuRoot.transform, "ms", "The Ember Exchange", 24, TextAnchor.UpperCenter, HsUi.Cream)
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.80f);
+            HsUi.Label(_menuRoot.transform, "msub", "Register or log in, then Practice vs bots or Queue Casual.", 18, TextAnchor.UpperCenter, HsUi.Gold)
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.74f);
+
+            var card = HsUi.Panel(_menuRoot.transform, "card", new Vector2(0.30f, 0.08f), new Vector2(0.70f, 0.72f), HsUi.Wood);
+
+            _authPanel = HsUi.Panel(card, "auth", Vector2.zero, Vector2.one, Color.clear).gameObject;
+            _nameInput = HsUi.MakeInput(_authPanel.transform, "name", new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.88f), "Captain name", false, 16);
+            _passInput = HsUi.MakeInput(_authPanel.transform, "pass", new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.68f), "Password", true, 64);
+            HsUi.MakeButton(_authPanel.transform, "reg", "REGISTER", new Vector2(0.08f, 0.30f), new Vector2(0.48f, 0.46f), HsUi.GoldDark, () => StartCoroutine(DoRegister()));
+            HsUi.MakeButton(_authPanel.transform, "login", "LOG IN", new Vector2(0.52f, 0.30f), new Vector2(0.92f, 0.46f), new Color(0.15f, 0.45f, 0.18f), () => StartCoroutine(DoLogin()));
+            HsUi.Label(_authPanel.transform, "ah", "Name 3–16 letters  ·  password 6+  ·  English only", 16, TextAnchor.MiddleCenter, HsUi.Cream)
+                .GetComponent<RectTransform>().anchorMax = new Vector2(1f, 0.22f);
+
+            _hubPanel = HsUi.Panel(card, "hub", Vector2.zero, Vector2.one, Color.clear).gameObject;
+            _hubWelcome = HsUi.Label(_hubPanel.transform, "hw", "Welcome", 26, TextAnchor.UpperCenter, HsUi.Gold);
+            var wrt = _hubWelcome.GetComponent<RectTransform>();
+            wrt.anchorMin = new Vector2(0.06f, 0.72f);
+            wrt.anchorMax = new Vector2(0.94f, 0.96f);
+            _hubWelcome.horizontalOverflow = HorizontalWrapMode.Wrap;
+            HsUi.MakeButton(_hubPanel.transform, "prac", "PRACTICE  ·  vs bots", new Vector2(0.08f, 0.58f), new Vector2(0.92f, 0.72f), new Color(0.15f, 0.45f, 0.18f), StartPractice);
+            HsUi.MakeButton(_hubPanel.transform, "queue", "QUEUE  ·  Casual", new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.56f), HsUi.GoldDark, () => StartCoroutine(StartQueue()));
+            _hostInput = HsUi.MakeInput(_hubPanel.transform, "host", new Vector2(0.08f, 0.28f), new Vector2(0.92f, 0.40f), "Match host (optional)", false, 128);
+            HsUi.MakeButton(_hubPanel.transform, "frame", "CARD FRAME", new Vector2(0.08f, 0.16f), new Vector2(0.48f, 0.26f), HsUi.GoldDark, CycleFrame);
+            HsUi.MakeButton(_hubPanel.transform, "a11y", "PATTERNS", new Vector2(0.52f, 0.16f), new Vector2(0.92f, 0.26f), HsUi.ChorusColor(Chorus.Spirit), TogglePatterns);
+            HsUi.MakeButton(_hubPanel.transform, "out", "LOG OUT", new Vector2(0.08f, 0.04f), new Vector2(0.92f, 0.14f), HsUi.WickRed, Logout);
+
+            var hist = HsUi.Panel(_menuRoot.transform, "history", new Vector2(0.02f, 0.08f), new Vector2(0.28f, 0.72f), HsUi.Wood);
+            HsUi.Label(hist, "ht", "RECENT MATCHES", 16, TextAnchor.UpperCenter, HsUi.Gold)
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0, 0.88f);
+            _historyLabel = HsUi.Label(hist, "hb", "", 16, TextAnchor.UpperLeft, HsUi.Cream);
+            var hrt2 = _historyLabel.GetComponent<RectTransform>();
+            hrt2.anchorMin = new Vector2(0.06f, 0.04f);
+            hrt2.anchorMax = new Vector2(0.94f, 0.86f);
+            _historyLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _historyLabel.verticalOverflow = VerticalWrapMode.Overflow;
+
+            _menuStatus = HsUi.Label(_menuRoot.transform, "st", "", 20, TextAnchor.LowerCenter, HsUi.Selected);
+            _menuStatus.GetComponent<RectTransform>().anchorMax = new Vector2(1f, 0.08f);
+            _hubPanel.SetActive(false);
+        }
+
+        void ShowMenu()
+        {
+            _inMatch = false;
+            _timerArmed = false;
+            if (_menuRoot != null)
+            {
+                _menuRoot.SetActive(true);
+                _menuRoot.transform.SetAsLastSibling();
+            }
+            bool logged = !string.IsNullOrEmpty(_authToken) && !string.IsNullOrEmpty(_displayName);
+            if (_authPanel != null) _authPanel.SetActive(!logged);
+            if (_hubPanel != null) _hubPanel.SetActive(logged);
+            PaintHub();
+        }
+
+        void PaintHub()
+        {
+            if (_hubWelcome != null)
+            {
+                _hubWelcome.text = string.IsNullOrEmpty(_displayName)
+                    ? "Welcome"
+                    : ("Welcome, " + _displayName + "\nWick rating  " + (_mmr > 0 ? _mmr : 1500));
+            }
+            if (_hostInput != null && string.IsNullOrEmpty(_hostInput.text))
+                _hostInput.text = NetMatchClient.ResolveHost() ?? "";
+            if (_historyLabel != null) _historyLabel.text = LocalHistoryText();
+            ApplyFramePrefs();
+        }
+
+        void CycleFrame()
+        {
+            _frameId = Cosmetics.NextFrame(_frameId);
+            PlayerPrefs.SetString("kindling.frame", _frameId);
+            PlayerPrefs.Save();
+            ApplyFramePrefs();
+            MenuMsg("Card frame  " + _frameId);
+        }
+
+        void TogglePatterns()
+        {
+            bool on = PlayerPrefs.GetInt("kindling.a11y.patterns", 0) != 1;
+            PlayerPrefs.SetInt("kindling.a11y.patterns", on ? 1 : 0);
+            PlayerPrefs.Save();
+            HsUi.ForcePatterns = on;
+            MenuMsg(on ? "Chorus patterns on" : "Chorus patterns default");
+        }
+
+        void ApplyFramePrefs()
+        {
+            if (string.IsNullOrEmpty(_frameId))
+                _frameId = PlayerPrefs.GetString("kindling.frame", "gold");
+            HsUi.FrameColor = HsUi.CosmeticFrame(_frameId);
+            HsUi.ForcePatterns = PlayerPrefs.GetInt("kindling.a11y.patterns", 0) == 1;
+        }
+
+        static string LocalHistoryText()
+        {
+            string raw = PlayerPrefs.GetString("kindling.history.v1", "");
+            if (string.IsNullOrEmpty(raw)) return "Play a match to fill this list.";
+            var items = Protocol.ExtractObjects("{\"h\":" + (raw.StartsWith("[") ? raw : ("[" + raw + "]")) + "}", "h");
+            if (items.Count == 0) return "Play a match to fill this list.";
+            var sb = new System.Text.StringBuilder();
+            int n = items.Count < 8 ? items.Count : 8;
+            for (int i = 0; i < n; i++)
+            {
+                int place = Protocol.ReadInt(items[i], "place");
+                string mode = Protocol.ReadString(items[i], "mode");
+                string cap = Protocol.ReadString(items[i], "captain");
+                sb.Append('#').Append(place > 0 ? place.ToString() : "-");
+                sb.Append("  ").Append(string.IsNullOrEmpty(mode) ? "match" : mode);
+                if (!string.IsNullOrEmpty(cap)) sb.Append("  ").Append(cap);
+                sb.Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        void RecordHistory()
+        {
+            if (_loop == null || _loop.Human == null) return;
+            int place = _loop.Human.Place ?? 0;
+            string cap = _loop.Human.Captain.IsEmpty ? "" : NameOfCaptain(_loop.Human.Captain.Value);
+            string item = "{\"place\":" + place + ",\"mode\":\"" + JsonEsc(_matchMode)
+                + "\",\"captain\":\"" + JsonEsc(cap) + "\"}";
+            string raw = PlayerPrefs.GetString("kindling.history.v1", "[]");
+            if (raw.Length < 2 || raw[0] != '[') raw = "[]";
+            string next = "[" + item + (raw == "[]" ? "" : "," + raw.Substring(1, raw.Length - 2)) + "]";
+            if (next.Length > 2000) next = next.Substring(0, 2000);
+            PlayerPrefs.SetString("kindling.history.v1", next);
+            if (place > 0) _mmr = Mathf.Max(100, _mmr + (place == 1 ? 25 : (place <= 4 ? 8 : -12)));
+            PlayerPrefs.SetInt("kindling.auth.mmr", _mmr);
+            PlayerPrefs.Save();
+        }
+
+        void ShowCrown()
+        {
+            RecordHistory();
+            if (_crownPanel == null)
+            {
+                ReturnToMenu();
+                return;
+            }
+            _crownPanel.SetActive(true);
+            _crownPanel.transform.SetAsLastSibling();
+            if (_crownText != null)
+                _crownText.text = StandingsLine().Replace("   ", "\n");
+        }
+
+        void DismissCrown()
+        {
+            if (_crownPanel != null) _crownPanel.SetActive(false);
+            ReturnToMenu();
+        }
+
+        void MenuMsg(string msg)
+        {
+            if (_menuStatus != null) _menuStatus.text = msg ?? "";
+            Toast(msg);
+        }
+
+        void RestoreSession()
+        {
+            _authToken = PlayerPrefs.GetString("kindling.auth.token", "");
+            _displayName = PlayerPrefs.GetString("kindling.auth.name", "");
+            _accountId = PlayerPrefs.GetString("kindling.auth.id", "");
+            _mmr = PlayerPrefs.GetInt("kindling.auth.mmr", 1500);
+            _frameId = PlayerPrefs.GetString("kindling.frame", "gold");
+            ApplyFramePrefs();
+            if (string.IsNullOrEmpty(_authToken) || string.IsNullOrEmpty(_displayName))
+            {
+                _authToken = "";
+                _displayName = "";
+            }
+        }
+
+        void SaveSession()
+        {
+            PlayerPrefs.SetString("kindling.auth.token", _authToken ?? "");
+            PlayerPrefs.SetString("kindling.auth.name", _displayName ?? "");
+            PlayerPrefs.SetString("kindling.auth.id", _accountId ?? "");
+            PlayerPrefs.SetInt("kindling.auth.mmr", _mmr);
+            PlayerPrefs.Save();
+        }
+
+        void ApplyAccountJson(string token, string account)
+        {
+            _authToken = token ?? "";
+            _displayName = Protocol.ReadString(account, "displayName");
+            _accountId = Protocol.ReadString(account, "id");
+            _mmr = Protocol.ReadInt(account, "mmr");
+            if (_mmr < 1) _mmr = 1500;
+            SaveSession();
+            ShowMenu();
+        }
+
+        IEnumerator DoRegister()
+        {
+            yield return SubmitAuth("/v1/auth/register", true);
+        }
+
+        IEnumerator DoLogin()
+        {
+            yield return SubmitAuth("/v1/auth/login", false);
+        }
+
+        IEnumerator SubmitAuth(string path, bool register)
+        {
+            string name = _nameInput != null ? _nameInput.text : "";
+            string pass = _passInput != null ? _passInput.text : "";
+            string bad = AccountAuth.ValidateName(name);
+            if (bad != null) { MenuMsg(AuthHint(bad)); yield break; }
+            bad = AccountAuth.ValidatePassword(pass);
+            if (bad != null) { MenuMsg(AuthHint(bad)); yield break; }
+
+            string host = CurrentHost();
+            if (string.IsNullOrEmpty(host))
+            {
+                if (TryLocalAuth(name, pass, register, out string err))
+                    MenuMsg(register ? "Registered — local practice" : "Logged in");
+                else
+                    MenuMsg(AuthHint(err));
+                yield break;
+            }
+
+            EnsureNet(host);
+            string body = "{\"displayName\":\"" + JsonEsc(name.Trim())
+                + "\",\"password\":\"" + JsonEsc(pass)
+                + "\",\"deviceId\":\"" + JsonEsc(SystemInfo.deviceUniqueIdentifier) + "\"}";
+            MenuMsg(register ? "Registering…" : "Logging in…");
+            int code = 0;
+            string resp = "";
+            yield return _net.PostJson(path, body, (c, t) => { code = c; resp = t; });
+            if (code == 200)
+            {
+                ApplyAccountJson(Protocol.ReadString(resp, "token"), Protocol.ExtractObject(resp, "account"));
+                MenuMsg("Welcome, " + _displayName);
+                yield break;
+            }
+            string errCode = Protocol.ReadString(resp, "error");
+            if (string.IsNullOrEmpty(errCode)) errCode = _net.LastHttpError;
+            MenuMsg(AuthHint(errCode));
+        }
+
+        bool TryLocalAuth(string name, string pass, bool register, out string err)
+        {
+            err = null;
+            string login = AccountAuth.NormalizeLogin(name);
+            string key = "kindling.local." + login;
+            const string pepper = "kindling-local-pepper";
+            if (register)
+            {
+                if (PlayerPrefs.HasKey(key)) { err = "NAME_TAKEN"; return false; }
+                string id = DeviceAuth.NewAccountId();
+                string salt = AccountAuth.NewSalt();
+                string hash = AccountAuth.HashPassword(pass, pepper, salt);
+                string json = AccountAuth.CreateAccount(id, name.Trim(), login, salt, hash, "");
+                PlayerPrefs.SetString(key, json);
+                ApplyAccountJson("local." + id, json);
+                return true;
+            }
+            if (!PlayerPrefs.HasKey(key)) { err = "BAD_LOGIN"; return false; }
+            string stored = PlayerPrefs.GetString(key, "{}");
+            if (!AccountAuth.VerifyPassword(pass, pepper, Protocol.ReadString(stored, "passSalt"), Protocol.ReadString(stored, "passHash")))
+            {
+                err = "BAD_LOGIN";
+                return false;
+            }
+            ApplyAccountJson("local." + Protocol.ReadString(stored, "id"), stored);
+            return true;
+        }
+
+        static string AuthHint(string code)
+        {
+            switch (code)
+            {
+                case "NAME_SHORT": return "Name must be at least 3 characters";
+                case "NAME_LONG": return "Name must be 16 characters or fewer";
+                case "NAME_CHARS": return "Use letters, numbers, spaces, - or _";
+                case "NAME_TAKEN": return "That name is taken";
+                case "PASS_SHORT": return "Password must be at least 6 characters";
+                case "PASS_LONG": return "Password is too long";
+                case "BAD_LOGIN": return "Name or password is wrong";
+                case "unauthorized": return "Log in first";
+                default:
+                    return string.IsNullOrEmpty(code) ? "Could not reach the match host" : code;
+            }
+        }
+
+        string CurrentHost()
+        {
+            if (_hostInput != null && !string.IsNullOrEmpty(_hostInput.text))
+                return _hostInput.text.Trim().TrimEnd('/');
+            return NetMatchClient.ResolveHost();
+        }
+
+        void EnsureNet(string host)
+        {
+            if (_net == null) _net = gameObject.AddComponent<NetMatchClient>();
+            _net.Host = host;
+            _net.AuthToken = _authToken;
+            _net.OnSnapshot = OnNetSnapshot;
+            _net.OnError = code => Toast(code ?? "error");
+        }
+
+        void StartPractice()
+        {
+            if (string.IsNullOrEmpty(_authToken)) { MenuMsg("Log in first"); return; }
+            if (_cat == null) return;
+            _net?.Disconnect();
+            _loop = MatchLoop.Create(_cat, Guid.NewGuid(), (uint)Environment.TickCount, humanSeats: 1);
+            if (_loop.Human != null) _loop.Human.DisplayName = _displayName;
+            _loop.AutoPickBotCaptains();
+            _loop.OfferFullRoster();
+            _loop.TutorialWickFloor = PlayerPrefs.GetInt("kindling.help.v1", 0) != 1;
+            _matchMode = "practice";
+            EnterMatch();
+            ArmTimer(Rules.CaptainPickSeconds);
+            if (PlayerPrefs.GetInt("kindling.help.v1", 0) != 1)
             {
                 _helpStep = 0;
                 PaintHelp();
             }
+            Refresh();
+            Toast("Practice  ·  1v7 bots");
+        }
+
+        IEnumerator StartQueue()
+        {
+            if (string.IsNullOrEmpty(_authToken)) { MenuMsg("Log in first"); yield break; }
+            if (_authToken.StartsWith("local.", StringComparison.Ordinal))
+            {
+                MenuMsg("Local accounts play Practice. Set a match host to queue.");
+                yield break;
+            }
+            string host = CurrentHost();
+            if (string.IsNullOrEmpty(host))
+            {
+                MenuMsg("Set a match host to queue Casual");
+                yield break;
+            }
+            PlayerPrefs.SetString("kindling.host", host);
+            PlayerPrefs.Save();
+            EnsureNet(host);
+            _net.AuthToken = _authToken;
+            MenuMsg("Queuing…");
+            yield return _net.QueueMatch();
+            if (!_net.Connected)
+            {
+                MenuMsg(string.IsNullOrEmpty(_net.LastHttpError) ? "Queue failed" : AuthHint(_net.LastHttpError));
+                yield break;
+            }
+            _loop = MatchLoop.Create(_cat, Guid.NewGuid(), (uint)Environment.TickCount, humanSeats: 1);
+            if (_loop.Human != null) _loop.Human.DisplayName = _displayName;
+            _loop.AutoPickBotCaptains();
+            _matchMode = "casual";
+            EnterMatch();
+            Refresh();
+            Toast("Casual  ·  queued");
+        }
+
+        void EnterMatch()
+        {
+            _inMatch = true;
+            _showingCombat = false;
+            _netCombatSeq = 0;
+            _netReadySent = false;
+            if (_menuRoot != null) _menuRoot.SetActive(false);
+        }
+
+        void LeaveMatch()
+        {
+            if (!_inMatch) return;
+            if (NetLive && _net != null)
+                _net.SendRaw("{\"op\":\"Abandon\"}");
+            ReturnToMenu();
+        }
+
+        void ReturnToMenu()
+        {
+            _timerArmed = false;
+            _showingCombat = false;
+            _edictTargeting = false;
+            if (_playback != null && _playback.Root != null)
+                _playback.Root.SetActive(false);
+            if (_glimpsePanel != null) _glimpsePanel.SetActive(false);
+            if (_pickPanel != null) _pickPanel.SetActive(false);
+            if (_helpPanel != null) _helpPanel.SetActive(false);
+            if (_crownPanel != null) _crownPanel.SetActive(false);
+            _net?.Disconnect();
+            _loop = null;
+            ShowMenu();
+            MenuMsg("The Ember Exchange");
+        }
+
+        void Logout()
+        {
+            _authToken = "";
+            _displayName = "";
+            _accountId = "";
+            _mmr = 1500;
+            SaveSession();
+            if (_nameInput != null) _nameInput.text = "";
+            if (_passInput != null) _passInput.text = "";
+            ShowMenu();
+            MenuMsg("Logged out");
+        }
+
+        static string JsonEsc(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
         void Select(SelKind kind, int index)
         {
-            if (_loop.State.Phase != Phase.Recruit) return;
+            if (_loop == null || _loop.State.Phase != Phase.Recruit) return;
             if (_edictTargeting && kind == SelKind.Board)
             {
                 FireEdict(index);
@@ -301,19 +794,21 @@ namespace Kindling.Client
             Apply(new RecruitAction { Op = RecruitOp.Reorder, Seat = p.Seat, BoardPerm = perm });
         }
 
+        bool NetLive => _net != null && _net.Connected;
+
         void PickCaptain(int offerIndex)
         {
             var p = _loop.Human;
             if (p == null) return;
             var r = Apply(new RecruitAction { Op = RecruitOp.CaptainPick, Seat = p.Seat, OfferIndex = offerIndex });
-            if (r.Ok)
+            if (r.Ok && !NetLive)
             {
                 _loop.StartFromCaptainPick();
                 _pickPanel.SetActive(false);
                 _awakenSeen = _loop.State.AwakenEvents;
                 ArmTimer(Rules.RecruitSeconds(_loop.State.Round));
-                Refresh();
             }
+            Refresh();
         }
 
         void WireDrag(CardView cv, int index)
@@ -341,6 +836,7 @@ namespace Kindling.Client
             DropZone z = CardDrag.HitZone(ev);
             if (_handZone != null) _handZone.SetHot(z == _handZone);
             if (_boardZone != null) _boardZone.SetHot(z == _boardZone);
+            if (_stallZone != null) _stallZone.SetHot(z == _stallZone);
         }
 
         void OnCardDragEnded(CardDrag drag, PointerEventData ev)
@@ -348,18 +844,23 @@ namespace Kindling.Client
             DropZone z = CardDrag.HitZone(ev);
             if (_handZone != null) _handZone.SetHot(false);
             if (_boardZone != null) _boardZone.SetHot(false);
+            if (_stallZone != null) _stallZone.SetHot(false);
 
             bool handled = false;
             if (z != null && _loop != null && _loop.State.Phase == Phase.Recruit)
             {
-                if (drag.Zone == CardZone.Stall && z.Zone == CardZone.Hand)
+                if (drag.Zone == CardZone.Stall && (z.Zone == CardZone.Hand || z.Zone == CardZone.Board))
                 {
-                    BuyStallToHand(drag.Index, InsertIndex(_handCards, Occupied(_handCards), ev));
+                    int dest = z.Zone == CardZone.Hand
+                        ? InsertIndex(_handCards, Occupied(_handCards), ev)
+                        : (_loop.Human != null ? _loop.Human.Hand.Count : 0);
+                    BuyStallToHand(drag.Index, dest);
                     handled = true;
                 }
-                else if (drag.Zone == CardZone.Stall && z.Zone == CardZone.Board)
+                else if ((drag.Zone == CardZone.Board || drag.Zone == CardZone.Hand) && z.Zone == CardZone.Stall)
                 {
-                    Toast("Bought Kindled go to your hand first");
+                    SellFrom(drag.Zone == CardZone.Board ? DestLoc.Board : DestLoc.Hand, drag.Index);
+                    handled = true;
                 }
                 else if (drag.Zone == CardZone.Hand && z.Zone == CardZone.Board)
                 {
@@ -426,7 +927,7 @@ namespace Kindling.Client
         void BuyToHand()
         {
             var p = _loop.Human;
-            if (p == null || _sel != SelKind.Stall) { Toast("Drag a stall card into your hand"); return; }
+            if (p == null || _sel != SelKind.Stall) { Toast("Drag a stall card onto your hand or warband"); return; }
             BuyStallToHand(_selIndex, p.Hand.Count);
         }
 
@@ -462,15 +963,20 @@ namespace Kindling.Client
 
         void Sell()
         {
+            if (_sel == SelKind.Board)
+                SellFrom(DestLoc.Board, _selIndex);
+            else if (_sel == SelKind.Hand)
+                SellFrom(DestLoc.Hand, _selIndex);
+            else { Toast("Drop a board or hand card onto the stall to sell"); return; }
+            Refresh();
+        }
+
+        void SellFrom(DestLoc loc, int index)
+        {
             var p = _loop.Human;
             if (p == null) return;
-            if (_sel == SelKind.Board)
-                Apply(new RecruitAction { Op = RecruitOp.Sell, Seat = p.Seat, Loc = DestLoc.Board, Index = _selIndex });
-            else if (_sel == SelKind.Hand)
-                Apply(new RecruitAction { Op = RecruitOp.Sell, Seat = p.Seat, Loc = DestLoc.Hand, Index = _selIndex });
-            else { Toast("Select a board or hand card to sell"); return; }
+            Apply(new RecruitAction { Op = RecruitOp.Sell, Seat = p.Seat, Loc = loc, Index = index });
             _sel = SelKind.None;
-            Refresh();
         }
 
         bool TryLatchDrop(CardDrag drag, CardView hostCard)
@@ -549,12 +1055,21 @@ namespace Kindling.Client
 
         void Ready()
         {
+            if (_showingCombat) return;
             if (_loop.State.Phase != Phase.Recruit) return;
             var p = _loop.Human;
             if (p != null && p.HasFlag(PlayerFlags.GlimpseOpen) && p.GlimpseQueue.Count > 0)
             {
                 Toast("Choose a Glimpse first");
                 Refresh();
+                return;
+            }
+            if (NetLive)
+            {
+                if (_netReadySent) return;
+                _netReadySent = true;
+                Apply(new RecruitAction { Op = RecruitOp.Ready, Seat = p.Seat });
+                Toast("Ready");
                 return;
             }
             LockRecruit();
@@ -577,7 +1092,12 @@ namespace Kindling.Client
             _showingCombat = false;
             if (_playback != null && _playback.Root != null)
                 _playback.Root.SetActive(false);
-            if (!_loop.State.MatchOver)
+            if (_loop != null && _loop.State.MatchOver)
+            {
+                ShowCrown();
+                return;
+            }
+            if (!NetLive && _loop != null && !_loop.State.MatchOver)
             {
                 _loop.ContinueToNextRecruit();
                 _awakenSeen = _loop.State.AwakenEvents;
@@ -625,12 +1145,33 @@ namespace Kindling.Client
         void OnNetSnapshot(string json)
         {
             if (_loop == null || string.IsNullOrEmpty(json)) return;
+            if (Protocol.ReadString(json, "op") == "Error")
+            {
+                Toast(Protocol.ReadString(json, "code"));
+                return;
+            }
             SnapshotApply.Apply(_loop.State, _loop.HumanSeat, _cat, json);
             int t = Protocol.ReadInt(json, "timer");
             if (t > 0)
             {
                 _timerArmed = true;
                 _timerEnd = Time.unscaledTime + t;
+            }
+            int round = _loop.State.Round;
+            if (round != _netRound)
+            {
+                _netRound = round;
+                _netReadySent = false;
+            }
+            int combatSeq = Protocol.ReadInt(json, "combatSeq");
+            string combat = Protocol.ExtractObject(json, "combat");
+            if (combatSeq > _netCombatSeq && !string.IsNullOrEmpty(combat) && combat != "null")
+            {
+                _netCombatSeq = combatSeq;
+                _netCombat = CombatSnapshot.Read(combat);
+                _showingCombat = true;
+                if (_glimpsePanel != null) _glimpsePanel.SetActive(false);
+                _playback.Begin(_netCombat, _loop.HumanSeat, _cat, _loop.State.MatchOver, StandingsLine());
             }
             Refresh();
         }
@@ -672,6 +1213,7 @@ namespace Kindling.Client
             }
             if (!_timerArmed || _loop == null) return;
             PaintTimer();
+            if (NetLive) return;
             if (Time.unscaledTime < _timerEnd) return;
             _timerArmed = false;
             if (_loop.State.Phase == Phase.CaptainPick)
@@ -681,6 +1223,18 @@ namespace Kindling.Client
                 Toast("Time — combat starts");
                 LockRecruit();
             }
+        }
+
+        void OnApplicationPause(bool pause)
+        {
+            if (!pause && _inMatch && _net != null)
+                StartCoroutine(_net.Reconnect());
+        }
+
+        void OnApplicationFocus(bool focus)
+        {
+            if (focus && _inMatch && _net != null && !_net.Connected)
+                StartCoroutine(_net.Reconnect());
         }
 
         string StandingsLine()
@@ -698,16 +1252,22 @@ namespace Kindling.Client
 
         void Refresh()
         {
-            if (_loop == null) return;
+            if (!_inMatch || _loop == null) return;
             var p = _loop.Human;
             bool picking = _loop.State.Phase == Phase.CaptainPick;
             _pickPanel.SetActive(picking);
-            if (picking && p != null && p.CaptainOffers != null)
+            if (picking)
             {
-                for (int i = 0; i < _offerCards.Count; i++)
+                _pickPanel.transform.SetAsLastSibling();
+                if (p != null && p.CaptainOffers != null)
                 {
-                    CaptainDef def = i < p.CaptainOffers.Length ? _cat.GetCaptain(p.CaptainOffers[i]) : null;
-                    _offerCards[i].BindCaptain(def, false);
+                    EnsureOfferCards(p.CaptainOffers.Length);
+                    LayoutPickGrid(p.CaptainOffers.Length);
+                    for (int i = 0; i < _offerCards.Count; i++)
+                    {
+                        CaptainDef def = i < p.CaptainOffers.Length ? _cat.GetCaptain(p.CaptainOffers[i]) : null;
+                        _offerCards[i].BindCaptain(def, false);
+                    }
                 }
             }
 
@@ -716,6 +1276,8 @@ namespace Kindling.Client
             if (_glimpsePanel != null) _glimpsePanel.SetActive(glimpse);
             if (glimpse)
             {
+                _glimpsePanel.transform.SetAsLastSibling();
+                if (_helpPanel != null) _helpPanel.SetActive(false);
                 GlimpseOffer offer = p.GlimpseQueue.Peek();
                 for (int i = 0; i < _glimpseCards.Count; i++)
                 {
@@ -724,6 +1286,11 @@ namespace Kindling.Client
                         def = _cat.GetUnit(offer.Choices[i]);
                     _glimpseCards[i].BindPreview(def);
                 }
+            }
+            else if (_helpPanel != null && PlayerPrefs.GetInt("kindling.help.v1", 0) != 1
+                     && !_showingCombat && !picking)
+            {
+                _helpPanel.SetActive(true);
             }
 
             if (p == null) return;
@@ -824,10 +1391,10 @@ namespace Kindling.Client
             switch (_helpStep)
             {
                 case 0:
-                    _helpText.text = "1 / 4   Pick a Captain. Timer auto-picks if you wait.";
+                    _helpText.text = "1 / 4   Pick a Captain. Each one has a Passive or an Edict that changes your recruit. Timer auto-picks if you wait.";
                     break;
                 case 1:
-                    _helpText.text = "2 / 4   Drag a stall card into HAND to buy (3 Embers). Purchases never go straight to the board.";
+                    _helpText.text = "2 / 4   Drag a stall card onto HAND or WARBAND to buy (3 Embers). Buys always land in your hand. Drag a warband card onto the stall to sell.";
                     break;
                 case 2:
                     _helpText.text = "3 / 4   Drag from hand onto WARBAND to play. Spells cast from hand and never sit on the board.";
@@ -860,7 +1427,17 @@ namespace Kindling.Client
                 if (cap != null)
                 {
                     _infoLabel.text = cap.Name + "\nWick " + cap.Wick + "\n"
-                        + (cap.HasEdict ? ("Edict " + cap.EdictCost) : "Passive");
+                        + Kindling.Sim.Captains.CaptainPower.Line(cap);
+                    return;
+                }
+            }
+            if (!p.Captain.IsEmpty)
+            {
+                CaptainDef mine = _cat.GetCaptain(p.Captain);
+                if (mine != null)
+                {
+                    _infoLabel.text = mine.Name + "\nWick " + mine.Wick + "\n"
+                        + Kindling.Sim.Captains.CaptainPower.Line(mine);
                     return;
                 }
             }

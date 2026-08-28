@@ -182,7 +182,9 @@ namespace Kindling.Sim.Model
         KettleStallPlus1,
         CandleAwakenPlus2,
         GlassKindleLeftAegis,
-        SkivBeastOnBuyPlus1Atk
+        SkivBeastOnBuyPlus1Atk,
+        FlintKindleRightPlus1Atk,
+        NollOnBuyPendingEmber
     }
 
     public enum Phase

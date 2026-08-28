@@ -1,6 +1,7 @@
 id: cap_sable
 name: Sable Coil
 wick: 30
+text: "Edict 2: Glimpse at your current Depth."
 edict:
   cost: 2
   actions:

@@ -1,4 +1,5 @@
 id: cap_kettle
 name: Kettle-Eye
 wick: 30
+text: "Your stall has +1 slot."
 passives: [KettleStallPlus1]

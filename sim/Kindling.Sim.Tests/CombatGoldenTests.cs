@@ -139,5 +139,20 @@ namespace Kindling.Sim.Tests
                 if (r.Events[i].Op == CombatOp.Afterglow) ag = true;
             Assert.True(ag);
         }
+
+        [Fact]
+        public void Latch_host_survives_kindle_with_attached_stats()
+        {
+            var rng = new MatchRng(8UL);
+            var a = TestSupport.Player(0);
+            var b = TestSupport.Player(1);
+            var host = Units.CreateRaw(rng, "ck_brokerling", 2, 3, Keyword.None);
+            var bit = Units.CreateRaw(rng, "gw_cog", 1, 1, Keyword.Latch);
+            host.Latches.Add(new LatchAttachment { CatalogId = bit.CatalogId, Atk = 1, Hp = 1, Keywords = Keyword.Latch });
+            a.Board.Add(host);
+            b.Board.Add(Units.CreateRaw(rng, "ne_wall", 0, 1, Keyword.None));
+            CombatResult r = CombatSim.Run(a, b, rng, TestSupport.Cat);
+            Assert.Equal(a.Seat, r.WinnerSeat);
+        }
     }
 }

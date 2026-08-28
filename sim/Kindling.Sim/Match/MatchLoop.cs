@@ -19,6 +19,7 @@ namespace Kindling.Sim.Match
         public int HumanSeat;
         public CombatResult LastHumanCombat;
         public readonly List<CombatResult> LastRoundCombats = new List<CombatResult>();
+        public bool TutorialWickFloor;
 
         public static MatchLoop Create(Catalog.Catalog cat, Guid matchId, uint salt, int humanSeats = 0)
         {
@@ -76,6 +77,16 @@ namespace Kindling.Sim.Match
                 for (int i = 0; i < n; i++) offers[i] = bag[i];
                 m.Seats[s].CaptainOffers = offers;
             }
+        }
+
+        /// <summary>Practice: the human picks from the full Captain roster.</summary>
+        public void OfferFullRoster()
+        {
+            if (HumanSeat < 0 || HumanSeat >= State.Seats.Length || Cat.Captains.Count == 0) return;
+            var ids = new CaptainId[Cat.Captains.Count];
+            for (int i = 0; i < Cat.Captains.Count; i++)
+                ids[i] = Cat.Captains[i].Id;
+            State.Seats[HumanSeat].CaptainOffers = ids;
         }
 
         public void RunToEnd()
@@ -399,6 +410,12 @@ namespace Kindling.Sim.Match
 
         public void PlaceNewlyDead()
         {
+            if (TutorialWickFloor && HumanSeat >= 0 && HumanSeat < State.Seats.Length)
+            {
+                PlayerState h = State.Seats[HumanSeat];
+                if (h.Wick <= 0 && !h.Place.HasValue)
+                    h.Wick = 1;
+            }
             var newly = new List<PlayerState>();
             for (int i = 0; i < State.Seats.Length; i++)
             {

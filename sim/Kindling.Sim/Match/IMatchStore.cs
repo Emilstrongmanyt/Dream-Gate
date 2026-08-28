@@ -8,5 +8,9 @@ namespace Kindling.Sim.Match
         string GetAccount(string accountId);
         void PutDevice(string deviceHash, string accountId);
         string GetDevice(string deviceHash);
+        void AppendHistory(string accountId, string json);
+        string ListHistory(string accountId);
+        void PutLogin(string login, string accountId);
+        string GetLogin(string login);
     }
 }

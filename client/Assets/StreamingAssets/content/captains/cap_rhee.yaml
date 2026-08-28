@@ -1,6 +1,7 @@
 id: cap_rhee
 name: Quartermaster Rhee
 wick: 30
+text: "Edict 1: Reroll the stall and Hold it."
 edict:
   cost: 1
   actions:

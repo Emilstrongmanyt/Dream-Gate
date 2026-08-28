@@ -1,6 +1,7 @@
 id: cap_widow
 name: Widow Ash
 wick: 30
+text: "Edict 1: give a Kindled Echo (it summons an Ash Mote)."
 edict:
   cost: 1
   target: Board

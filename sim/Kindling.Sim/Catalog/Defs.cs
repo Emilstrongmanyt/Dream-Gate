@@ -105,6 +105,7 @@ namespace Kindling.Sim.Catalog
         public bool EdictNeedsTarget;
         public List<ActionDef> EdictActions = new List<ActionDef>();
         public bool HasEdict;
+        public string Text = "";
     }
 
     public sealed class SeasonDef

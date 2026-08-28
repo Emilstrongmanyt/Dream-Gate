@@ -18,7 +18,7 @@ namespace Kindling.Sim.Tests
             Assert.Equal(48, cat.Units.Count);
             Assert.Equal(7, cat.Tokens.Count);
             Assert.Equal(7, cat.Spells.Count);
-            Assert.Equal(12, cat.Captains.Count);
+            Assert.Equal(16, cat.Captains.Count);
             Assert.NotNull(cat.GetUnit("ck_urchin"));
             Assert.NotNull(cat.GetUnit("ne_smelter"));
             Assert.NotNull(cat.GetUnit("ck_sovereign"));

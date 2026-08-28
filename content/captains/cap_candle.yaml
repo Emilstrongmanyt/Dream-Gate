@@ -1,4 +1,5 @@
 id: cap_candle
 name: Ninth Candle
 wick: 30
+text: "When a Kindled Awakens, it gains +2/+2."
 passives: [CandleAwakenPlus2]

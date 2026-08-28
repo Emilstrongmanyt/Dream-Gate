@@ -1,6 +1,7 @@
 id: cap_mere
 name: Iron Mere
 wick: 30
+text: "Edict 1: add a 2/1 Latch Scrap to your hand."
 edict:
   cost: 1
   actions:

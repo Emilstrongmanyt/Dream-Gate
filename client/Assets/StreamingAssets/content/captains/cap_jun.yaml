@@ -1,6 +1,7 @@
 id: cap_jun
 name: Hollow Jun
 wick: 30
+text: "Edict 0: pay 1 Wick, give a Kindled +1/+1."
 edict:
   cost: 0
   target: Board

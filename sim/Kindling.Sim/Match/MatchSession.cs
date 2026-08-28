@@ -17,7 +17,11 @@ namespace Kindling.Sim.Match
         public DateTime RecruitEndsAtUtc;
         public readonly int[] LastSeq = new int[Rules.LobbySize];
         public readonly string[] ResumeTokens = new string[Rules.LobbySize];
+        public readonly string[] AccountIds = new string[Rules.LobbySize];
         public int SnapshotVersion;
+        public int CombatSeq;
+        public CombatResult PendingPlayback;
+        public bool RatingsWritten;
 
         public static MatchSession Create(Catalog.Catalog cat, Guid matchId, uint salt, int humanSeats = 1)
         {
@@ -53,6 +57,15 @@ namespace Kindling.Sim.Match
             return s < 0 ? 0 : s;
         }
 
+        double RecruitAgeSeconds()
+        {
+            int dur = Loop.State.Phase == Phase.CaptainPick
+                ? Rules.CaptainPickSeconds
+                : Rules.RecruitSeconds(Loop.State.Round);
+            DateTime started = RecruitEndsAtUtc.AddSeconds(-dur);
+            return (DateTime.UtcNow - started).TotalSeconds;
+        }
+
         public bool Tick(DateTime utcNow)
         {
             if (Loop.State.MatchOver) return false;
@@ -65,19 +78,25 @@ namespace Kindling.Sim.Match
                 return true;
             }
             if (Loop.State.Phase == Phase.Recruit)
-            {
-                Loop.ResolveRecruitAndCombat();
-                SnapshotVersion++;
-                if (Loop.State.MatchOver)
-                    Finish();
-                else
-                {
-                    Loop.ContinueToNextRecruit();
-                    ArmTimer(Rules.RecruitSeconds(Loop.State.Round));
-                }
-                return true;
-            }
+                return CommitRecruit();
             return false;
+        }
+
+        public bool CommitRecruit()
+        {
+            if (Loop.State.Phase != Phase.Recruit) return false;
+            Loop.ResolveRecruitAndCombat();
+            PendingPlayback = Loop.LastHumanCombat;
+            CombatSeq++;
+            SnapshotVersion++;
+            if (Loop.State.MatchOver)
+                Finish();
+            else
+            {
+                Loop.ContinueToNextRecruit();
+                ArmTimer(Rules.RecruitSeconds(Loop.State.Round));
+            }
+            return true;
         }
 
         public string Handle(int seat, string json)
@@ -89,7 +108,10 @@ namespace Kindling.Sim.Match
             if (json != null && json.IndexOf("\"op\":\"Join\"", StringComparison.Ordinal) >= 0)
                 return Welcome(seat);
             if (json != null && json.IndexOf("\"op\":\"Reconnect\"", StringComparison.Ordinal) >= 0)
+            {
+                Telemetry.ReconnectTotal++;
                 return SnapshotFor(seat, LastSeq[seat]);
+            }
             if (json != null && json.IndexOf("\"op\":\"Abandon\"", StringComparison.Ordinal) >= 0)
                 return Abandon(seat);
             RecruitAction a = Protocol.Parse(json, seat);
@@ -115,6 +137,8 @@ namespace Kindling.Sim.Match
                     ArmTimer(Rules.RecruitSeconds(Loop.State.Round));
                 }
             }
+            else if (a.Op == RecruitOp.Ready && RecruitAgeSeconds() >= 0.4)
+                CommitRecruit();
             return SnapshotFor(seat, a.Seq);
         }
 
@@ -171,6 +195,7 @@ namespace Kindling.Sim.Match
             sb.Append(",\"round\":").Append(Loop.State.Round);
             sb.Append(",\"timer\":").Append(SecondsLeft(DateTime.UtcNow));
             sb.Append(",\"matchOver\":").Append(Loop.State.MatchOver ? "true" : "false");
+            sb.Append(",\"combatSeq\":").Append(CombatSeq);
             sb.Append(",\"you\":{");
             WriteYou(sb, you);
             sb.Append(",\"rating\":").Append(you.Rating.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -185,10 +210,26 @@ namespace Kindling.Sim.Match
                 sb.Append(",\"wick\":").Append(p.Wick);
                 sb.Append(",\"depth\":").Append(p.Depth);
                 sb.Append(",\"alive\":").Append(p.Alive ? "true" : "false");
+                sb.Append(",\"place\":").Append(p.Place ?? 0);
+                if (!p.Captain.IsEmpty)
+                    sb.Append(",\"captain\":\"").Append(Escape(p.Captain.Value)).Append('"');
                 sb.Append(",\"chorusTags\":\"").Append(Escape(ChorusTags(p))).Append('"');
                 sb.Append('}');
             }
-            sb.Append("]}");
+            sb.Append("],\"pairings\":[");
+            if (Loop.State.Pairings != null)
+            {
+                for (int i = 0; i < Loop.State.Pairings.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    Pairing pr = Loop.State.Pairings[i];
+                    sb.Append("{\"a\":").Append(pr.SeatA).Append(",\"b\":").Append(pr.SeatB)
+                        .Append(",\"g\":").Append(pr.Ghost ? "true" : "false").Append('}');
+                }
+            }
+            sb.Append("],\"combat\":");
+            CombatSnapshot.Write(sb, PendingPlayback);
+            sb.Append('}');
             return sb.ToString();
         }
 
@@ -200,6 +241,38 @@ namespace Kindling.Sim.Match
             sb.Append(",\"upgradeCost\":").Append(p.UpgradeCost);
             sb.Append(",\"hold\":").Append(p.Hold ? "true" : "false");
             sb.Append(",\"ready\":").Append(p.Ready ? "true" : "false");
+            sb.Append(",\"flags\":").Append((uint)p.Flags);
+            sb.Append(",\"place\":").Append(p.Place ?? 0);
+            if (!p.Captain.IsEmpty)
+                sb.Append(",\"captain\":\"").Append(Escape(p.Captain.Value)).Append('"');
+            sb.Append(",\"captainOffers\":[");
+            if (p.CaptainOffers != null)
+            {
+                for (int i = 0; i < p.CaptainOffers.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append('"').Append(Escape(p.CaptainOffers[i].Value)).Append('"');
+                }
+            }
+            sb.Append(']');
+            sb.Append(",\"edictUsed\":").Append(p.Edict != null && p.Edict.UsedThisRecruit ? "true" : "false");
+            sb.Append(",\"glimpse\":{");
+            bool gOpen = p.HasFlag(PlayerFlags.GlimpseOpen) && p.GlimpseQueue != null && p.GlimpseQueue.Count > 0;
+            sb.Append("\"open\":").Append(gOpen ? "true" : "false");
+            sb.Append(",\"choices\":[");
+            if (gOpen)
+            {
+                GlimpseOffer offer = p.GlimpseQueue.Peek();
+                if (offer != null && offer.Choices != null)
+                {
+                    for (int i = 0; i < offer.Choices.Length; i++)
+                    {
+                        if (i > 0) sb.Append(',');
+                        sb.Append('"').Append(Escape(offer.Choices[i].Value)).Append('"');
+                    }
+                }
+            }
+            sb.Append("]}");
             sb.Append(",\"board\":"); WriteUnits(sb, p.Board);
             sb.Append(",\"hand\":"); WriteUnits(sb, p.Hand);
             sb.Append(",\"stall\":"); WriteStall(sb, p);
@@ -237,6 +310,7 @@ namespace Kindling.Sim.Match
             sb.Append(",\"catalogId\":\"").Append(Escape(u.CatalogId.Value)).Append('"');
             sb.Append(",\"atk\":").Append(u.EffectiveAtk);
             sb.Append(",\"hp\":").Append(u.Hp);
+            sb.Append(",\"kw\":").Append((int)u.Keywords);
             sb.Append(",\"awakened\":").Append(u.Awakened ? "true" : "false");
             sb.Append('}');
         }

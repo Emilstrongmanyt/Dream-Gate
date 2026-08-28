@@ -37,6 +37,8 @@ namespace Kindling.Sim.Captains
         public static void OnBuy(PlayerState p, Catalog.Catalog cat, UnitInstance bought)
         {
             if (bought == null) return;
+            if (Has(p, cat, CaptainPassive.NollOnBuyPendingEmber))
+                p.PendingEmbers += 1;
             if (!Has(p, cat, CaptainPassive.SkivBeastOnBuyPlus1Atk)) return;
             UnitDef def = cat.GetUnit(bought.CatalogId);
             if (def != null && def.Chorus == Chorus.Beast)
@@ -58,20 +60,26 @@ namespace Kindling.Sim.Captains
 
         public static void OnKindle(PlayerState p, Catalog.Catalog cat, Combat.CombatRuntime rt)
         {
-            if (!Has(p, cat, CaptainPassive.GlassKindleLeftAegis)) return;
-            if (p.Board.Count == 0) return;
-            UnitInstance u = p.Board[0];
-            if (u == null) return;
-            if (!u.Has(Keyword.Aegis))
+            if (p == null || p.Board.Count == 0) return;
+            if (Has(p, cat, CaptainPassive.GlassKindleLeftAegis))
             {
-                u.AddKeyword(Keyword.Aegis);
-                u.Mods.Add(new Modifier
+                UnitInstance u = p.Board[0];
+                if (u != null && !u.Has(Keyword.Aegis))
                 {
-                    Tag = ModTag.ThisCombat,
-                    Keywords = Keyword.Aegis
-                });
+                    u.AddKeyword(Keyword.Aegis);
+                    u.Mods.Add(new Modifier { Tag = ModTag.ThisCombat, Keywords = Keyword.Aegis });
+                    rt?.Log(CombatOp.Kindle, p.Seat, p.Seat, u.InstanceId, 0, 0, 0, 0, u.Atk, u.Hp, u.CatalogId.Value, "GlassAegis");
+                }
             }
-            rt?.Log(CombatOp.Kindle, p.Seat, p.Seat, u.InstanceId, 0, 0, 0, 0, u.Atk, u.Hp, u.CatalogId.Value, "GlassAegis");
+            if (Has(p, cat, CaptainPassive.FlintKindleRightPlus1Atk))
+            {
+                UnitInstance u = p.Board[p.Board.Count - 1];
+                if (u != null)
+                {
+                    Units.BuffCombat(u, 1, 0);
+                    rt?.Log(CombatOp.Kindle, p.Seat, p.Seat, u.InstanceId, 0, p.Board.Count - 1, -1, 1, u.Atk, u.Hp, u.CatalogId.Value, "FlintAtk");
+                }
+            }
         }
 
         static void ApplyNamed(CaptainPassive passive, PlayerState p, Catalog.Catalog cat, string hook, UnitInstance unit)
@@ -87,6 +95,8 @@ namespace Kindling.Sim.Captains
                 case CaptainPassive.CandleAwakenPlus2:
                 case CaptainPassive.GlassKindleLeftAegis:
                 case CaptainPassive.SkivBeastOnBuyPlus1Atk:
+                case CaptainPassive.FlintKindleRightPlus1Atk:
+                case CaptainPassive.NollOnBuyPendingEmber:
                     break;
             }
         }

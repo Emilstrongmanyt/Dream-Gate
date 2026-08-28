@@ -6,7 +6,8 @@ using UnityEngine.UI;
 namespace Kindling.Client
 {
     public sealed class CardDrag : MonoBehaviour,
-        IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
+        IPointerDownHandler, IInitializePotentialDragHandler,
+        IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
     {
         public CardView View;
         public CardZone Zone;
@@ -19,6 +20,7 @@ namespace Kindling.Client
         CanvasGroup _group;
         bool _dragging;
         bool _moved;
+        bool _clicked;
 
         void Awake()
         {
@@ -29,10 +31,22 @@ namespace Kindling.Client
         public void OnPointerDown(PointerEventData eventData)
         {
             _moved = false;
+            _clicked = false;
+        }
+
+        public void OnInitializePotentialDrag(PointerEventData eventData)
+        {
+            if (Zone == CardZone.Offer)
+                eventData.pointerDrag = null;
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (Zone == CardZone.Offer)
+            {
+                FireClick();
+                return;
+            }
             if (View == null || View.Unit == null) return;
             if (Zone != CardZone.Stall && Zone != CardZone.Hand && Zone != CardZone.Board) return;
             _dragging = true;
@@ -58,6 +72,13 @@ namespace Kindling.Client
         public void OnPointerClick(PointerEventData eventData)
         {
             if (_moved) return;
+            FireClick();
+        }
+
+        void FireClick()
+        {
+            if (_clicked) return;
+            _clicked = true;
             Clicked?.Invoke(this);
         }
 
