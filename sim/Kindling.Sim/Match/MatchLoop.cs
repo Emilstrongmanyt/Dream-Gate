@@ -79,14 +79,43 @@ namespace Kindling.Sim.Match
             }
         }
 
-        /// <summary>Practice: the human picks from the full Captain roster.</summary>
-        public void OfferFullRoster()
+        public static bool CaptainTaken(MatchState m, CaptainId id, int exceptSeat)
         {
-            if (HumanSeat < 0 || HumanSeat >= State.Seats.Length || Cat.Captains.Count == 0) return;
-            var ids = new CaptainId[Cat.Captains.Count];
+            return RecruitValidator.CaptainTaken(m, id, exceptSeat);
+        }
+
+        public bool PickFirstFreeCaptain(int seat)
+        {
+            if (seat < 0 || seat >= State.Seats.Length) return false;
+            PlayerState p = State.Seats[seat];
+            if (!p.Captain.IsEmpty) return true;
+            if (p.CaptainOffers != null)
+            {
+                for (int i = 0; i < p.CaptainOffers.Length; i++)
+                {
+                    SimResult r = RecruitValidator.TryApply(State, new RecruitAction
+                    {
+                        Op = RecruitOp.CaptainPick,
+                        Seat = seat,
+                        OfferIndex = i
+                    }, Cat);
+                    if (r.Ok) return true;
+                }
+            }
             for (int i = 0; i < Cat.Captains.Count; i++)
-                ids[i] = Cat.Captains[i].Id;
-            State.Seats[HumanSeat].CaptainOffers = ids;
+            {
+                CaptainId id = Cat.Captains[i].Id;
+                if (CaptainTaken(State, id, seat)) continue;
+                SimResult r = RecruitValidator.TryApply(State, new RecruitAction
+                {
+                    Op = RecruitOp.CaptainPick,
+                    Seat = seat,
+                    OfferIndex = -1,
+                    CaptainId = id.Value
+                }, Cat);
+                if (r.Ok) return true;
+            }
+            return false;
         }
 
         public void RunToEnd()
@@ -119,7 +148,7 @@ namespace Kindling.Sim.Match
             BeginRecruitPhase();
         }
 
-        /// <summary>Bots pick immediately. Human offers stay until CaptainPick or StartFromCaptainPick.</summary>
+        /// <summary>Bots claim unique leftovers. Humans keep their offers until they pick or timeout.</summary>
         public void AutoPickBotCaptains()
         {
             State.Phase = Phase.CaptainPick;
@@ -127,12 +156,7 @@ namespace Kindling.Sim.Match
             {
                 PlayerState p = State.Seats[i];
                 if (!p.IsBot || !p.Captain.IsEmpty) continue;
-                RecruitValidator.TryApply(State, new RecruitAction
-                {
-                    Op = RecruitOp.CaptainPick,
-                    Seat = i,
-                    OfferIndex = 0
-                }, Cat);
+                PickFirstFreeCaptain(i);
             }
         }
 
@@ -244,15 +268,8 @@ namespace Kindling.Sim.Match
             State.Phase = Phase.CaptainPick;
             for (int i = 0; i < State.Seats.Length; i++)
             {
-                PlayerState p = State.Seats[i];
-                if (!p.Captain.IsEmpty) continue;
-                var a = new RecruitAction
-                {
-                    Op = RecruitOp.CaptainPick,
-                    Seat = i,
-                    OfferIndex = 0
-                };
-                RecruitValidator.TryApply(State, a, Cat);
+                if (State.Seats[i].Captain.IsEmpty)
+                    PickFirstFreeCaptain(i);
             }
             State.Phase = Phase.Recruit;
         }

@@ -30,18 +30,42 @@ namespace Kindling.Sim.Tests
         }
 
         [Fact]
-        public void Practice_offers_full_roster()
+        public void Every_mode_offers_four()
         {
-            MatchLoop loop = MatchLoop.Create(TestSupport.Cat, System.Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"), 1u, 1);
-            loop.OfferFullRoster();
-            Assert.Equal(TestSupport.Cat.Captains.Count, loop.Human.CaptainOffers.Length);
+            MatchLoop loop = MatchLoop.Create(TestSupport.Cat, System.Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"), 2u, 1);
+            Assert.Equal(4, loop.Human.CaptainOffers.Length);
+            Assert.Equal(4, loop.State.Seats[1].CaptainOffers.Length);
         }
 
         [Fact]
-        public void Casual_offers_three()
+        public void Lobby_cannot_double_claim_a_captain()
         {
-            MatchLoop loop = MatchLoop.Create(TestSupport.Cat, System.Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"), 2u, 1);
-            Assert.Equal(3, loop.Human.CaptainOffers.Length);
+            MatchLoop loop = MatchLoop.Create(TestSupport.Cat, System.Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"), 11u, 1);
+            loop.State.Seats[1].IsBot = false;
+            loop.State.Seats[1].CaptainOffers = (CaptainId[])loop.Human.CaptainOffers.Clone();
+            SimResult first = loop.Try(new RecruitAction { Op = RecruitOp.CaptainPick, Seat = 0, OfferIndex = 0 });
+            Assert.True(first.Ok, first.Code);
+            SimResult second = loop.Try(new RecruitAction { Op = RecruitOp.CaptainPick, Seat = 1, OfferIndex = 0 });
+            Assert.False(second.Ok);
+            Assert.Equal("CAPTAIN_TAKEN", second.Code);
+            Assert.True(loop.PickFirstFreeCaptain(1));
+            Assert.False(loop.State.Seats[1].Captain.IsEmpty);
+            Assert.NotEqual(loop.Human.Captain, loop.State.Seats[1].Captain);
+        }
+
+        [Fact]
+        public void Auto_picks_are_unique_across_the_lobby()
+        {
+            MatchLoop loop = MatchLoop.Create(TestSupport.Cat, System.Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"), 12u, 0);
+            loop.AutoCaptainPicks();
+            var seen = new System.Collections.Generic.HashSet<string>();
+            for (int i = 0; i < loop.State.Seats.Length; i++)
+            {
+                string id = loop.State.Seats[i].Captain.Value;
+                Assert.False(string.IsNullOrEmpty(id));
+                Assert.True(seen.Add(id), id);
+            }
+            Assert.Equal(8, seen.Count);
         }
 
         [Fact]

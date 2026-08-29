@@ -192,9 +192,9 @@ These numbers are **spec, not placeholders**. Changing them after playtest is a 
 | Upgrade discount | −1 at the start of each Recruit after round 1 if the player did **not** upgrade last Recruit. Floor 0. After upgrade, cost resets to the **base** of the next Depth. |
 | Round-1 upgrade | Cost is **5** with grant **3** → **illegal**. Intended. Round 2 ticks to 4 with grant 4 → can all-in. Not a bug. |
 | Copy limits by Depth (shared pool) | 16 / 15 / 13 / 11 / 9 / 7. **Git-only**; not live-config hot-patchable. |
-| Captain offer count | **Ranked: 3 for every seat.** Casual / offline / tutorial: 3, or 4 if free BP level ≥ 5. Never mix 3-offer and 4-offer in one Ranked lobby. |
-| Captain pool (MVP) | 12. Duplicate Captains **allowed** across seats. One player’s 3 offers are drawn without replacement. |
-| Captain-pick timer | 20 seconds; timeout auto-picks offer slot 0 |
+| Captain offer count | **4 for every seat, every mode** (Practice, Casual, Ranked). Offers may overlap across seats. |
+| Captain pool (MVP) | 16. **Claimed Captain is unique in the lobby** (first valid pick wins). Timeout takes the first still-free offer, else a random unclaimed roster id. Bots wait until humans lock, then claim leftovers. |
+| Captain-pick timer | 20 seconds |
 | Recruit timer | See timer curve |
 | Combat playback cap | **12 seconds** visual; sim is instant. `dt = min(0.20, 12 / max(N,1))` seconds per CombatEvent. Skip allowed. |
 | Combat occupancy | **7 living units per side**. Summons that would exceed 7 fail closed. |

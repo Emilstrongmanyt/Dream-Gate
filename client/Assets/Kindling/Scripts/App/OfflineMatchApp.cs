@@ -62,6 +62,7 @@ namespace Kindling.Client
         GameObject _menuRoot;
         GameObject _authPanel;
         GameObject _hubPanel;
+        GameObject _settingsPanel;
         InputField _nameInput;
         InputField _passInput;
         InputField _hostInput;
@@ -142,7 +143,7 @@ namespace Kindling.Client
 
             // Stall
             var stallBar = HsUi.Panel(canvas.transform, "stallBar", new Vector2(0.02f, 0.70f), new Vector2(0.72f, 0.93f), HsUi.Wood);
-            HsUi.Label(stallBar, "sl", "STALL  ·  drop onto hand or warband to buy  ·  drop a Kindled here to sell", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Label(stallBar, "sl", "STALL", 16, TextAnchor.UpperLeft, HsUi.Gold);
             _stallZone = stallBar.gameObject.AddComponent<DropZone>();
             _stallZone.Init(CardZone.Stall, stallBar.GetComponent<Image>());
             var stallRow = HsUi.Panel(stallBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
@@ -161,7 +162,7 @@ namespace Kindling.Client
 
             // Board
             var boardBar = HsUi.Panel(canvas.transform, "boardBar", new Vector2(0.02f, 0.38f), new Vector2(0.72f, 0.69f), new Color(0.12f, 0.08f, 0.05f, 1));
-            HsUi.Label(boardBar, "bl", "WARBAND  ·  drop from hand to play  ·  drop from stall to buy (lands in hand)", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Label(boardBar, "bl", "WARBAND", 16, TextAnchor.UpperLeft, HsUi.Gold);
             _boardZone = boardBar.gameObject.AddComponent<DropZone>();
             _boardZone.Init(CardZone.Board, boardBar.GetComponent<Image>());
             var boardRow = HsUi.Panel(boardBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
@@ -179,7 +180,7 @@ namespace Kindling.Client
 
             // Hand
             var handBar = HsUi.Panel(canvas.transform, "handBar", new Vector2(0.02f, 0.14f), new Vector2(0.72f, 0.37f), HsUi.Wood);
-            HsUi.Label(handBar, "hl", "HAND  ·  drop from stall to buy  ·  drop here to sell", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Label(handBar, "hl", "HAND", 16, TextAnchor.UpperLeft, HsUi.Gold);
             _handZone = handBar.gameObject.AddComponent<DropZone>();
             _handZone.Init(CardZone.Hand, handBar.GetComponent<Image>());
             var handRow = HsUi.Panel(handBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
@@ -197,7 +198,7 @@ namespace Kindling.Client
 
             // Leaderboard
             var lb = HsUi.Panel(canvas.transform, "lb", new Vector2(0.735f, 0.38f), new Vector2(0.99f, 0.93f), HsUi.Wood);
-            HsUi.Label(lb, "lbt", "THE CROWN", 16, TextAnchor.UpperCenter, HsUi.Gold);
+            HsUi.Label(lb, "lbt", "TABLE", 16, TextAnchor.UpperCenter, HsUi.Gold);
             _log = HsUi.Label(lb, "log", "", 16, TextAnchor.UpperLeft, HsUi.Cream);
             var lrt = _log.GetComponent<RectTransform>();
             lrt.anchorMin = new Vector2(0.04f, 0.02f);
@@ -206,20 +207,17 @@ namespace Kindling.Client
             _log.horizontalOverflow = HorizontalWrapMode.Wrap;
             _log.verticalOverflow = VerticalWrapMode.Overflow;
 
-            // Actions
-            var act = HsUi.Panel(canvas.transform, "act", new Vector2(0.02f, 0.01f), new Vector2(0.72f, 0.13f), HsUi.Wood);
-            HsUi.MakeButton(act, "buyH", "Buy  3", new Vector2(0.01f, 0.15f), new Vector2(0.16f, 0.85f), HsUi.GoldDark, BuyToHand);
-            HsUi.MakeButton(act, "sell", "Sell  +1", new Vector2(0.17f, 0.15f), new Vector2(0.32f, 0.85f), HsUi.WickRed, Sell);
-            _edictBtn = HsUi.MakeButton(act, "edict", "Edict", new Vector2(0.33f, 0.15f), new Vector2(0.49f, 0.85f), HsUi.ChorusColor(Chorus.Spirit), Edict);
-            HsUi.MakeButton(act, "reroll", "Reroll  1", new Vector2(0.50f, 0.15f), new Vector2(0.66f, 0.85f), HsUi.Ember, Reroll);
-            HsUi.MakeButton(act, "hold", "Hold", new Vector2(0.67f, 0.15f), new Vector2(0.82f, 0.85f), HsUi.ChorusColor(Chorus.Humanoid), Hold);
-            HsUi.MakeButton(act, "up", "Upgrade", new Vector2(0.83f, 0.15f), new Vector2(0.99f, 0.85f), HsUi.Gold, Upgrade);
+            var act = HsUi.Panel(canvas.transform, "act", new Vector2(0.02f, 0.01f), new Vector2(0.72f, 0.15f), HsUi.Wood);
+            _edictBtn = HsUi.MakeButton(act, "edict", "Edict", new Vector2(0.02f, 0.12f), new Vector2(0.22f, 0.88f), HsUi.ChorusColor(Chorus.Spirit), Edict);
+            HsUi.MakeButton(act, "reroll", "Reroll  1", new Vector2(0.24f, 0.12f), new Vector2(0.44f, 0.88f), HsUi.Ember, Reroll);
+            HsUi.MakeButton(act, "hold", "Hold", new Vector2(0.46f, 0.12f), new Vector2(0.66f, 0.88f), HsUi.ChorusColor(Chorus.Humanoid), Hold);
+            HsUi.MakeButton(act, "up", "Upgrade", new Vector2(0.68f, 0.12f), new Vector2(0.88f, 0.88f), HsUi.Gold, Upgrade);
 
             HsUi.MakeButton(canvas.transform, "ready", "READY", new Vector2(0.735f, 0.01f), new Vector2(0.99f, 0.13f), new Color(0.15f, 0.45f, 0.18f), Ready);
             _timerLabel = HsUi.Label(HsUi.Panel(canvas.transform, "timer", new Vector2(0.735f, 0.14f), new Vector2(0.99f, 0.20f), Color.clear),
                 "timer", "COMBAT IN 0:15", 24, TextAnchor.MiddleCenter, HsUi.Gold);
             _infoLabel = HsUi.Label(HsUi.Panel(canvas.transform, "info", new Vector2(0.735f, 0.21f), new Vector2(0.99f, 0.37f), HsUi.Wood),
-                "info", "Tap a card for tribe and keywords.\nAuthored text comes later.", 14, TextAnchor.UpperLeft, HsUi.Cream);
+                "info", "Tap a Kindled for keywords.", 14, TextAnchor.UpperLeft, HsUi.Cream);
             var irt = _infoLabel.GetComponent<RectTransform>();
             irt.offsetMin = new Vector2(8, 6);
             irt.offsetMax = new Vector2(-8, -6);
@@ -232,7 +230,7 @@ namespace Kindling.Client
 
             _recruitRoot = canvas;
 
-            // Captain pick overlay — 3 offers online, full roster in Practice
+            // Captain pick overlay — 4 unique-claim offers every match
             _pickPanel = HsUi.Panel(canvas.transform, "pick", Vector2.zero, Vector2.one, new Color(0.05f, 0.03f, 0.02f, 0.92f)).gameObject;
             HsUi.Label(_pickPanel.transform, "pt", "Choose your Captain", 36, TextAnchor.UpperCenter, HsUi.Gold)
                 .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.86f);
@@ -247,7 +245,7 @@ namespace Kindling.Client
             grid.childAlignment = TextAnchor.MiddleCenter;
             grid.padding = new RectOffset(8, 8, 4, 4);
             EnsureOfferCards(3);
-            HsUi.Label(_pickPanel.transform, "hint", "Tap a Captain to lock them in for this match.", 18, TextAnchor.LowerCenter, HsUi.Cream)
+            HsUi.Label(_pickPanel.transform, "hint", "Four offers. No two Captains in the lobby can match. Timer picks a free one.", 18, TextAnchor.LowerCenter, HsUi.Cream)
                 .GetComponent<RectTransform>().anchorMax = new Vector2(1, 0.14f);
 
             _playback = new CombatPlayback();
@@ -349,17 +347,17 @@ namespace Kindling.Client
                 .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.86f);
             HsUi.Label(_menuRoot.transform, "ms", "The Ember Exchange", 24, TextAnchor.UpperCenter, HsUi.Cream)
                 .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.80f);
-            HsUi.Label(_menuRoot.transform, "msub", "Register or log in, then Practice vs bots or Queue Casual.", 18, TextAnchor.UpperCenter, HsUi.Gold)
+            HsUi.Label(_menuRoot.transform, "msub", "Sign in with a username, then Practice or Queue.", 18, TextAnchor.UpperCenter, HsUi.Gold)
                 .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.74f);
 
             var card = HsUi.Panel(_menuRoot.transform, "card", new Vector2(0.30f, 0.08f), new Vector2(0.70f, 0.72f), HsUi.Wood);
 
             _authPanel = HsUi.Panel(card, "auth", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            _nameInput = HsUi.MakeInput(_authPanel.transform, "name", new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.88f), "Captain name", false, 16);
+            _nameInput = HsUi.MakeInput(_authPanel.transform, "name", new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.88f), "Username", false, 16);
             _passInput = HsUi.MakeInput(_authPanel.transform, "pass", new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.68f), "Password", true, 64);
             HsUi.MakeButton(_authPanel.transform, "reg", "REGISTER", new Vector2(0.08f, 0.30f), new Vector2(0.48f, 0.46f), HsUi.GoldDark, () => StartCoroutine(DoRegister()));
             HsUi.MakeButton(_authPanel.transform, "login", "LOG IN", new Vector2(0.52f, 0.30f), new Vector2(0.92f, 0.46f), new Color(0.15f, 0.45f, 0.18f), () => StartCoroutine(DoLogin()));
-            HsUi.Label(_authPanel.transform, "ah", "Name 3–16 letters  ·  password 6+  ·  English only", 16, TextAnchor.MiddleCenter, HsUi.Cream)
+            HsUi.Label(_authPanel.transform, "ah", "Username 3–16 letters  ·  password 6+  ·  English only", 16, TextAnchor.MiddleCenter, HsUi.Cream)
                 .GetComponent<RectTransform>().anchorMax = new Vector2(1f, 0.22f);
 
             _hubPanel = HsUi.Panel(card, "hub", Vector2.zero, Vector2.one, Color.clear).gameObject;
@@ -368,12 +366,19 @@ namespace Kindling.Client
             wrt.anchorMin = new Vector2(0.06f, 0.72f);
             wrt.anchorMax = new Vector2(0.94f, 0.96f);
             _hubWelcome.horizontalOverflow = HorizontalWrapMode.Wrap;
-            HsUi.MakeButton(_hubPanel.transform, "prac", "PRACTICE  ·  vs bots", new Vector2(0.08f, 0.58f), new Vector2(0.92f, 0.72f), new Color(0.15f, 0.45f, 0.18f), StartPractice);
-            HsUi.MakeButton(_hubPanel.transform, "queue", "QUEUE  ·  Casual", new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.56f), HsUi.GoldDark, () => StartCoroutine(StartQueue()));
-            _hostInput = HsUi.MakeInput(_hubPanel.transform, "host", new Vector2(0.08f, 0.28f), new Vector2(0.92f, 0.40f), "Match host (optional)", false, 128);
-            HsUi.MakeButton(_hubPanel.transform, "frame", "CARD FRAME", new Vector2(0.08f, 0.16f), new Vector2(0.48f, 0.26f), HsUi.GoldDark, CycleFrame);
-            HsUi.MakeButton(_hubPanel.transform, "a11y", "PATTERNS", new Vector2(0.52f, 0.16f), new Vector2(0.92f, 0.26f), HsUi.ChorusColor(Chorus.Spirit), TogglePatterns);
-            HsUi.MakeButton(_hubPanel.transform, "out", "LOG OUT", new Vector2(0.08f, 0.04f), new Vector2(0.92f, 0.14f), HsUi.WickRed, Logout);
+            HsUi.MakeButton(_hubPanel.transform, "prac", "PRACTICE  ·  vs bots", new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.70f), new Color(0.15f, 0.45f, 0.18f), StartPractice);
+            HsUi.MakeButton(_hubPanel.transform, "queue", "QUEUE  ·  Casual", new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.50f), HsUi.GoldDark, () => StartCoroutine(StartQueue()));
+            HsUi.MakeButton(_hubPanel.transform, "set", "SETTINGS", new Vector2(0.08f, 0.16f), new Vector2(0.48f, 0.28f), HsUi.GoldDark, ToggleSettings);
+            HsUi.MakeButton(_hubPanel.transform, "out", "LOG OUT", new Vector2(0.52f, 0.16f), new Vector2(0.92f, 0.28f), HsUi.WickRed, Logout);
+
+            _settingsPanel = HsUi.Panel(_menuRoot.transform, "settings", new Vector2(0.28f, 0.12f), new Vector2(0.72f, 0.78f), HsUi.Wood).gameObject;
+            HsUi.Label(_settingsPanel.transform, "stt", "SETTINGS", 28, TextAnchor.UpperCenter, HsUi.Gold)
+                .GetComponent<RectTransform>().anchorMin = new Vector2(0.06f, 0.86f);
+            _hostInput = HsUi.MakeInput(_settingsPanel.transform, "host", new Vector2(0.08f, 0.68f), new Vector2(0.92f, 0.82f), "Match host (optional)", false, 128);
+            HsUi.MakeButton(_settingsPanel.transform, "frame", "CARD FRAME", new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.62f), HsUi.GoldDark, CycleFrame);
+            HsUi.MakeButton(_settingsPanel.transform, "a11y", "PATTERNS", new Vector2(0.08f, 0.30f), new Vector2(0.92f, 0.44f), HsUi.ChorusColor(Chorus.Spirit), TogglePatterns);
+            HsUi.MakeButton(_settingsPanel.transform, "close", "CLOSE", new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.22f), HsUi.GoldDark, ToggleSettings);
+            _settingsPanel.SetActive(false);
 
             var hist = HsUi.Panel(_menuRoot.transform, "history", new Vector2(0.02f, 0.08f), new Vector2(0.28f, 0.72f), HsUi.Wood);
             HsUi.Label(hist, "ht", "RECENT MATCHES", 16, TextAnchor.UpperCenter, HsUi.Gold)
@@ -402,6 +407,7 @@ namespace Kindling.Client
             bool logged = !string.IsNullOrEmpty(_authToken) && !string.IsNullOrEmpty(_displayName);
             if (_authPanel != null) _authPanel.SetActive(!logged);
             if (_hubPanel != null) _hubPanel.SetActive(logged);
+            if (_settingsPanel != null) _settingsPanel.SetActive(false);
             PaintHub();
         }
 
@@ -417,6 +423,18 @@ namespace Kindling.Client
                 _hostInput.text = NetMatchClient.ResolveHost() ?? "";
             if (_historyLabel != null) _historyLabel.text = LocalHistoryText();
             ApplyFramePrefs();
+        }
+
+        void ToggleSettings()
+        {
+            if (_settingsPanel == null) return;
+            bool on = !_settingsPanel.activeSelf;
+            _settingsPanel.SetActive(on);
+            if (on)
+            {
+                _settingsPanel.transform.SetAsLastSibling();
+                PaintHub();
+            }
         }
 
         void CycleFrame()
@@ -660,8 +678,6 @@ namespace Kindling.Client
             _net?.Disconnect();
             _loop = MatchLoop.Create(_cat, Guid.NewGuid(), (uint)Environment.TickCount, humanSeats: 1);
             if (_loop.Human != null) _loop.Human.DisplayName = _displayName;
-            _loop.AutoPickBotCaptains();
-            _loop.OfferFullRoster();
             _loop.TutorialWickFloor = PlayerPrefs.GetInt("kindling.help.v1", 0) != 1;
             _matchMode = "practice";
             EnterMatch();
@@ -702,7 +718,6 @@ namespace Kindling.Client
             }
             _loop = MatchLoop.Create(_cat, Guid.NewGuid(), (uint)Environment.TickCount, humanSeats: 1);
             if (_loop.Human != null) _loop.Human.DisplayName = _displayName;
-            _loop.AutoPickBotCaptains();
             _matchMode = "casual";
             EnterMatch();
             Refresh();
@@ -801,7 +816,13 @@ namespace Kindling.Client
             var p = _loop.Human;
             if (p == null) return;
             var r = Apply(new RecruitAction { Op = RecruitOp.CaptainPick, Seat = p.Seat, OfferIndex = offerIndex });
-            if (r.Ok && !NetLive)
+            if (!r.Ok)
+            {
+                Toast(r.Code == "CAPTAIN_TAKEN" ? "That Captain is taken" : (r.Code ?? "Cannot pick"));
+                Refresh();
+                return;
+            }
+            if (!NetLive)
             {
                 _loop.StartFromCaptainPick();
                 _pickPanel.SetActive(false);
@@ -1217,7 +1238,15 @@ namespace Kindling.Client
             if (Time.unscaledTime < _timerEnd) return;
             _timerArmed = false;
             if (_loop.State.Phase == Phase.CaptainPick)
-                PickCaptain(0);
+            {
+                if (_loop.Human != null)
+                    _loop.PickFirstFreeCaptain(_loop.Human.Seat);
+                _loop.StartFromCaptainPick();
+                if (_pickPanel != null) _pickPanel.SetActive(false);
+                _awakenSeen = _loop.State.AwakenEvents;
+                ArmTimer(Rules.RecruitSeconds(_loop.State.Round));
+                Refresh();
+            }
             else if (_loop.State.Phase == Phase.Recruit)
             {
                 Toast("Time — combat starts");
@@ -1266,7 +1295,8 @@ namespace Kindling.Client
                     for (int i = 0; i < _offerCards.Count; i++)
                     {
                         CaptainDef def = i < p.CaptainOffers.Length ? _cat.GetCaptain(p.CaptainOffers[i]) : null;
-                        _offerCards[i].BindCaptain(def, false);
+                        bool taken = def != null && MatchLoop.CaptainTaken(_loop.State, def.Id, p.Seat);
+                        _offerCards[i].BindCaptain(def, false, taken);
                     }
                 }
             }
@@ -1306,14 +1336,17 @@ namespace Kindling.Client
                         capText.text = "Edict";
                 }
             }
-            _hud.text = "Round " + _loop.State.Round
+            string user = string.IsNullOrEmpty(p.DisplayName) ? _displayName : p.DisplayName;
+            string capName = p.Captain.IsEmpty ? "" : NameOfCaptain(p.Captain.Value);
+            _hud.text = (string.IsNullOrEmpty(user) ? "You" : user)
+                + (string.IsNullOrEmpty(capName) ? "" : ("  ·  " + capName))
+                + "   Round " + _loop.State.Round
                 + "   Wick " + p.Wick
                 + "   Embers " + p.Embers
                 + "   Depth " + p.Depth
                 + "   Upgrade " + p.UpgradeCost
                 + (p.Hold ? "   HOLD" : "")
-                + (_edictTargeting ? "   EDICT TARGET" : "")
-                + "   " + (p.Captain.IsEmpty ? "" : NameOfCaptain(p.Captain.Value));
+                + (_edictTargeting ? "   EDICT TARGET" : "");
 
             for (int i = 0; i < _stallCards.Count; i++)
             {
@@ -1353,7 +1386,8 @@ namespace Kindling.Client
             {
                 var s = _loop.State.Seats[i];
                 lb.Append(s.Alive ? "● " : "○ ");
-                lb.Append(s.DisplayName.PadRight(8));
+                lb.Append((s.DisplayName ?? ("Seat" + i)).PadRight(10));
+                if (!s.Captain.IsEmpty) lb.Append(" ").Append(NameOfCaptain(s.Captain.Value));
                 lb.Append(" W").Append(s.Wick.ToString().PadLeft(3));
                 lb.Append(" D").Append(s.Depth);
                 if (s.Place.HasValue) lb.Append(" #").Append(s.Place.Value);
@@ -1391,7 +1425,7 @@ namespace Kindling.Client
             switch (_helpStep)
             {
                 case 0:
-                    _helpText.text = "1 / 4   Pick a Captain. Each one has a Passive or an Edict that changes your recruit. Timer auto-picks if you wait.";
+                    _helpText.text = "1 / 4   Pick one of four Captains. Username is yours; the Captain is this match's power. Taken names cannot be shared.";
                     break;
                 case 1:
                     _helpText.text = "2 / 4   Drag a stall card onto HAND or WARBAND to buy (3 Embers). Buys always land in your hand. Drag a warband card onto the stall to sell.";
@@ -1441,7 +1475,7 @@ namespace Kindling.Client
                     return;
                 }
             }
-            _infoLabel.text = "Tap a card for tribe and keywords.\nAuthored text comes later.";
+            _infoLabel.text = "Tap a Kindled. Drag stall to hand to buy. Drag hand to warband to play.";
         }
 
         string NameOfCaptain(string id)

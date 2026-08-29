@@ -132,12 +132,14 @@ namespace Kindling.Sim.Tests
             var a = TestSupport.Player(0);
             var b = TestSupport.Player(1);
             a.Board.Add(Units.CreateRaw(rng, "ab_cinderling", 1, 1, Keyword.Afterglow));
-            b.Board.Add(Units.CreateRaw(rng, "ne_wall", 5, 5, Keyword.None));
+            b.Board.Add(Units.CreateRaw(rng, "ne_wall", 10, 1, Keyword.None));
             CombatResult r = CombatSim.Run(a, b, rng, TestSupport.Cat);
             bool ag = false;
             for (int i = 0; i < r.Events.Count; i++)
                 if (r.Events[i].Op == CombatOp.Afterglow) ag = true;
             Assert.True(ag);
+            Assert.Equal(1, r.RemainingA);
+            Assert.Equal(0, r.RemainingB);
         }
 
         [Fact]

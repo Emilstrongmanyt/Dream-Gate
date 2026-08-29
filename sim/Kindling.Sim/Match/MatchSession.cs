@@ -30,7 +30,6 @@ namespace Kindling.Sim.Match
                 Cat = cat,
                 Loop = MatchLoop.Create(cat, matchId, salt, humanSeats)
             };
-            s.Loop.AutoPickBotCaptains();
             for (int i = 0; i < Rules.LobbySize; i++)
                 s.ResumeTokens[i] = matchId.ToString("N") + "-" + i.ToString();
             if (s.Loop.State.Phase == Phase.CaptainPick)
@@ -128,10 +127,13 @@ namespace Kindling.Sim.Match
             SnapshotVersion++;
             if (a.Op == RecruitOp.CaptainPick && Loop.State.Phase == Phase.CaptainPick)
             {
-                bool all = true;
+                bool humansDone = true;
                 for (int i = 0; i < Loop.State.Seats.Length; i++)
-                    if (Loop.State.Seats[i].Alive && Loop.State.Seats[i].Captain.IsEmpty) all = false;
-                if (all)
+                {
+                    PlayerState ps = Loop.State.Seats[i];
+                    if (ps.Alive && !ps.IsBot && ps.Captain.IsEmpty) humansDone = false;
+                }
+                if (humansDone)
                 {
                     Loop.StartFromCaptainPick();
                     ArmTimer(Rules.RecruitSeconds(Loop.State.Round));

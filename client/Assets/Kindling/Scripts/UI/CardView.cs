@@ -109,7 +109,7 @@ namespace Kindling.Client
             PaintPattern(def, spell);
         }
 
-        public void BindCaptain(CaptainDef def, bool selected)
+        public void BindCaptain(CaptainDef def, bool selected, bool taken = false)
         {
             _cap = def;
             _unit = null;
@@ -121,14 +121,16 @@ namespace Kindling.Client
             gameObject.SetActive(true);
             if (Drag != null)
             {
-                Drag.enabled = true;
+                Drag.enabled = !taken;
                 Drag.Zone = CardZone.Offer;
             }
             NameLabel.text = def.Name;
             Border.sprite = HsUi.CardShirt(Chorus.Neutral, true);
             Border.preserveAspect = true;
-            Art.color = HsUi.CaptainTint(def.Id.Value);
-            Stats.text = "Wick " + def.Wick + (def.HasEdict ? ("  ·  Edict " + def.EdictCost) : "  ·  Passive");
+            Art.color = taken ? new Color(0.18f, 0.14f, 0.12f, 1f) : HsUi.CaptainTint(def.Id.Value);
+            Stats.text = taken
+                ? "Taken"
+                : ("Wick " + def.Wick + (def.HasEdict ? ("  ·  Edict " + def.EdictCost) : "  ·  Passive"));
             Keys.text = Kindling.Sim.Captains.CaptainPower.Line(def);
             Keys.fontSize = 13;
             Keys.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -140,7 +142,7 @@ namespace Kindling.Client
             stRt.anchorMin = new Vector2(0.05f, 0.32f);
             stRt.anchorMax = new Vector2(0.95f, 0.44f);
             DepthLabel.text = "";
-            Border.color = selected ? HsUi.Selected : HsUi.Gold;
+            Border.color = taken ? new Color(0.35f, 0.3f, 0.25f) : (selected ? HsUi.Selected : HsUi.Gold);
             if (Pattern != null) Pattern.enabled = false;
         }
 

@@ -18,7 +18,9 @@ namespace Kindling.Sim.Match
                 case "CaptainPick":
                     a.Op = RecruitOp.CaptainPick;
                     a.CaptainId = ReadString(json, "captainId");
-                    a.OfferIndex = ReadInt(json, "offerIndex");
+                    a.OfferIndex = json.IndexOf("\"offerIndex\":", StringComparison.Ordinal) >= 0
+                        ? ReadInt(json, "offerIndex")
+                        : -1;
                     break;
                 case "Buy":
                     a.Op = RecruitOp.Buy;

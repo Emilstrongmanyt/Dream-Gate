@@ -53,16 +53,41 @@ namespace Kindling.Sim.Validation
         {
             if (m.Phase != Phase.CaptainPick) return SimResult.Fail("WRONG_PHASE");
             if (!p.Captain.IsEmpty) return SimResult.Fail("ALREADY_PICKED");
-            string id = a.CaptainId;
-            if (string.IsNullOrEmpty(id) && p.CaptainOffers != null && p.CaptainOffers.Length > 0)
-                id = p.CaptainOffers[0].Value;
-            if (string.IsNullOrEmpty(id) && a.OfferIndex >= 0 && p.CaptainOffers != null && a.OfferIndex < p.CaptainOffers.Length)
+            string id = null;
+            if (a.OfferIndex >= 0 && p.CaptainOffers != null && a.OfferIndex < p.CaptainOffers.Length)
                 id = p.CaptainOffers[a.OfferIndex].Value;
+            else if (!string.IsNullOrEmpty(a.CaptainId))
+                id = a.CaptainId;
             CaptainDef def = cat.GetCaptain(id);
             if (def == null) return SimResult.Fail("BAD_CAPTAIN");
+            bool inOffer = OfferContains(p, def.Id.Value);
+            if (!inOffer && a.OfferIndex >= 0) return SimResult.Fail("BAD_CAPTAIN");
+            if (CaptainTaken(m, def.Id, p.Seat)) return SimResult.Fail("CAPTAIN_TAKEN");
             p.Captain = def.Id;
             CaptainPassives.OnCaptainPicked(p, cat);
             return SimResult.Success();
+        }
+
+        public static bool CaptainTaken(MatchState m, CaptainId id, int exceptSeat)
+        {
+            if (m == null || id.IsEmpty) return false;
+            for (int i = 0; i < m.Seats.Length; i++)
+            {
+                if (i == exceptSeat) continue;
+                if (m.Seats[i].Captain == id) return true;
+            }
+            return false;
+        }
+
+        static bool OfferContains(PlayerState p, string id)
+        {
+            if (p == null || p.CaptainOffers == null || string.IsNullOrEmpty(id)) return false;
+            for (int i = 0; i < p.CaptainOffers.Length; i++)
+            {
+                if (string.Equals(p.CaptainOffers[i].Value, id, System.StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
         }
 
         static SimResult Buy(MatchState m, PlayerState p, RecruitAction a, Catalog.Catalog cat)

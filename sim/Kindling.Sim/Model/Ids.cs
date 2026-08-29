@@ -157,7 +157,7 @@ namespace Kindling.Sim.Model
         public DestLoc From;
         public int FromIndex;
         public int HostIndex;
-        public int OfferIndex;
+        public int OfferIndex = -1;
         public int TargetIndex = -1;
         public string CaptainId;
     }

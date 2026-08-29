@@ -37,6 +37,61 @@ namespace Kindling.EditorTools
             CopyShirtsToResources();
         }
 
+        [MenuItem("Kindling/Import The Stone UI")]
+        public static void ImportTheStone()
+        {
+            string[] roots =
+            {
+                @"C:\MMORPG-Project\mmorpg-mobile\Project Zx\Assets\Layer Lab\GUI-TheStone\ResourcesData",
+                Path.Combine(Application.dataPath, "..", "..", "..", "Layer Lab", "GUI-TheStone", "ResourcesData")
+            };
+            string src = null;
+            for (int i = 0; i < roots.Length; i++)
+            {
+                if (Directory.Exists(Path.Combine(roots[i], "Sprites", "Components")))
+                {
+                    src = roots[i];
+                    break;
+                }
+            }
+            if (src == null)
+            {
+                Debug.LogError("The Stone UI not found. Expected Layer Lab GUI-TheStone/ResourcesData.");
+                return;
+            }
+            string dest = Path.Combine(Application.dataPath, "Kindling", "Resources", "Stone");
+            string[] parts = { "Button", "Frame", "Popup", "Label-Title", "Slider", "UI_Etc", "ActionText" };
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string from = Path.Combine(src, "Sprites", "Components", parts[i]);
+                string to = Path.Combine(dest, "Sprites", "Components", parts[i]);
+                if (!Directory.Exists(from)) continue;
+                CopyDir(from, to);
+            }
+            string ofl = Path.Combine(src, "Fonts", "OFL.txt");
+            if (File.Exists(ofl))
+            {
+                Directory.CreateDirectory(Path.Combine(dest, "Fonts"));
+                File.Copy(ofl, Path.Combine(dest, "Fonts", "OFL.txt"), true);
+            }
+            AssetDatabase.Refresh();
+            Debug.Log("Imported The Stone UI into " + dest);
+        }
+
+        static void CopyDir(string from, string to)
+        {
+            Directory.CreateDirectory(to);
+            string[] files = Directory.GetFiles(from);
+            for (int i = 0; i < files.Length; i++)
+            {
+                string name = Path.GetFileName(files[i]);
+                File.Copy(files[i], Path.Combine(to, name), true);
+            }
+            string[] dirs = Directory.GetDirectories(from);
+            for (int i = 0; i < dirs.Length; i++)
+                CopyDir(dirs[i], Path.Combine(to, Path.GetFileName(dirs[i])));
+        }
+
         static string FindDownloadedPackage()
         {
             string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

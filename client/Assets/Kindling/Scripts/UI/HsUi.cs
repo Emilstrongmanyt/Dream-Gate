@@ -195,8 +195,15 @@ namespace Kindling.Client
             rt.anchorMax = anchorMax;
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
-            go.GetComponent<Image>().color = color;
-            go.GetComponent<Image>().sprite = Pixel(color);
+            var img = go.GetComponent<Image>();
+            img.color = color;
+            img.sprite = Pixel(color);
+            bool full = anchorMin == Vector2.zero && anchorMax == Vector2.one;
+            if (!full && color.a > 0.4f)
+            {
+                if (StoneTheme.Skin(img, StoneTheme.PanelSprite()))
+                    img.color = new Color(1f, 1f, 1f, Mathf.Clamp01(color.a + 0.15f));
+            }
             return rt;
         }
 
@@ -226,11 +233,13 @@ namespace Kindling.Client
             var rt = Panel(parent, name, anchorMin, anchorMax, bg);
             var img = rt.GetComponent<Image>();
             img.raycastTarget = true;
+            if (StoneTheme.Skin(img, StoneTheme.ButtonSprite(bg)))
+                img.color = Color.white;
             var btn = rt.gameObject.AddComponent<Button>();
             btn.targetGraphic = img;
             var colors = btn.colors;
-            colors.highlightedColor = Color.Lerp(bg, Color.white, 0.2f);
-            colors.pressedColor = Color.Lerp(bg, Color.black, 0.2f);
+            colors.highlightedColor = Color.Lerp(Color.white, Gold, 0.15f);
+            colors.pressedColor = new Color(0.82f, 0.82f, 0.82f, 1f);
             btn.colors = colors;
             Label(rt, "cap", caption, 22, TextAnchor.MiddleCenter, Cream);
             btn.onClick.AddListener(() => onClick());
@@ -242,6 +251,8 @@ namespace Kindling.Client
             var rt = Panel(parent, name, anchorMin, anchorMax, Hex("2a1a10"));
             var img = rt.GetComponent<Image>();
             img.raycastTarget = true;
+            if (StoneTheme.Skin(img, StoneTheme.InputSprite()))
+                img.color = Color.white;
             var input = rt.gameObject.AddComponent<InputField>();
             input.targetGraphic = img;
             var text = Label(rt, "text", "", 22, TextAnchor.MiddleLeft, Cream);

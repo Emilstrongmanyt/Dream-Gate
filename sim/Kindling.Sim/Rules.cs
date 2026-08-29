@@ -16,7 +16,7 @@ namespace Kindling.Sim
         public const int LifetimeSummonCap = 32;
         public const int DeathWaveCap = 64;
         public const int MaxStall = 7;
-        public const int CaptainOfferCount = 3;
+        public const int CaptainOfferCount = 4;
         public const int GlimpseOfferCount = 3;
         public const int DummyGhostCount = 3;
         public const int CaptainPickSeconds = 20;
