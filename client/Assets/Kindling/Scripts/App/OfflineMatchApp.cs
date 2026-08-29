@@ -36,6 +36,7 @@ namespace Kindling.Client
         Text _infoLabel;
         GameObject _recruitRoot;
         Canvas _canvas;
+        RectTransform _safe;
         DropZone _handZone;
         DropZone _boardZone;
         DropZone _stallZone;
@@ -131,22 +132,22 @@ namespace Kindling.Client
         {
             var canvasGo = HsUi.Canvas("KindlingCanvas");
             _canvas = canvasGo.GetComponent<Canvas>();
-            var canvas = canvasGo;
-            HsUi.Panel(canvas.transform, "felt", Vector2.zero, Vector2.one, HsUi.Felt);
+            HsUi.Panel(_canvas.transform, "felt", Vector2.zero, Vector2.one, HsUi.Felt);
+            _safe = HsUi.SafeRoot(_canvas.transform);
+            var canvas = _safe;
 
-            HsUi.Label(HsUi.Panel(canvas.transform, "title", new Vector2(0.01f, 0.94f), new Vector2(0.40f, 0.995f), Color.clear),
-                "t", "KINDLING  ·  The Ember Exchange", 26, TextAnchor.MiddleLeft, HsUi.Gold);
+            HsUi.Band(canvas, "t", "KINDLING", 22, TextAnchor.MiddleLeft, HsUi.Gold,
+                new Vector2(0.01f, 0.94f), new Vector2(0.20f, 0.995f));
+            _hud = HsUi.Band(canvas, "hud", "", 20, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.21f, 0.94f), new Vector2(0.84f, 0.995f));
+            HsUi.MakeButton(canvas, "leave", "MENU", new Vector2(0.86f, 0.94f), new Vector2(0.99f, 0.995f), HsUi.WickRed, LeaveMatch);
 
-            _hud = HsUi.Label(HsUi.Panel(canvas.transform, "hud", new Vector2(0.40f, 0.94f), new Vector2(0.86f, 0.995f), Color.clear),
-                "hud", "", 22, TextAnchor.MiddleRight, HsUi.Cream);
-            HsUi.MakeButton(canvas.transform, "leave", "MENU", new Vector2(0.87f, 0.94f), new Vector2(0.99f, 0.995f), HsUi.WickRed, LeaveMatch);
-
-            // Stall
-            var stallBar = HsUi.Panel(canvas.transform, "stallBar", new Vector2(0.02f, 0.70f), new Vector2(0.72f, 0.93f), HsUi.Wood);
-            HsUi.Label(stallBar, "sl", "STALL", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            var stallBar = HsUi.Panel(canvas, "stallBar", new Vector2(0.01f, 0.70f), new Vector2(0.73f, 0.93f), HsUi.Wood);
+            HsUi.Band(stallBar, "sl", "STALL", 14, TextAnchor.MiddleLeft, HsUi.Gold,
+                new Vector2(0.02f, 0.86f), new Vector2(0.40f, 0.98f));
             _stallZone = stallBar.gameObject.AddComponent<DropZone>();
             _stallZone.Init(CardZone.Stall, stallBar.GetComponent<Image>());
-            var stallRow = HsUi.Panel(stallBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
+            var stallRow = HsUi.Panel(stallBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.84f), Color.clear);
             var hlg = stallRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             hlg.spacing = 8; hlg.childAlignment = TextAnchor.MiddleCenter;
             hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = true;
@@ -162,10 +163,11 @@ namespace Kindling.Client
 
             // Board
             var boardBar = HsUi.Panel(canvas.transform, "boardBar", new Vector2(0.02f, 0.38f), new Vector2(0.72f, 0.69f), new Color(0.12f, 0.08f, 0.05f, 1));
-            HsUi.Label(boardBar, "bl", "WARBAND", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Band(boardBar, "bl", "WARBAND", 14, TextAnchor.MiddleLeft, HsUi.Gold,
+                new Vector2(0.02f, 0.86f), new Vector2(0.50f, 0.98f));
             _boardZone = boardBar.gameObject.AddComponent<DropZone>();
             _boardZone.Init(CardZone.Board, boardBar.GetComponent<Image>());
-            var boardRow = HsUi.Panel(boardBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
+            var boardRow = HsUi.Panel(boardBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.84f), Color.clear);
             var hlg2 = boardRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             hlg2.spacing = 8; hlg2.childAlignment = TextAnchor.MiddleCenter;
             hlg2.childForceExpandWidth = false; hlg2.childForceExpandHeight = true;
@@ -180,10 +182,11 @@ namespace Kindling.Client
 
             // Hand
             var handBar = HsUi.Panel(canvas.transform, "handBar", new Vector2(0.02f, 0.14f), new Vector2(0.72f, 0.37f), HsUi.Wood);
-            HsUi.Label(handBar, "hl", "HAND", 16, TextAnchor.UpperLeft, HsUi.Gold);
+            HsUi.Band(handBar, "hl", "HAND", 14, TextAnchor.MiddleLeft, HsUi.Gold,
+                new Vector2(0.02f, 0.86f), new Vector2(0.40f, 0.98f));
             _handZone = handBar.gameObject.AddComponent<DropZone>();
             _handZone.Init(CardZone.Hand, handBar.GetComponent<Image>());
-            var handRow = HsUi.Panel(handBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.88f), Color.clear);
+            var handRow = HsUi.Panel(handBar, "row", new Vector2(0.01f, 0.02f), new Vector2(0.99f, 0.84f), Color.clear);
             var hlg3 = handRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             hlg3.spacing = 6; hlg3.childAlignment = TextAnchor.MiddleLeft;
             hlg3.childForceExpandWidth = false; hlg3.childForceExpandHeight = true;
@@ -198,44 +201,39 @@ namespace Kindling.Client
 
             // Leaderboard
             var lb = HsUi.Panel(canvas.transform, "lb", new Vector2(0.735f, 0.38f), new Vector2(0.99f, 0.93f), HsUi.Wood);
-            HsUi.Label(lb, "lbt", "TABLE", 16, TextAnchor.UpperCenter, HsUi.Gold);
-            _log = HsUi.Label(lb, "log", "", 16, TextAnchor.UpperLeft, HsUi.Cream);
-            var lrt = _log.GetComponent<RectTransform>();
-            lrt.anchorMin = new Vector2(0.04f, 0.02f);
-            lrt.anchorMax = new Vector2(0.96f, 0.90f);
-            _log.alignment = TextAnchor.UpperLeft;
-            _log.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _log.verticalOverflow = VerticalWrapMode.Overflow;
+            HsUi.Band(lb, "lbt", "TABLE", 14, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.06f, 0.88f), new Vector2(0.94f, 0.98f));
+            _log = HsUi.Band(lb, "log", "", 13, TextAnchor.UpperLeft, HsUi.Cream,
+                new Vector2(0.06f, 0.04f), new Vector2(0.94f, 0.86f));
+            _log.resizeTextForBestFit = false;
+            lb.gameObject.AddComponent<RectMask2D>();
 
             var act = HsUi.Panel(canvas.transform, "act", new Vector2(0.02f, 0.01f), new Vector2(0.72f, 0.15f), HsUi.Wood);
             _edictBtn = HsUi.MakeButton(act, "edict", "Edict", new Vector2(0.02f, 0.12f), new Vector2(0.22f, 0.88f), HsUi.ChorusColor(Chorus.Spirit), Edict);
             HsUi.MakeButton(act, "reroll", "Reroll  1", new Vector2(0.24f, 0.12f), new Vector2(0.44f, 0.88f), HsUi.Ember, Reroll);
             HsUi.MakeButton(act, "hold", "Hold", new Vector2(0.46f, 0.12f), new Vector2(0.66f, 0.88f), HsUi.ChorusColor(Chorus.Humanoid), Hold);
-            HsUi.MakeButton(act, "up", "Upgrade", new Vector2(0.68f, 0.12f), new Vector2(0.88f, 0.88f), HsUi.Gold, Upgrade);
+            HsUi.MakeButton(act, "up", "Upgrade", new Vector2(0.68f, 0.12f), new Vector2(0.98f, 0.88f), HsUi.Gold, Upgrade);
 
             HsUi.MakeButton(canvas.transform, "ready", "READY", new Vector2(0.735f, 0.01f), new Vector2(0.99f, 0.13f), new Color(0.15f, 0.45f, 0.18f), Ready);
-            _timerLabel = HsUi.Label(HsUi.Panel(canvas.transform, "timer", new Vector2(0.735f, 0.14f), new Vector2(0.99f, 0.20f), Color.clear),
-                "timer", "COMBAT IN 0:15", 24, TextAnchor.MiddleCenter, HsUi.Gold);
-            _infoLabel = HsUi.Label(HsUi.Panel(canvas.transform, "info", new Vector2(0.735f, 0.21f), new Vector2(0.99f, 0.37f), HsUi.Wood),
-                "info", "Tap a Kindled for keywords.", 14, TextAnchor.UpperLeft, HsUi.Cream);
-            var irt = _infoLabel.GetComponent<RectTransform>();
-            irt.offsetMin = new Vector2(8, 6);
-            irt.offsetMax = new Vector2(-8, -6);
-            _infoLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _infoLabel.verticalOverflow = VerticalWrapMode.Overflow;
+            _timerLabel = HsUi.Band(HsUi.Panel(canvas, "timer", new Vector2(0.735f, 0.14f), new Vector2(0.99f, 0.20f), Color.clear),
+                "timer", "COMBAT IN 0:15", 20, TextAnchor.MiddleCenter, HsUi.Gold, Vector2.zero, Vector2.one);
+            var infoPanel = HsUi.Panel(canvas, "info", new Vector2(0.735f, 0.21f), new Vector2(0.99f, 0.37f), HsUi.Wood);
+            _infoLabel = HsUi.Band(infoPanel, "info", "Tap a Kindled.", 14, TextAnchor.UpperLeft, HsUi.Cream,
+                new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f));
+            infoPanel.gameObject.AddComponent<RectMask2D>();
 
             var toastRt = HsUi.Panel(canvas.transform, "toast", new Vector2(0.25f, 0.48f), new Vector2(0.75f, 0.56f), new Color(0, 0, 0, 0.0f));
             toastRt.GetComponent<Image>().raycastTarget = false;
             _toastLabel = HsUi.Label(toastRt, "toast", "", 24, TextAnchor.MiddleCenter, HsUi.Selected);
 
-            _recruitRoot = canvas;
+            _recruitRoot = canvas.gameObject;
 
             // Captain pick overlay — 4 unique-claim offers every match
-            _pickPanel = HsUi.Panel(canvas.transform, "pick", Vector2.zero, Vector2.one, new Color(0.05f, 0.03f, 0.02f, 0.92f)).gameObject;
-            HsUi.Label(_pickPanel.transform, "pt", "Choose your Captain", 36, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.86f);
-            HsUi.Label(_pickPanel.transform, "ps", "Every match. Passive is always on. Edict costs Embers once per recruit.", 18, TextAnchor.UpperCenter, HsUi.Cream)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.80f);
+            _pickPanel = HsUi.Panel(canvas, "pick", Vector2.zero, Vector2.one, new Color(0.05f, 0.03f, 0.02f, 0.92f)).gameObject;
+            HsUi.Band(_pickPanel.transform, "pt", "Choose your Captain", 34, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.08f, 0.88f), new Vector2(0.92f, 0.98f));
+            HsUi.Band(_pickPanel.transform, "ps", "Passive is always on. Edict costs Embers once per recruit.", 16, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.08f, 0.80f), new Vector2(0.92f, 0.88f));
             _offerRow = HsUi.Panel(_pickPanel.transform, "offers", new Vector2(0.06f, 0.16f), new Vector2(0.94f, 0.78f), Color.clear);
             var grid = _offerRow.gameObject.AddComponent<GridLayoutGroup>();
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
@@ -245,15 +243,15 @@ namespace Kindling.Client
             grid.childAlignment = TextAnchor.MiddleCenter;
             grid.padding = new RectOffset(8, 8, 4, 4);
             EnsureOfferCards(3);
-            HsUi.Label(_pickPanel.transform, "hint", "Four offers. No two Captains in the lobby can match. Timer picks a free one.", 18, TextAnchor.LowerCenter, HsUi.Cream)
-                .GetComponent<RectTransform>().anchorMax = new Vector2(1, 0.14f);
+            HsUi.Band(_pickPanel.transform, "hint", "Four offers. No two Captains in the lobby can match.", 16, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.08f, 0.02f), new Vector2(0.92f, 0.12f));
 
             _playback = new CombatPlayback();
             _playback.Build(canvas.transform, NextAfterCombat);
 
-            _glimpsePanel = HsUi.Panel(canvas.transform, "glimpse", Vector2.zero, Vector2.one, new Color(0.06f, 0.03f, 0.08f, 0.93f)).gameObject;
-            HsUi.Label(_glimpsePanel.transform, "gt", "GLIMPSE  ·  choose one", 32, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.78f);
+            _glimpsePanel = HsUi.Panel(canvas, "glimpse", Vector2.zero, Vector2.one, new Color(0.06f, 0.03f, 0.08f, 0.93f)).gameObject;
+            HsUi.Band(_glimpsePanel.transform, "gt", "GLIMPSE  ·  choose one", 30, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.97f));
             var gRow = HsUi.Panel(_glimpsePanel.transform, "goffers", new Vector2(0.10f, 0.28f), new Vector2(0.90f, 0.74f), Color.clear);
             var gh = gRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             gh.spacing = 20; gh.childAlignment = TextAnchor.MiddleCenter;
@@ -267,30 +265,22 @@ namespace Kindling.Client
                 le.preferredWidth = 200; le.preferredHeight = 300;
                 _glimpseCards.Add(cv);
             }
-            HsUi.Label(_glimpsePanel.transform, "gh", "Timer does not pause.", 18, TextAnchor.LowerCenter, HsUi.Cream)
-                .GetComponent<RectTransform>().anchorMax = new Vector2(1, 0.22f);
+            HsUi.Band(_glimpsePanel.transform, "gh", "Timer does not pause.", 16, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.10f, 0.08f), new Vector2(0.90f, 0.18f));
             _glimpsePanel.SetActive(false);
 
-            _helpPanel = HsUi.Panel(canvas.transform, "help", new Vector2(0.18f, 0.40f), new Vector2(0.82f, 0.62f), new Color(0.08f, 0.05f, 0.02f, 0.94f)).gameObject;
-            _helpText = HsUi.Label(_helpPanel.transform, "ht", "", 20, TextAnchor.UpperLeft, HsUi.Cream);
-            var hrt = _helpText.GetComponent<RectTransform>();
-            hrt.anchorMin = new Vector2(0.04f, 0.28f);
-            hrt.anchorMax = new Vector2(0.96f, 0.94f);
-            _helpText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _helpText.verticalOverflow = VerticalWrapMode.Overflow;
+            _helpPanel = HsUi.Panel(canvas, "help", new Vector2(0.18f, 0.38f), new Vector2(0.82f, 0.64f), new Color(0.08f, 0.05f, 0.02f, 0.94f)).gameObject;
+            _helpText = HsUi.Band(_helpPanel.transform, "ht", "", 18, TextAnchor.UpperLeft, HsUi.Cream,
+                new Vector2(0.06f, 0.30f), new Vector2(0.94f, 0.94f));
             HsUi.MakeButton(_helpPanel.transform, "next", "GOT IT", new Vector2(0.55f, 0.06f), new Vector2(0.96f, 0.26f), HsUi.GoldDark, AdvanceHelp);
             HsUi.MakeButton(_helpPanel.transform, "skip", "SKIP", new Vector2(0.04f, 0.06f), new Vector2(0.48f, 0.26f), HsUi.WickRed, SkipHelp);
             _helpPanel.SetActive(false);
 
-            _crownPanel = HsUi.Panel(canvas.transform, "crown", Vector2.zero, Vector2.one, new Color(0.05f, 0.03f, 0.02f, 0.96f)).gameObject;
-            HsUi.Label(_crownPanel.transform, "ct", "THE CROWN", 40, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.82f);
-            _crownText = HsUi.Label(_crownPanel.transform, "cs", "", 22, TextAnchor.UpperCenter, HsUi.Cream);
-            var crt = _crownText.GetComponent<RectTransform>();
-            crt.anchorMin = new Vector2(0.15f, 0.22f);
-            crt.anchorMax = new Vector2(0.85f, 0.78f);
-            _crownText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _crownText.verticalOverflow = VerticalWrapMode.Overflow;
+            _crownPanel = HsUi.Panel(canvas, "crown", Vector2.zero, Vector2.one, new Color(0.05f, 0.03f, 0.02f, 0.96f)).gameObject;
+            HsUi.Band(_crownPanel.transform, "ct", "THE CROWN", 36, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.10f, 0.84f), new Vector2(0.90f, 0.96f));
+            _crownText = HsUi.Band(_crownPanel.transform, "cs", "", 20, TextAnchor.UpperCenter, HsUi.Cream,
+                new Vector2(0.12f, 0.22f), new Vector2(0.88f, 0.80f));
             HsUi.MakeButton(_crownPanel.transform, "ok", "BACK TO MENU", new Vector2(0.35f, 0.06f), new Vector2(0.65f, 0.16f), HsUi.GoldDark, DismissCrown);
             _crownPanel.SetActive(false);
         }
@@ -342,56 +332,53 @@ namespace Kindling.Client
 
         void BuildMenu()
         {
-            _menuRoot = HsUi.Panel(_canvas.transform, "menu", Vector2.zero, Vector2.one, new Color(0.08f, 0.04f, 0.02f, 0.98f)).gameObject;
-            HsUi.Label(_menuRoot.transform, "mt", "KINDLING", 56, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.86f);
-            HsUi.Label(_menuRoot.transform, "ms", "The Ember Exchange", 24, TextAnchor.UpperCenter, HsUi.Cream)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.1f, 0.80f);
-            HsUi.Label(_menuRoot.transform, "msub", "Sign in with a username, then Practice or Queue.", 18, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.08f, 0.74f);
+            Transform root = _safe != null ? _safe : _canvas.transform;
+            _menuRoot = HsUi.Panel(root, "menu", Vector2.zero, Vector2.one, new Color(0.08f, 0.04f, 0.02f, 0.98f)).gameObject;
+            HsUi.Band(_menuRoot.transform, "mt", "KINDLING", 48, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.18f, 0.86f), new Vector2(0.82f, 0.97f));
+            HsUi.Band(_menuRoot.transform, "ms", "The Ember Exchange", 22, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.18f, 0.79f), new Vector2(0.82f, 0.86f));
+            HsUi.Band(_menuRoot.transform, "msub", "Sign in with a username, then Practice or Queue.", 16, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.18f, 0.73f), new Vector2(0.82f, 0.79f));
 
-            var card = HsUi.Panel(_menuRoot.transform, "card", new Vector2(0.30f, 0.08f), new Vector2(0.70f, 0.72f), HsUi.Wood);
+            var card = HsUi.Panel(_menuRoot.transform, "card", new Vector2(0.33f, 0.12f), new Vector2(0.77f, 0.71f), HsUi.Wood);
 
             _authPanel = HsUi.Panel(card, "auth", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            _nameInput = HsUi.MakeInput(_authPanel.transform, "name", new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.88f), "Username", false, 16);
-            _passInput = HsUi.MakeInput(_authPanel.transform, "pass", new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.68f), "Password", true, 64);
-            HsUi.MakeButton(_authPanel.transform, "reg", "REGISTER", new Vector2(0.08f, 0.30f), new Vector2(0.48f, 0.46f), HsUi.GoldDark, () => StartCoroutine(DoRegister()));
-            HsUi.MakeButton(_authPanel.transform, "login", "LOG IN", new Vector2(0.52f, 0.30f), new Vector2(0.92f, 0.46f), new Color(0.15f, 0.45f, 0.18f), () => StartCoroutine(DoLogin()));
-            HsUi.Label(_authPanel.transform, "ah", "Username 3–16 letters  ·  password 6+  ·  English only", 16, TextAnchor.MiddleCenter, HsUi.Cream)
-                .GetComponent<RectTransform>().anchorMax = new Vector2(1f, 0.22f);
+            _nameInput = HsUi.MakeInput(_authPanel.transform, "name", new Vector2(0.10f, 0.70f), new Vector2(0.90f, 0.86f), "Username", false, 16);
+            _passInput = HsUi.MakeInput(_authPanel.transform, "pass", new Vector2(0.10f, 0.50f), new Vector2(0.90f, 0.66f), "Password", true, 64);
+            HsUi.MakeButton(_authPanel.transform, "reg", "REGISTER", new Vector2(0.10f, 0.28f), new Vector2(0.48f, 0.44f), HsUi.GoldDark, () => StartCoroutine(DoRegister()));
+            HsUi.MakeButton(_authPanel.transform, "login", "LOG IN", new Vector2(0.52f, 0.28f), new Vector2(0.90f, 0.44f), new Color(0.15f, 0.45f, 0.18f), () => StartCoroutine(DoLogin()));
+            HsUi.Band(_authPanel.transform, "ah", "Username 3–16 letters  ·  password 6+", 14, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.22f));
 
             _hubPanel = HsUi.Panel(card, "hub", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            _hubWelcome = HsUi.Label(_hubPanel.transform, "hw", "Welcome", 26, TextAnchor.UpperCenter, HsUi.Gold);
-            var wrt = _hubWelcome.GetComponent<RectTransform>();
-            wrt.anchorMin = new Vector2(0.06f, 0.72f);
-            wrt.anchorMax = new Vector2(0.94f, 0.96f);
-            _hubWelcome.horizontalOverflow = HorizontalWrapMode.Wrap;
-            HsUi.MakeButton(_hubPanel.transform, "prac", "PRACTICE  ·  vs bots", new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.70f), new Color(0.15f, 0.45f, 0.18f), StartPractice);
-            HsUi.MakeButton(_hubPanel.transform, "queue", "QUEUE  ·  Casual", new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.50f), HsUi.GoldDark, () => StartCoroutine(StartQueue()));
-            HsUi.MakeButton(_hubPanel.transform, "set", "SETTINGS", new Vector2(0.08f, 0.16f), new Vector2(0.48f, 0.28f), HsUi.GoldDark, ToggleSettings);
-            HsUi.MakeButton(_hubPanel.transform, "out", "LOG OUT", new Vector2(0.52f, 0.16f), new Vector2(0.92f, 0.28f), HsUi.WickRed, Logout);
+            _hubWelcome = HsUi.Band(_hubPanel.transform, "hw", "Welcome", 22, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.08f, 0.78f), new Vector2(0.92f, 0.96f));
+            HsUi.MakeButton(_hubPanel.transform, "prac", "PRACTICE  ·  vs bots", new Vector2(0.10f, 0.54f), new Vector2(0.90f, 0.72f), new Color(0.15f, 0.45f, 0.18f), StartPractice);
+            HsUi.MakeButton(_hubPanel.transform, "queue", "QUEUE  ·  Casual", new Vector2(0.10f, 0.34f), new Vector2(0.90f, 0.52f), HsUi.GoldDark, () => StartCoroutine(StartQueue()));
+            HsUi.MakeButton(_hubPanel.transform, "set", "SETTINGS", new Vector2(0.10f, 0.14f), new Vector2(0.48f, 0.30f), HsUi.GoldDark, ToggleSettings);
+            HsUi.MakeButton(_hubPanel.transform, "out", "LOG OUT", new Vector2(0.52f, 0.14f), new Vector2(0.90f, 0.30f), HsUi.WickRed, Logout);
 
-            _settingsPanel = HsUi.Panel(_menuRoot.transform, "settings", new Vector2(0.28f, 0.12f), new Vector2(0.72f, 0.78f), HsUi.Wood).gameObject;
-            HsUi.Label(_settingsPanel.transform, "stt", "SETTINGS", 28, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0.06f, 0.86f);
-            _hostInput = HsUi.MakeInput(_settingsPanel.transform, "host", new Vector2(0.08f, 0.68f), new Vector2(0.92f, 0.82f), "Match host (optional)", false, 128);
-            HsUi.MakeButton(_settingsPanel.transform, "frame", "CARD FRAME", new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.62f), HsUi.GoldDark, CycleFrame);
-            HsUi.MakeButton(_settingsPanel.transform, "a11y", "PATTERNS", new Vector2(0.08f, 0.30f), new Vector2(0.92f, 0.44f), HsUi.ChorusColor(Chorus.Spirit), TogglePatterns);
-            HsUi.MakeButton(_settingsPanel.transform, "close", "CLOSE", new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.22f), HsUi.GoldDark, ToggleSettings);
+            _settingsPanel = HsUi.Panel(_menuRoot.transform, "settings", new Vector2(0.30f, 0.14f), new Vector2(0.70f, 0.78f), HsUi.Wood).gameObject;
+            HsUi.Band(_settingsPanel.transform, "stt", "SETTINGS", 26, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.97f));
+            _hostInput = HsUi.MakeInput(_settingsPanel.transform, "host", new Vector2(0.10f, 0.68f), new Vector2(0.90f, 0.82f), "Match host (optional)", false, 128);
+            HsUi.MakeButton(_settingsPanel.transform, "frame", "CARD FRAME", new Vector2(0.10f, 0.48f), new Vector2(0.90f, 0.62f), HsUi.GoldDark, CycleFrame);
+            HsUi.MakeButton(_settingsPanel.transform, "a11y", "PATTERNS", new Vector2(0.10f, 0.32f), new Vector2(0.90f, 0.46f), HsUi.ChorusColor(Chorus.Spirit), TogglePatterns);
+            HsUi.MakeButton(_settingsPanel.transform, "close", "CLOSE", new Vector2(0.10f, 0.10f), new Vector2(0.90f, 0.26f), HsUi.GoldDark, ToggleSettings);
             _settingsPanel.SetActive(false);
 
-            var hist = HsUi.Panel(_menuRoot.transform, "history", new Vector2(0.02f, 0.08f), new Vector2(0.28f, 0.72f), HsUi.Wood);
-            HsUi.Label(hist, "ht", "RECENT MATCHES", 16, TextAnchor.UpperCenter, HsUi.Gold)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0, 0.88f);
-            _historyLabel = HsUi.Label(hist, "hb", "", 16, TextAnchor.UpperLeft, HsUi.Cream);
-            var hrt2 = _historyLabel.GetComponent<RectTransform>();
-            hrt2.anchorMin = new Vector2(0.06f, 0.04f);
-            hrt2.anchorMax = new Vector2(0.94f, 0.86f);
-            _historyLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _historyLabel.verticalOverflow = VerticalWrapMode.Overflow;
+            var hist = HsUi.Panel(_menuRoot.transform, "history", new Vector2(0.02f, 0.12f), new Vector2(0.30f, 0.71f), HsUi.Wood);
+            hist.gameObject.AddComponent<RectMask2D>();
+            HsUi.Band(hist, "ht", "RECENT MATCHES", 15, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.97f));
+            _historyLabel = HsUi.Band(hist, "hb", "", 14, TextAnchor.UpperLeft, HsUi.Cream,
+                new Vector2(0.08f, 0.05f), new Vector2(0.92f, 0.84f));
+            _historyLabel.resizeTextForBestFit = false;
+            _historyLabel.verticalOverflow = VerticalWrapMode.Truncate;
 
-            _menuStatus = HsUi.Label(_menuRoot.transform, "st", "", 20, TextAnchor.LowerCenter, HsUi.Selected);
-            _menuStatus.GetComponent<RectTransform>().anchorMax = new Vector2(1f, 0.08f);
+            _menuStatus = HsUi.Band(_menuRoot.transform, "st", "", 16, TextAnchor.MiddleCenter, HsUi.Selected,
+                new Vector2(0.10f, 0.02f), new Vector2(0.90f, 0.10f));
             _hubPanel.SetActive(false);
         }
 
@@ -470,7 +457,7 @@ namespace Kindling.Client
             var items = Protocol.ExtractObjects("{\"h\":" + (raw.StartsWith("[") ? raw : ("[" + raw + "]")) + "}", "h");
             if (items.Count == 0) return "Play a match to fill this list.";
             var sb = new System.Text.StringBuilder();
-            int n = items.Count < 8 ? items.Count : 8;
+            int n = items.Count < 6 ? items.Count : 6;
             for (int i = 0; i < n; i++)
             {
                 int place = Protocol.ReadInt(items[i], "place");
@@ -478,7 +465,8 @@ namespace Kindling.Client
                 string cap = Protocol.ReadString(items[i], "captain");
                 sb.Append('#').Append(place > 0 ? place.ToString() : "-");
                 sb.Append("  ").Append(string.IsNullOrEmpty(mode) ? "match" : mode);
-                if (!string.IsNullOrEmpty(cap)) sb.Append("  ").Append(cap);
+                if (!string.IsNullOrEmpty(cap))
+                    sb.Append("  ").Append(cap.Length > 14 ? cap.Substring(0, 14) : cap);
                 sb.Append('\n');
             }
             return sb.ToString();
@@ -1338,15 +1326,22 @@ namespace Kindling.Client
             }
             string user = string.IsNullOrEmpty(p.DisplayName) ? _displayName : p.DisplayName;
             string capName = p.Captain.IsEmpty ? "" : NameOfCaptain(p.Captain.Value);
-            _hud.text = (string.IsNullOrEmpty(user) ? "You" : user)
-                + (string.IsNullOrEmpty(capName) ? "" : ("  ·  " + capName))
-                + "   Round " + _loop.State.Round
+            _hud.text = "R" + _loop.State.Round
                 + "   Wick " + p.Wick
                 + "   Embers " + p.Embers
-                + "   Depth " + p.Depth
-                + "   Upgrade " + p.UpgradeCost
+                + "   D" + p.Depth
                 + (p.Hold ? "   HOLD" : "")
-                + (_edictTargeting ? "   EDICT TARGET" : "");
+                + (_edictTargeting ? "   EDICT" : "");
+            if (_log != null && _log.transform.parent != null)
+            {
+                var title = _log.transform.parent.Find("lbt");
+                var titleText = title != null ? title.GetComponent<Text>() : null;
+                if (titleText != null)
+                {
+                    string who = string.IsNullOrEmpty(user) ? "You" : user;
+                    titleText.text = string.IsNullOrEmpty(capName) ? who : (who + "  ·  " + capName);
+                }
+            }
 
             for (int i = 0; i < _stallCards.Count; i++)
             {
@@ -1385,11 +1380,11 @@ namespace Kindling.Client
             for (int i = 0; i < _loop.State.Seats.Length; i++)
             {
                 var s = _loop.State.Seats[i];
+                string nm = s.DisplayName ?? ("Seat" + i);
+                if (nm.Length > 8) nm = nm.Substring(0, 8);
                 lb.Append(s.Alive ? "● " : "○ ");
-                lb.Append((s.DisplayName ?? ("Seat" + i)).PadRight(10));
-                if (!s.Captain.IsEmpty) lb.Append(" ").Append(NameOfCaptain(s.Captain.Value));
-                lb.Append(" W").Append(s.Wick.ToString().PadLeft(3));
-                lb.Append(" D").Append(s.Depth);
+                lb.Append(nm);
+                lb.Append("  W").Append(s.Wick);
                 if (s.Place.HasValue) lb.Append(" #").Append(s.Place.Value);
                 lb.AppendLine();
             }

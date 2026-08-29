@@ -39,22 +39,14 @@ namespace Kindling.Client
             cv.Pattern = pat.GetComponent<Image>();
             cv.Pattern.raycastTarget = false;
             cv.Pattern.enabled = false;
-            cv.NameLabel = HsUi.Label(inner, "name", "", 16, TextAnchor.UpperCenter, HsUi.Cream);
-            var nameRt = cv.NameLabel.GetComponent<RectTransform>();
-            nameRt.anchorMin = new Vector2(0.05f, 0.82f);
-            nameRt.anchorMax = new Vector2(0.95f, 0.98f);
-            cv.Keys = HsUi.Label(inner, "keys", "", 12, TextAnchor.MiddleCenter, HsUi.Gold);
-            var kRt = cv.Keys.GetComponent<RectTransform>();
-            kRt.anchorMin = new Vector2(0.05f, 0.22f);
-            kRt.anchorMax = new Vector2(0.95f, 0.34f);
-            cv.Stats = HsUi.Label(inner, "stats", "0 / 0", 22, TextAnchor.MiddleCenter, Color.white);
-            var sRt = cv.Stats.GetComponent<RectTransform>();
-            sRt.anchorMin = new Vector2(0.05f, 0.02f);
-            sRt.anchorMax = new Vector2(0.95f, 0.22f);
-            cv.DepthLabel = HsUi.Label(inner, "d", "", 12, TextAnchor.UpperRight, HsUi.Gold);
-            var dRt = cv.DepthLabel.GetComponent<RectTransform>();
-            dRt.anchorMin = new Vector2(0.6f, 0.70f);
-            dRt.anchorMax = new Vector2(0.95f, 0.82f);
+            cv.NameLabel = HsUi.Band(inner, "name", "", 15, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.06f, 0.82f), new Vector2(0.94f, 0.98f));
+            cv.Keys = HsUi.Band(inner, "keys", "", 11, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.06f, 0.22f), new Vector2(0.94f, 0.34f));
+            cv.Stats = HsUi.Band(inner, "stats", "0 / 0", 18, TextAnchor.MiddleCenter, Color.white,
+                new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.22f));
+            cv.DepthLabel = HsUi.Band(inner, "d", "", 11, TextAnchor.MiddleRight, HsUi.Gold,
+                new Vector2(0.50f, 0.70f), new Vector2(0.94f, 0.82f));
 
             cv.Drag = go.GetComponent<CardDrag>();
             cv.Drag.View = cv;
@@ -95,8 +87,9 @@ namespace Kindling.Client
             Art.color = def != null ? HsUi.ChorusColor(def.Chorus) : HsUi.Felt;
             bool spell = def != null && def.Spell;
             Stats.text = spell ? "Spell" : (u.EffectiveAtk + " / " + u.Hp);
-            Keys.fontSize = 12;
-            Keys.horizontalOverflow = HorizontalWrapMode.Overflow;
+            Keys.fontSize = 11;
+            Keys.horizontalOverflow = HorizontalWrapMode.Wrap;
+            Keys.verticalOverflow = VerticalWrapMode.Truncate;
             Keys.text = spell ? "Play to cast" : HsUi.Keywords(u.Keywords, u.Awakened);
             var kRt = Keys.GetComponent<RectTransform>();
             kRt.anchorMin = new Vector2(0.05f, 0.22f);
@@ -132,9 +125,9 @@ namespace Kindling.Client
                 ? "Taken"
                 : ("Wick " + def.Wick + (def.HasEdict ? ("  ·  Edict " + def.EdictCost) : "  ·  Passive"));
             Keys.text = Kindling.Sim.Captains.CaptainPower.Line(def);
-            Keys.fontSize = 13;
+            Keys.fontSize = 12;
             Keys.horizontalOverflow = HorizontalWrapMode.Wrap;
-            Keys.verticalOverflow = VerticalWrapMode.Overflow;
+            Keys.verticalOverflow = VerticalWrapMode.Truncate;
             var kRt = Keys.GetComponent<RectTransform>();
             kRt.anchorMin = new Vector2(0.06f, 0.04f);
             kRt.anchorMax = new Vector2(0.94f, 0.32f);

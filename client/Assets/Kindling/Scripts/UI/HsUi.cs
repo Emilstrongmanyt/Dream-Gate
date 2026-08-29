@@ -199,7 +199,11 @@ namespace Kindling.Client
             img.color = color;
             img.sprite = Pixel(color);
             bool full = anchorMin == Vector2.zero && anchorMax == Vector2.one;
-            if (!full && color.a > 0.4f)
+            float w = anchorMax.x - anchorMin.x;
+            float h = anchorMax.y - anchorMin.y;
+            bool top = parent != null && (parent.GetComponent<Canvas>() != null
+                || parent.name == "safe" || parent.name == "menu" || parent.name == "KindlingCanvas");
+            if (!full && color.a > 0.4f && w >= 0.32f && h >= 0.34f && top)
             {
                 if (StoneTheme.Skin(img, StoneTheme.PanelSprite()))
                     img.color = new Color(1f, 1f, 1f, Mathf.Clamp01(color.a + 0.15f));
@@ -223,9 +227,35 @@ namespace Kindling.Client
             t.color = color;
             t.text = text;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
             t.raycastTarget = false;
             return t;
+        }
+
+        public static Text Band(Transform parent, string name, string text, int size, TextAnchor align, Color color, Vector2 anchorMin, Vector2 anchorMax)
+        {
+            var t = Label(parent, name, text, size, align, color);
+            var rt = t.GetComponent<RectTransform>();
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = size > 14 ? size / 2 : 10;
+            t.resizeTextMaxSize = size;
+            return t;
+        }
+
+        public static RectTransform SafeRoot(Transform canvas)
+        {
+            var rt = Panel(canvas, "safe", Vector2.zero, Vector2.one, Color.clear);
+            rt.gameObject.AddComponent<SafeAreaFitter>();
+            var img = rt.GetComponent<Image>();
+            img.raycastTarget = false;
+            img.color = Color.clear;
+            return rt;
         }
 
         public static Button MakeButton(Transform parent, string name, string caption, Vector2 anchorMin, Vector2 anchorMax, Color bg, System.Action onClick)
@@ -241,7 +271,15 @@ namespace Kindling.Client
             colors.highlightedColor = Color.Lerp(Color.white, Gold, 0.15f);
             colors.pressedColor = new Color(0.82f, 0.82f, 0.82f, 1f);
             btn.colors = colors;
-            Label(rt, "cap", caption, 22, TextAnchor.MiddleCenter, Cream);
+            var cap = Label(rt, "cap", caption, 22, TextAnchor.MiddleCenter, Cream);
+            cap.horizontalOverflow = HorizontalWrapMode.Wrap;
+            cap.verticalOverflow = VerticalWrapMode.Truncate;
+            cap.resizeTextForBestFit = true;
+            cap.resizeTextMinSize = 11;
+            cap.resizeTextMaxSize = 22;
+            var capRt = cap.GetComponent<RectTransform>();
+            capRt.offsetMin = new Vector2(8, 4);
+            capRt.offsetMax = new Vector2(-8, -4);
             btn.onClick.AddListener(() => onClick());
             return btn;
         }
@@ -360,6 +398,30 @@ namespace Kindling.Client
                 sb.Append(seen[i]);
             }
             return sb.ToString();
+        }
+    }
+
+    public sealed class SafeAreaFitter : MonoBehaviour
+    {
+        Rect _last;
+
+        void OnEnable() { Apply(); }
+
+        void LateUpdate() { Apply(); }
+
+        void Apply()
+        {
+            Rect sa = Screen.safeArea;
+            if (sa == _last && Screen.width > 0) return;
+            _last = sa;
+            float w = Screen.width;
+            float h = Screen.height;
+            if (w < 1f || h < 1f) return;
+            var rt = (RectTransform)transform;
+            rt.anchorMin = new Vector2(sa.xMin / w, sa.yMin / h);
+            rt.anchorMax = new Vector2(sa.xMax / w, sa.yMax / h);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
         }
     }
 }

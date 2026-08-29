@@ -39,8 +39,8 @@ namespace Kindling.Client
         {
             _onDismiss = onDismiss;
             Root = HsUi.Panel(canvas, "combat", Vector2.zero, Vector2.one, new Color(0.04f, 0.02f, 0.02f, 0.96f)).gameObject;
-            HsUi.Label(Root.transform, "ct", "ASH RING", 32, TextAnchor.UpperCenter, HsUi.Ember)
-                .GetComponent<RectTransform>().anchorMin = new Vector2(0, 0.92f);
+            HsUi.Band(Root.transform, "ct", "ASH RING", 28, TextAnchor.MiddleCenter, HsUi.Ember,
+                new Vector2(0.10f, 0.92f), new Vector2(0.90f, 0.99f));
 
             _oppHdr = HsUi.Label(HsUi.Panel(Root.transform, "oh", new Vector2(0.04f, 0.86f), new Vector2(0.96f, 0.92f), Color.clear),
                 "oh", "Opponent", 20, TextAnchor.MiddleLeft, HsUi.Cream);
