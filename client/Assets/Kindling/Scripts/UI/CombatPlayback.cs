@@ -365,6 +365,9 @@ namespace Kindling.Client
             else line = "Defeat  ·  Ring " + _cr.Damage;
             if (_matchOver) line += "\nMATCH OVER";
             _result.text = line;
+            if (_cr.Draw) BannerFx.Show("ActionText_Nice", 1.2f);
+            else if (_cr.WinnerSeat == _youSeat) BannerFx.Show(_matchOver ? "ActionText_Victory" : "ActionText_Win", 1.4f);
+            else BannerFx.Show(_matchOver ? "ActionText_Defeat" : "ActionText_Lose", 1.4f);
             if (_matchOver && !string.IsNullOrEmpty(_standings))
                 _ticker.text = _standings;
             else

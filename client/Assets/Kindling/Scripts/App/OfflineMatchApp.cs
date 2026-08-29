@@ -44,6 +44,9 @@ namespace Kindling.Client
         Transform _dragOriginParent;
         int _dragOriginSibling;
         Text _timerLabel;
+        Image _wickFill;
+        Image _emberFill;
+        Text _capRailName;
         Button _edictBtn;
         GameObject _glimpsePanel;
         readonly List<CardView> _glimpseCards = new List<CardView>();
@@ -199,8 +202,15 @@ namespace Kindling.Client
                 _handCards.Add(cv);
             }
 
-            // Leaderboard
-            var lb = HsUi.Panel(canvas.transform, "lb", new Vector2(0.735f, 0.38f), new Vector2(0.99f, 0.93f), HsUi.Wood);
+            var capRail = HsUi.Panel(canvas, "capRail", new Vector2(0.735f, 0.62f), new Vector2(0.99f, 0.93f), HsUi.Wood);
+            var portrait = HsUi.Panel(capRail, "port", new Vector2(0.22f, 0.46f), new Vector2(0.78f, 0.92f), HsUi.Felt);
+            StoneTheme.Skin(portrait.GetComponent<Image>(), "ProfileFrame_137_Bg", false);
+            _capRailName = HsUi.Band(capRail, "cn", "", 14, TextAnchor.MiddleCenter, HsUi.Cream,
+                new Vector2(0.06f, 0.30f), new Vector2(0.94f, 0.45f));
+            _wickFill = MakeFillBar(capRail, "wick", new Vector2(0.08f, 0.16f), new Vector2(0.92f, 0.28f), "Slider_Basic01_Fill_Orange");
+            _emberFill = MakeFillBar(capRail, "ember", new Vector2(0.08f, 0.02f), new Vector2(0.92f, 0.14f), "Slider_Basic01_Fill_White");
+
+            var lb = HsUi.Panel(canvas, "lb", new Vector2(0.735f, 0.38f), new Vector2(0.99f, 0.61f), HsUi.Wood);
             HsUi.Band(lb, "lbt", "TABLE", 14, TextAnchor.MiddleCenter, HsUi.Gold,
                 new Vector2(0.06f, 0.88f), new Vector2(0.94f, 0.98f));
             _log = HsUi.Band(lb, "log", "", 13, TextAnchor.UpperLeft, HsUi.Cream,
@@ -225,6 +235,7 @@ namespace Kindling.Client
             var toastRt = HsUi.Panel(canvas.transform, "toast", new Vector2(0.25f, 0.48f), new Vector2(0.75f, 0.56f), new Color(0, 0, 0, 0.0f));
             toastRt.GetComponent<Image>().raycastTarget = false;
             _toastLabel = HsUi.Label(toastRt, "toast", "", 24, TextAnchor.MiddleCenter, HsUi.Selected);
+            BannerFx.Build(canvas);
 
             _recruitRoot = canvas.gameObject;
 
@@ -719,6 +730,7 @@ namespace Kindling.Client
             _netCombatSeq = 0;
             _netReadySent = false;
             if (_menuRoot != null) _menuRoot.SetActive(false);
+            BannerFx.Show("ActionText_Start", 1.1f);
         }
 
         void LeaveMatch()
@@ -818,6 +830,22 @@ namespace Kindling.Client
                 ArmTimer(Rules.RecruitSeconds(_loop.State.Round));
             }
             Refresh();
+        }
+
+        static Image MakeFillBar(Transform parent, string name, Vector2 min, Vector2 max, string fillSprite)
+        {
+            var bg = HsUi.Panel(parent, name, min, max, HsUi.Wood);
+            StoneTheme.Skin(bg.GetComponent<Image>(), "Slider_Basic01_Bg");
+            var fillRt = HsUi.Panel(bg, "fill", new Vector2(0.05f, 0.22f), new Vector2(0.95f, 0.78f), HsUi.Ember);
+            var img = fillRt.GetComponent<Image>();
+            if (!StoneTheme.Skin(img, fillSprite, false))
+                img.color = HsUi.Ember;
+            img.type = Image.Type.Filled;
+            img.fillMethod = Image.FillMethod.Horizontal;
+            img.fillOrigin = 0;
+            img.fillAmount = 1f;
+            img.raycastTarget = false;
+            return img;
         }
 
         void WireDrag(CardView cv, int index)
@@ -1079,8 +1107,10 @@ namespace Kindling.Client
                 _netReadySent = true;
                 Apply(new RecruitAction { Op = RecruitOp.Ready, Seat = p.Seat });
                 Toast("Ready");
+                BannerFx.Show("ActionText_Ready", 0.9f);
                 return;
             }
+            BannerFx.Show("ActionText_Ready", 0.8f);
             LockRecruit();
         }
 
@@ -1211,6 +1241,7 @@ namespace Kindling.Client
 
         void Update()
         {
+            BannerFx.Tick();
             if (_toastLabel != null && Time.unscaledTime > _toastUntil)
                 _toastLabel.text = "";
             if (_showingCombat && _playback != null)
@@ -1332,15 +1363,20 @@ namespace Kindling.Client
                 + "   D" + p.Depth
                 + (p.Hold ? "   HOLD" : "")
                 + (_edictTargeting ? "   EDICT" : "");
+            if (_wickFill != null)
+                _wickFill.fillAmount = Mathf.Clamp01(p.Wick / 30f);
+            if (_emberFill != null)
+                _emberFill.fillAmount = Mathf.Clamp01(p.Embers / 20f);
+            if (_capRailName != null)
+            {
+                string who = string.IsNullOrEmpty(user) ? "You" : user;
+                _capRailName.text = string.IsNullOrEmpty(capName) ? who : (capName + "\n" + who);
+            }
             if (_log != null && _log.transform.parent != null)
             {
                 var title = _log.transform.parent.Find("lbt");
                 var titleText = title != null ? title.GetComponent<Text>() : null;
-                if (titleText != null)
-                {
-                    string who = string.IsNullOrEmpty(user) ? "You" : user;
-                    titleText.text = string.IsNullOrEmpty(capName) ? who : (who + "  ·  " + capName);
-                }
+                if (titleText != null) titleText.text = "TABLE";
             }
 
             for (int i = 0; i < _stallCards.Count; i++)
