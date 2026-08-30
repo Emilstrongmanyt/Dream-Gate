@@ -233,30 +233,37 @@ namespace Kindling.Client
                 case CombatOp.Attack:
                     _ticker.text = NameOf(e.CatalogId) + " strikes";
                     Touch(e.SrcInstance, u => { if (e.Atk > 0) u.Atk = e.Atk; });
+                    Burst("slash", e.SrcInstance);
                     break;
                 case CombatOp.Damage:
                     _ticker.text = NameOf(e.CatalogId) + "  −" + e.Amount;
                     Touch(e.DstInstance, u => u.Hp = e.HpAfter);
+                    Burst("hit", e.DstInstance);
                     break;
                 case CombatOp.Venom:
                     _ticker.text = "Venom";
                     Touch(e.DstInstance, u => u.Hp = 0);
+                    Burst("venom", e.DstInstance);
                     break;
                 case CombatOp.AegisBreak:
                     _ticker.text = "Aegis breaks";
                     Touch(e.DstInstance, u => u.RemoveKeyword(Keyword.Aegis));
+                    Burst("spark", e.DstInstance);
                     break;
                 case CombatOp.Death:
                     _ticker.text = NameOf(e.CatalogId) + " falls";
+                    Burst("poof", e.SrcInstance);
                     Remove(e.SrcInstance);
                     break;
                 case CombatOp.Summon:
                     _ticker.text = NameOf(e.CatalogId) + " arrives";
                     Insert(e.SrcSeat, e.SrcSlot, PieceFrom(e));
+                    Burst("smoke", e.SrcInstance);
                     break;
                 case CombatOp.Afterglow:
                     _ticker.text = NameOf(e.CatalogId) + " Afterglow";
                     Insert(e.SrcSeat, e.SrcSlot, PieceFrom(e));
+                    Burst("fire", e.SrcInstance);
                     break;
                 case CombatOp.Echo:
                     _ticker.text = NameOf(e.CatalogId) + " Echo";
@@ -264,6 +271,7 @@ namespace Kindling.Client
                 case CombatOp.Kindle:
                 case CombatOp.KindleStart:
                     _ticker.text = e.Op == CombatOp.KindleStart ? "Kindle" : (NameOf(e.CatalogId) + " Kindles");
+                    Burst("fire", e.SrcInstance);
                     break;
                 case CombatOp.CombatEnd:
                     ShowOutcome();
@@ -387,6 +395,29 @@ namespace Kindling.Client
                 case CombatOp.KindleStart: return 0.35f;
                 default: return 0.28f;
             }
+        }
+
+        void Burst(string key, ulong instanceId)
+        {
+            var rt = RectOf(instanceId);
+            if (rt != null) VfxPlayer.Play(key, rt);
+            else VfxPlayer.Play(key, Root != null ? Root.transform.position : Vector3.zero, 0.7f);
+        }
+
+        RectTransform RectOf(ulong instanceId)
+        {
+            if (instanceId == 0) return null;
+            for (int i = 0; i < _youCards.Count; i++)
+            {
+                if (_youCards[i] != null && _youCards[i].Unit != null && _youCards[i].Unit.InstanceId == instanceId)
+                    return _youCards[i].GetComponent<RectTransform>();
+            }
+            for (int i = 0; i < _oppCards.Count; i++)
+            {
+                if (_oppCards[i] != null && _oppCards[i].Unit != null && _oppCards[i].Unit.InstanceId == instanceId)
+                    return _oppCards[i].GetComponent<RectTransform>();
+            }
+            return null;
         }
 
         void Paint()

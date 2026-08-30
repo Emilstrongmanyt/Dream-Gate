@@ -78,6 +78,21 @@ namespace Kindling.EditorTools
             Debug.Log("Imported The Stone UI into " + dest);
         }
 
+        [MenuItem("Kindling/Import Cartoon FX")]
+        public static void ImportCartoonFx()
+        {
+            string pkg = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Unity", "Asset Store-5.x", "Jean Moreno", "Particle Systems", "Cartoon FX Remaster Free.unitypackage");
+            if (File.Exists(pkg))
+            {
+                AssetDatabase.ImportPackage(pkg, false);
+                Debug.Log("Imported " + pkg);
+            }
+            else
+                Debug.LogError("Cartoon FX Remaster Free not in Asset Store cache. Get it from Package Manager > My Assets (Jean Moreno).");
+        }
+
         static void CopyDir(string from, string to)
         {
             Directory.CreateDirectory(to);

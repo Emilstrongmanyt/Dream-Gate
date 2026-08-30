@@ -174,15 +174,29 @@ namespace Kindling.Client
         {
             var go = new GameObject(name);
             var canvas = go.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                var camGo = new GameObject("KindlingCam");
+                cam = camGo.AddComponent<Camera>();
+                Object.DontDestroyOnLoad(camGo);
+            }
+            cam.orthographic = true;
+            cam.orthographicSize = 5.4f;
+            cam.nearClipPlane = 0.3f;
+            cam.farClipPlane = 80f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = Felt;
+            cam.allowHDR = false;
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = cam;
+            canvas.planeDistance = 10f;
             canvas.sortingOrder = 10;
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
             go.AddComponent<GraphicRaycaster>();
-            var cam = Camera.main;
-            if (cam != null) cam.backgroundColor = Felt;
             return go;
         }
 

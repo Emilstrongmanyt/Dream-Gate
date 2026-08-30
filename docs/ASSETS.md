@@ -1,6 +1,6 @@
 # Kindling — asset board
 
-Catalog today: **16 Captains**, **48 Kindled**, **7 stall spells**, **7 tokens**, **5 Choruses**. UI chrome is Layer Lab The Stone (imported). Card shirts Lite is deferred. No audio yet.
+Catalog today: **16 Captains**, **48 Kindled**, **7 stall spells**, **7 tokens**, **5 Choruses**. UI chrome is Layer Lab The Stone. Combat/recruit VFX is Cartoon FX Remaster Free (Jean Moreno), already in the project. Card and Captain art is still pending. No audio yet.
 
 ## Do not buy yet
 
@@ -19,7 +19,9 @@ Generic RPG icon packs, lucky-box/gem/joystick chrome from Stone demos, extra ca
 
 ## Later
 
-Addressable remote catalog for art, VFX for Aegis/Venom/Afterglow, app icon refresh if Kindling replaces Dream Gate in the store listing.
+Addressable remote catalog for art, extra CFXR variants if the free set feels thin, app icon refresh if Kindling replaces Dream Gate in the store listing.
+
+Combat VFX mapping (Cartoon FX Remaster Free): death → Magic Poof, attack → sword slash, hit → red impact, spell → light hit, upgrade → magic aura, reroll/buy → flash, venom → poison cloud, Kindle/Afterglow → fire hit, sell → poof. Canvas is Screen Space Camera so particles can sit on cards.
 
 ## Rule
 

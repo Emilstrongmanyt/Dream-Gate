@@ -972,7 +972,7 @@ namespace Kindling.Client
         {
             var p = _loop.Human;
             if (p == null) return;
-            Apply(new RecruitAction
+            SimResult buy = Apply(new RecruitAction
             {
                 Op = RecruitOp.Buy,
                 Seat = p.Seat,
@@ -980,6 +980,8 @@ namespace Kindling.Client
                 Dest = DestLoc.Hand,
                 DestIndex = handIndex
             });
+            if (buy.Ok && stallIndex >= 0 && stallIndex < _stallCards.Count)
+                VfxPlayer.Play("flash", _stallCards[stallIndex].GetComponent<RectTransform>());
             _sel = SelKind.None;
         }
 
@@ -987,7 +989,10 @@ namespace Kindling.Client
         {
             var p = _loop.Human;
             if (p == null) return;
-            Apply(new RecruitAction
+            bool spell = p.Hand != null && handIndex >= 0 && handIndex < p.Hand.Count
+                && _cat.GetUnit(p.Hand[handIndex].CatalogId) != null
+                && _cat.GetUnit(p.Hand[handIndex].CatalogId).Spell;
+            SimResult play = Apply(new RecruitAction
             {
                 Op = RecruitOp.Play,
                 Seat = p.Seat,
@@ -995,6 +1000,13 @@ namespace Kindling.Client
                 DestIndex = boardIndex,
                 Dest = DestLoc.Board
             });
+            if (play.Ok)
+            {
+                RectTransform at = boardIndex >= 0 && boardIndex < _boardCards.Count
+                    ? _boardCards[boardIndex].GetComponent<RectTransform>()
+                    : (_handZone != null ? _handZone.GetComponent<RectTransform>() : null);
+                VfxPlayer.Play(spell ? "spark" : "smoke", at);
+            }
             _sel = SelKind.None;
         }
 
@@ -1012,7 +1024,9 @@ namespace Kindling.Client
         {
             var p = _loop.Human;
             if (p == null) return;
-            Apply(new RecruitAction { Op = RecruitOp.Sell, Seat = p.Seat, Loc = loc, Index = index });
+            SimResult sold = Apply(new RecruitAction { Op = RecruitOp.Sell, Seat = p.Seat, Loc = loc, Index = index });
+            if (sold.Ok && _stallZone != null)
+                VfxPlayer.Play("poof", _stallZone.GetComponent<RectTransform>());
             _sel = SelKind.None;
         }
 
@@ -1056,12 +1070,19 @@ namespace Kindling.Client
             var p = _loop.Human;
             if (p == null) return;
             _edictTargeting = false;
-            Apply(new RecruitAction
+            SimResult ed = Apply(new RecruitAction
             {
                 Op = RecruitOp.Edict,
                 Seat = p.Seat,
                 TargetIndex = targetIndex
             });
+            if (ed.Ok)
+            {
+                RectTransform at = targetIndex >= 0 && targetIndex < _boardCards.Count
+                    ? _boardCards[targetIndex].GetComponent<RectTransform>()
+                    : (_capRailName != null ? _capRailName.rectTransform : null);
+                VfxPlayer.Play("spark", at);
+            }
             Refresh();
         }
 
@@ -1069,7 +1090,9 @@ namespace Kindling.Client
         {
             var p = _loop.Human;
             if (p == null) return;
-            Apply(new RecruitAction { Op = RecruitOp.Reroll, Seat = p.Seat });
+            SimResult rr = Apply(new RecruitAction { Op = RecruitOp.Reroll, Seat = p.Seat });
+            if (rr.Ok && _stallZone != null)
+                VfxPlayer.Play("flash", _stallZone.GetComponent<RectTransform>());
             _sel = SelKind.None;
             Refresh();
         }
@@ -1086,7 +1109,9 @@ namespace Kindling.Client
         {
             var p = _loop.Human;
             if (p == null) return;
-            Apply(new RecruitAction { Op = RecruitOp.Upgrade, Seat = p.Seat });
+            SimResult up = Apply(new RecruitAction { Op = RecruitOp.Upgrade, Seat = p.Seat });
+            if (up.Ok && _stallZone != null)
+                VfxPlayer.Play("aura", _stallZone.GetComponent<RectTransform>());
             Refresh();
         }
 
@@ -1228,6 +1253,8 @@ namespace Kindling.Client
             {
                 _awakenSeen = _loop.State.AwakenEvents;
                 Toast("AWAKENED");
+                if (_boardZone != null)
+                    VfxPlayer.Play("flash", _boardZone.GetComponent<RectTransform>());
             }
             return r;
         }
