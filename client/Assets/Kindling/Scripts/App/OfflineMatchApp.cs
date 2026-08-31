@@ -29,6 +29,7 @@ namespace Kindling.Client
         readonly List<CardView> _offerCards = new List<CardView>();
         RectTransform _offerRow;
         Text _hud;
+        Text _depthChip;
         Text _log;
         Text _toastLabel;
         CombatPlayback _playback;
@@ -48,6 +49,8 @@ namespace Kindling.Client
         Image _emberFill;
         Text _capRailName;
         Button _edictBtn;
+        Button _upgradeBtn;
+        Button _rerollBtn;
         GameObject _glimpsePanel;
         readonly List<CardView> _glimpseCards = new List<CardView>();
         float _timerEnd;
@@ -140,9 +143,13 @@ namespace Kindling.Client
             var canvas = _safe;
 
             HsUi.Band(canvas, "t", "KINDLING", 22, TextAnchor.MiddleLeft, HsUi.Gold,
-                new Vector2(0.01f, 0.94f), new Vector2(0.20f, 0.995f));
+                new Vector2(0.01f, 0.94f), new Vector2(0.18f, 0.995f));
             _hud = HsUi.Band(canvas, "hud", "", 20, TextAnchor.MiddleCenter, HsUi.Cream,
-                new Vector2(0.21f, 0.94f), new Vector2(0.84f, 0.995f));
+                new Vector2(0.185f, 0.94f), new Vector2(0.66f, 0.995f));
+            var depthPanel = HsUi.Panel(canvas, "depth", new Vector2(0.67f, 0.94f), new Vector2(0.84f, 0.995f), HsUi.GoldDark);
+            StoneTheme.Skin(depthPanel.GetComponent<Image>(), StoneTheme.ButtonSprite(HsUi.Gold), true);
+            _depthChip = HsUi.Band(depthPanel, "d", "D1", 22, TextAnchor.MiddleCenter, HsUi.Gold,
+                new Vector2(0.04f, 0.08f), new Vector2(0.96f, 0.92f));
             HsUi.MakeButton(canvas, "leave", "MENU", new Vector2(0.86f, 0.94f), new Vector2(0.99f, 0.995f), HsUi.WickRed, LeaveMatch);
 
             var stallBar = HsUi.Panel(canvas, "stallBar", new Vector2(0.01f, 0.70f), new Vector2(0.73f, 0.93f), HsUi.Wood);
@@ -220,9 +227,9 @@ namespace Kindling.Client
 
             var act = HsUi.Panel(canvas.transform, "act", new Vector2(0.02f, 0.01f), new Vector2(0.72f, 0.15f), HsUi.Wood);
             _edictBtn = HsUi.MakeButton(act, "edict", "Edict", new Vector2(0.02f, 0.12f), new Vector2(0.22f, 0.88f), HsUi.ChorusColor(Chorus.Spirit), Edict);
-            HsUi.MakeButton(act, "reroll", "Reroll  1", new Vector2(0.24f, 0.12f), new Vector2(0.44f, 0.88f), HsUi.Ember, Reroll);
+            _rerollBtn = HsUi.MakeButton(act, "reroll", "Reroll  1", new Vector2(0.24f, 0.12f), new Vector2(0.44f, 0.88f), HsUi.Ember, Reroll);
             HsUi.MakeButton(act, "hold", "Hold", new Vector2(0.46f, 0.12f), new Vector2(0.66f, 0.88f), HsUi.ChorusColor(Chorus.Humanoid), Hold);
-            HsUi.MakeButton(act, "up", "Upgrade", new Vector2(0.68f, 0.12f), new Vector2(0.98f, 0.88f), HsUi.Gold, Upgrade);
+            _upgradeBtn = HsUi.MakeButton(act, "up", "Upgrade  D1", new Vector2(0.68f, 0.12f), new Vector2(0.98f, 0.88f), HsUi.Gold, Upgrade);
 
             HsUi.MakeButton(canvas.transform, "ready", "READY", new Vector2(0.735f, 0.01f), new Vector2(0.99f, 0.13f), new Color(0.15f, 0.45f, 0.18f), Ready);
             _timerLabel = HsUi.Band(HsUi.Panel(canvas, "timer", new Vector2(0.735f, 0.14f), new Vector2(0.99f, 0.20f), Color.clear),
@@ -832,6 +839,11 @@ namespace Kindling.Client
             Refresh();
         }
 
+        static RectTransform RtOf(Component c)
+        {
+            return c != null ? c.GetComponent<RectTransform>() : null;
+        }
+
         static Image MakeFillBar(Transform parent, string name, Vector2 min, Vector2 max, string fillSprite)
         {
             var bg = HsUi.Panel(parent, name, min, max, HsUi.Wood);
@@ -1002,9 +1014,11 @@ namespace Kindling.Client
             });
             if (play.Ok)
             {
-                RectTransform at = boardIndex >= 0 && boardIndex < _boardCards.Count
-                    ? _boardCards[boardIndex].GetComponent<RectTransform>()
-                    : (_handZone != null ? _handZone.GetComponent<RectTransform>() : null);
+                int slot = boardIndex;
+                if (slot < 0 && p.Board != null) slot = p.Board.Count - 1;
+                RectTransform at = slot >= 0 && slot < _boardCards.Count
+                    ? _boardCards[slot].GetComponent<RectTransform>()
+                    : null;
                 VfxPlayer.Play(spell ? "spark" : "smoke", at);
             }
             _sel = SelKind.None;
@@ -1024,9 +1038,14 @@ namespace Kindling.Client
         {
             var p = _loop.Human;
             if (p == null) return;
+            RectTransform at = null;
+            if (loc == DestLoc.Board && index >= 0 && index < _boardCards.Count)
+                at = _boardCards[index].GetComponent<RectTransform>();
+            else if (loc == DestLoc.Hand && index >= 0 && index < _handCards.Count)
+                at = _handCards[index].GetComponent<RectTransform>();
             SimResult sold = Apply(new RecruitAction { Op = RecruitOp.Sell, Seat = p.Seat, Loc = loc, Index = index });
-            if (sold.Ok && _stallZone != null)
-                VfxPlayer.Play("poof", _stallZone.GetComponent<RectTransform>());
+            if (sold.Ok)
+                VfxPlayer.Play("poof", at ?? RtOf(_stallZone));
             _sel = SelKind.None;
         }
 
@@ -1091,8 +1110,8 @@ namespace Kindling.Client
             var p = _loop.Human;
             if (p == null) return;
             SimResult rr = Apply(new RecruitAction { Op = RecruitOp.Reroll, Seat = p.Seat });
-            if (rr.Ok && _stallZone != null)
-                VfxPlayer.Play("flash", _stallZone.GetComponent<RectTransform>());
+            if (rr.Ok)
+                VfxPlayer.Play("flash", RtOf(_rerollBtn), 1.35f);
             _sel = SelKind.None;
             Refresh();
         }
@@ -1110,8 +1129,13 @@ namespace Kindling.Client
             var p = _loop.Human;
             if (p == null) return;
             SimResult up = Apply(new RecruitAction { Op = RecruitOp.Upgrade, Seat = p.Seat });
-            if (up.Ok && _stallZone != null)
-                VfxPlayer.Play("aura", _stallZone.GetComponent<RectTransform>());
+            if (up.Ok)
+            {
+                VfxPlayer.Play("flash", RtOf(_upgradeBtn), 1.7f);
+                VfxPlayer.Play("aura", RtOf(_upgradeBtn), 1.85f);
+                VfxPlayer.Play("flash", RtOf(_depthChip), 1.55f);
+                VfxPlayer.Play("aura", RtOf(_depthChip), 1.45f);
+            }
             Refresh();
         }
 
@@ -1253,8 +1277,20 @@ namespace Kindling.Client
             {
                 _awakenSeen = _loop.State.AwakenEvents;
                 Toast("AWAKENED");
-                if (_boardZone != null)
-                    VfxPlayer.Play("flash", _boardZone.GetComponent<RectTransform>());
+                bool any = false;
+                var board = _loop.Human != null ? _loop.Human.Board : null;
+                if (board != null)
+                {
+                    for (int i = 0; i < board.Count && i < _boardCards.Count; i++)
+                    {
+                        if (board[i] == null || !board[i].Awakened) continue;
+                        var rt = _boardCards[i].GetComponent<RectTransform>();
+                        VfxPlayer.Play("flash", rt, 1.3f);
+                        VfxPlayer.Play("fire", rt, 1.2f);
+                        any = true;
+                    }
+                }
+                if (!any) VfxPlayer.Play("flash", RtOf(_boardZone));
             }
             return r;
         }
@@ -1382,14 +1418,24 @@ namespace Kindling.Client
                         capText.text = "Edict";
                 }
             }
+            if (_upgradeBtn != null)
+            {
+                var upText = _upgradeBtn.GetComponentInChildren<Text>();
+                if (upText != null)
+                {
+                    if (p.Depth >= Rules.MaxDepth) upText.text = "MAX DEPTH";
+                    else upText.text = "Upgrade  D" + p.Depth;
+                }
+            }
             string user = string.IsNullOrEmpty(p.DisplayName) ? _displayName : p.DisplayName;
             string capName = p.Captain.IsEmpty ? "" : NameOfCaptain(p.Captain.Value);
             _hud.text = "R" + _loop.State.Round
                 + "   Wick " + p.Wick
                 + "   Embers " + p.Embers
-                + "   D" + p.Depth
                 + (p.Hold ? "   HOLD" : "")
                 + (_edictTargeting ? "   EDICT" : "");
+            if (_depthChip != null)
+                _depthChip.text = p.Depth >= Rules.MaxDepth ? "MAX" : ("D" + p.Depth);
             if (_wickFill != null)
                 _wickFill.fillAmount = Mathf.Clamp01(p.Wick / 30f);
             if (_emberFill != null)

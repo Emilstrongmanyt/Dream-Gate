@@ -21,7 +21,21 @@ Generic RPG icon packs, lucky-box/gem/joystick chrome from Stone demos, extra ca
 
 Addressable remote catalog for art, extra CFXR variants if the free set feels thin, app icon refresh if Kindling replaces Dream Gate in the store listing.
 
-Combat VFX mapping (Cartoon FX Remaster Free): death → Magic Poof, attack → sword slash, hit → red impact, spell → light hit, upgrade → magic aura, reroll/buy → flash, venom → poison cloud, Kindle/Afterglow → fire hit, sell → poof. Canvas is Screen Space Camera so particles can sit on cards.
+Combat VFX mapping (Cartoon FX Remaster Free), spawned on the control they belong to and scaled to that rect (native CFXR sizes vary ~0.5–8, so we do not use a shared 0.45 scale):
+
+| Beat | Prefab key | Lands on |
+|---|---|---|
+| Market Depth upgrade | flash + aura | Upgrade button **and** the top Depth chip (`D#`) |
+| Reroll | flash | Reroll button |
+| Buy | flash | Stall card |
+| Play Kindled / spell | smoke / spark | Destination warband card |
+| Sell | poof | The card being sold |
+| Awaken | flash + fire | The awakened warband card |
+| Edict | spark | Target card, or captain rail if untargeted |
+| Attack / hit / death | slash / hit / poof | Combat card |
+| Venom / Kindle / Afterglow / summon | venom / fire / smoke | Combat card |
+
+Magic Aura and Poison Cloud are ground-plane (XZ) prefabs; VfxPlayer tilts them into the canvas so the UI camera does not see an edge-on sliver. Canvas is Screen Space Camera so particles can sit on cards.
 
 ## Rule
 

@@ -401,7 +401,6 @@ namespace Kindling.Client
         {
             var rt = RectOf(instanceId);
             if (rt != null) VfxPlayer.Play(key, rt);
-            else VfxPlayer.Play(key, Root != null ? Root.transform.position : Vector3.zero, 0.7f);
         }
 
         RectTransform RectOf(ulong instanceId)
