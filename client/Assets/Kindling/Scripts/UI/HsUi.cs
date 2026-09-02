@@ -170,6 +170,19 @@ namespace Kindling.Client
             return Font;
         }
 
+        public static bool ApplyBackdrop(Image img, string resource, bool keepRaycast)
+        {
+            if (img == null || string.IsNullOrEmpty(resource)) return false;
+            Sprite s = Resources.Load<Sprite>("Bg/" + resource);
+            if (s == null) return false;
+            img.sprite = s;
+            img.color = Color.white;
+            img.type = Image.Type.Simple;
+            img.preserveAspect = false;
+            img.raycastTarget = keepRaycast;
+            return true;
+        }
+
         public static GameObject Canvas(string name)
         {
             var go = new GameObject(name);

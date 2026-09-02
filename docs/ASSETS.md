@@ -1,10 +1,10 @@
 # Kindling — asset board
 
-Catalog today: **16 Captains**, **48 Kindled**, **7 stall spells**, **7 tokens**, **5 Choruses**. UI chrome is Layer Lab The Stone. Combat/recruit VFX is Cartoon FX Remaster Free (Jean Moreno), already in the project. Card and Captain art is still pending. No audio yet.
+Catalog today: **16 Captains**, **48 Kindled**, **7 stall spells**, **7 tokens**, **5 Choruses**. UI chrome is Layer Lab The Stone. Combat/recruit VFX is Cartoon FX Remaster Free (Jean Moreno). Menu and table backdrops are original dusk-market paintings in `Resources/Bg` (`menu`, `board`). Card and Captain art is still pending. No audio yet.
 
 ## Do not buy yet
 
-Generic RPG icon packs, lucky-box/gem/joystick chrome from Stone demos, extra card-back packs, competitor lookalikes. They fight the dusk-market identity and do not make 7-wide cards readable.
+Generic RPG icon packs, lucky-box/gem/joystick chrome from Stone demos, extra card-back packs, competitor lookalikes, 3D dining-table furniture, and tavern/inn environment kits. They fight the dusk-market identity and do not make 7-wide cards readable. Menu and board backdrops are original; do not replace them with a store tavern.
 
 ## Need next (in this order)
 

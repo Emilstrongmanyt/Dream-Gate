@@ -44,6 +44,8 @@ namespace Kindling.Client
         CardDrag _activeDrag;
         Transform _dragOriginParent;
         int _dragOriginSibling;
+        Vector3 _dragOriginScale;
+        Vector2 _dragOriginSize;
         Text _timerLabel;
         Image _wickFill;
         Image _emberFill;
@@ -138,7 +140,8 @@ namespace Kindling.Client
         {
             var canvasGo = HsUi.Canvas("KindlingCanvas");
             _canvas = canvasGo.GetComponent<Canvas>();
-            HsUi.Panel(_canvas.transform, "felt", Vector2.zero, Vector2.one, HsUi.Felt);
+            var felt = HsUi.Panel(_canvas.transform, "felt", Vector2.zero, Vector2.one, HsUi.Felt);
+            HsUi.ApplyBackdrop(felt.GetComponent<Image>(), "board", false);
             _safe = HsUi.SafeRoot(_canvas.transform);
             var canvas = _safe;
 
@@ -152,7 +155,7 @@ namespace Kindling.Client
                 new Vector2(0.04f, 0.08f), new Vector2(0.96f, 0.92f));
             HsUi.MakeButton(canvas, "leave", "MENU", new Vector2(0.86f, 0.94f), new Vector2(0.99f, 0.995f), HsUi.WickRed, LeaveMatch);
 
-            var stallBar = HsUi.Panel(canvas, "stallBar", new Vector2(0.01f, 0.70f), new Vector2(0.73f, 0.93f), HsUi.Wood);
+            var stallBar = HsUi.Panel(canvas, "stallBar", new Vector2(0.01f, 0.70f), new Vector2(0.73f, 0.93f), new Color(HsUi.Wood.r, HsUi.Wood.g, HsUi.Wood.b, 0.78f));
             HsUi.Band(stallBar, "sl", "STALL", 14, TextAnchor.MiddleLeft, HsUi.Gold,
                 new Vector2(0.02f, 0.86f), new Vector2(0.40f, 0.98f));
             _stallZone = stallBar.gameObject.AddComponent<DropZone>();
@@ -172,7 +175,7 @@ namespace Kindling.Client
             }
 
             // Board
-            var boardBar = HsUi.Panel(canvas.transform, "boardBar", new Vector2(0.02f, 0.38f), new Vector2(0.72f, 0.69f), new Color(0.12f, 0.08f, 0.05f, 1));
+            var boardBar = HsUi.Panel(canvas.transform, "boardBar", new Vector2(0.02f, 0.38f), new Vector2(0.72f, 0.69f), new Color(0.12f, 0.08f, 0.05f, 0.55f));
             HsUi.Band(boardBar, "bl", "WARBAND", 14, TextAnchor.MiddleLeft, HsUi.Gold,
                 new Vector2(0.02f, 0.86f), new Vector2(0.50f, 0.98f));
             _boardZone = boardBar.gameObject.AddComponent<DropZone>();
@@ -191,7 +194,7 @@ namespace Kindling.Client
             }
 
             // Hand
-            var handBar = HsUi.Panel(canvas.transform, "handBar", new Vector2(0.02f, 0.14f), new Vector2(0.72f, 0.37f), HsUi.Wood);
+            var handBar = HsUi.Panel(canvas.transform, "handBar", new Vector2(0.02f, 0.14f), new Vector2(0.72f, 0.37f), new Color(HsUi.Wood.r, HsUi.Wood.g, HsUi.Wood.b, 0.78f));
             HsUi.Band(handBar, "hl", "HAND", 14, TextAnchor.MiddleLeft, HsUi.Gold,
                 new Vector2(0.02f, 0.86f), new Vector2(0.40f, 0.98f));
             _handZone = handBar.gameObject.AddComponent<DropZone>();
@@ -352,6 +355,10 @@ namespace Kindling.Client
         {
             Transform root = _safe != null ? _safe : _canvas.transform;
             _menuRoot = HsUi.Panel(root, "menu", Vector2.zero, Vector2.one, new Color(0.08f, 0.04f, 0.02f, 0.98f)).gameObject;
+            HsUi.ApplyBackdrop(_menuRoot.GetComponent<Image>(), "menu", true);
+            var veil = HsUi.Panel(_menuRoot.transform, "veil", Vector2.zero, Vector2.one, new Color(0.04f, 0.02f, 0.01f, 0.42f));
+            var veilImg = veil.GetComponent<Image>();
+            veilImg.raycastTarget = false;
             HsUi.Band(_menuRoot.transform, "mt", "KINDLING", 48, TextAnchor.MiddleCenter, HsUi.Gold,
                 new Vector2(0.18f, 0.86f), new Vector2(0.82f, 0.97f));
             HsUi.Band(_menuRoot.transform, "ms", "The Ember Exchange", 22, TextAnchor.MiddleCenter, HsUi.Cream,
@@ -875,17 +882,38 @@ namespace Kindling.Client
             _activeDrag = drag;
             _dragOriginParent = drag.transform.parent;
             _dragOriginSibling = drag.transform.GetSiblingIndex();
+            var rt = drag.GetComponent<RectTransform>();
+            _dragOriginScale = rt.localScale;
+            _dragOriginSize = rt.rect.size;
+            var le = drag.GetComponent<LayoutElement>();
+            if (le != null) le.ignoreLayout = true;
             drag.transform.SetParent(_canvas.transform, true);
             drag.transform.SetAsLastSibling();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = _dragOriginSize;
+            rt.localScale = _dragOriginScale * 1.08f;
+            FollowPointer(rt, ev);
         }
 
         void OnCardDragMoved(CardDrag drag, PointerEventData ev)
         {
-            drag.transform.position = ev.position;
+            if (_activeDrag != drag) return;
+            FollowPointer(drag.GetComponent<RectTransform>(), ev);
             DropZone z = CardDrag.HitZone(ev);
             if (_handZone != null) _handZone.SetHot(z == _handZone);
             if (_boardZone != null) _boardZone.SetHot(z == _boardZone);
             if (_stallZone != null) _stallZone.SetHot(z == _stallZone);
+        }
+
+        void FollowPointer(RectTransform rt, PointerEventData ev)
+        {
+            if (rt == null || _canvas == null) return;
+            Camera cam = _canvas.worldCamera != null ? _canvas.worldCamera : Camera.main;
+            Vector3 world;
+            if (RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    _canvas.transform as RectTransform, ev.position, cam, out world))
+                rt.position = world;
         }
 
         void OnCardDragEnded(CardDrag drag, PointerEventData ev)
@@ -937,6 +965,12 @@ namespace Kindling.Client
                 }
             }
 
+            if (drag != null)
+            {
+                var le = drag.GetComponent<LayoutElement>();
+                if (le != null) le.ignoreLayout = false;
+                drag.transform.localScale = _dragOriginScale.sqrMagnitude > 0.0001f ? _dragOriginScale : Vector3.one;
+            }
             if (_dragOriginParent != null)
             {
                 drag.transform.SetParent(_dragOriginParent, false);
