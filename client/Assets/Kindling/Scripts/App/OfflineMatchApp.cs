@@ -880,7 +880,7 @@ namespace Kindling.Client
             return c != null ? c.GetComponent<RectTransform>() : null;
         }
 
-        static Image MakeFillBar(Transform parent, string name, Vector2 min, Vector2 max, string fillSprite)
+        Image MakeFillBar(Transform parent, string name, Vector2 min, Vector2 max, string fillSprite)
         {
             var bg = HsUi.Panel(parent, name, min, max, HsUi.Wood);
             StoneTheme.Skin(bg.GetComponent<Image>(), "Slider_Basic01_Bg");
