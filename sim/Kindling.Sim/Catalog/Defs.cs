@@ -82,6 +82,7 @@ namespace Kindling.Sim.Catalog
         public List<EffectDef> AwakenedEffects;
         public bool Token;
         public bool Spell;
+        public string Text = "";
         public bool EchoOnSell;
         public bool AfterglowKeepsKeywords;
         public LatchHost LatchHost = LatchHost.Humanoid;

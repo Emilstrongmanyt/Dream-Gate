@@ -27,7 +27,8 @@ namespace Kindling.Client
         int _youSeat;
         int _index;
         float _nextAt;
-        float _speed = 2f;
+        float _speed = 1f;
+        float _pace = 1f;
         float _capAt;
         ulong _pulseA;
         ulong _pulseB;
@@ -89,8 +90,9 @@ namespace Kindling.Client
             _matchOver = matchOver;
             _standings = standings ?? "";
             _index = 0;
-            _speed = 2f;
-            if (_speedCap != null) _speedCap.text = "2×";
+            _speed = 1f;
+            _pace = FitPace(cr);
+            if (_speedCap != null) _speedCap.text = "1×";
             _pulseA = 0;
             _pulseB = 0;
             Done = false;
@@ -205,7 +207,7 @@ namespace Kindling.Client
             }
             StepEvent(e);
             Paint();
-            float d = Delay(e.Op) / _speed;
+            float d = Delay(e.Op) / (_speed * _pace);
             _nextAt = Time.unscaledTime + d;
             if (_index >= _cr.Events.Count)
                 ShowOutcome();
@@ -381,6 +383,23 @@ namespace Kindling.Client
             else
                 _ticker.text = line;
             MarkDone();
+        }
+
+        static float FitPace(CombatResult cr)
+        {
+            if (cr == null || cr.Events == null || cr.Events.Count == 0) return 1f;
+            float sum = 0f;
+            for (int i = 0; i < cr.Events.Count; i++)
+            {
+                CombatOp op = cr.Events[i].Op;
+                if (op == CombatOp.AuraRefresh || op == CombatOp.GlimpseEmpty || op == CombatOp.HandFull)
+                    continue;
+                sum += Delay(op);
+            }
+            float budget = Rules.CombatPlaybackCapSeconds - 0.8f;
+            if (budget < 4f) budget = 4f;
+            if (sum <= budget) return 1f;
+            return sum / budget;
         }
 
         static float Delay(CombatOp op)

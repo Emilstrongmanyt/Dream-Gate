@@ -165,6 +165,7 @@ namespace Kindling.Sim.Catalog
                 Hp = n.GetInt("hp"),
                 Token = n.GetBool("token"),
                 Spell = n.GetBool("spell"),
+                Text = n.GetString("text"),
                 EchoOnSell = n.GetBool("echoOnSell"),
                 AfterglowKeepsKeywords = n.GetBool("afterglowKeepsKeywords"),
                 LatchTransferEffects = true,

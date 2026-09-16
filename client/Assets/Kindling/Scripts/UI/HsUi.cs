@@ -367,41 +367,16 @@ namespace Kindling.Client
                 int hp = live != null ? live.Hp : def.Hp;
                 sb.Append(atk).Append(" / ").Append(hp).AppendLine();
             }
-            string kw = Keywords(live != null ? live.Keywords : def.Keywords, live != null && live.Awakened);
-            if (kw.Length > 0) sb.AppendLine(kw);
-            sb.Append(MechanicalLine(def));
+            string face = RulesText.Face(def, live);
+            if (face.Length > 0) sb.AppendLine(face);
+            string body = RulesText.Body(def);
+            if (body.Length > 0) sb.Append(body);
             return sb.ToString();
         }
 
         public static string MechanicalLine(UnitDef def)
         {
-            if (def == null) return "";
-            if (def.Spell) return TriggersOf(def);
-            string t = TriggersOf(def);
-            if (t.Length == 0) return "Text comes later.";
-            return t;
-        }
-
-        static string TriggersOf(UnitDef def)
-        {
-            if (def.Effects == null || def.Effects.Count == 0) return "";
-            var seen = new System.Collections.Generic.List<string>();
-            for (int i = 0; i < def.Effects.Count; i++)
-            {
-                string n = def.Effects[i].Trigger.ToString();
-                bool hit = false;
-                for (int s = 0; s < seen.Count; s++)
-                    if (seen[s] == n) { hit = true; break; }
-                if (!hit) seen.Add(n);
-            }
-            if (seen.Count == 0) return "";
-            var sb = new System.Text.StringBuilder();
-            for (int i = 0; i < seen.Count; i++)
-            {
-                if (i > 0) sb.Append(" · ");
-                sb.Append(seen[i]);
-            }
-            return sb.ToString();
+            return RulesText.Body(def);
         }
 
         public static string ChorusTags(PlayerState p, Catalog cat)

@@ -28,6 +28,7 @@ namespace Kindling.Sim.Model
         public int TokenSpawned;
         public int TokenDestroyed;
         public bool MatchOver;
+        public bool Ranked;
         public List<string> Logs = new List<string>();
         public int DrainReentryAttempts;
         public UnitInstance BoughtUnit;

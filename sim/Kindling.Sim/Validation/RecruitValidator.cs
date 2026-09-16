@@ -25,10 +25,10 @@ namespace Kindling.Sim.Validation
                 case RecruitOp.Buy: r = Buy(m, p, a, cat); break;
                 case RecruitOp.Sell: r = Sell(m, p, a, cat); break;
                 case RecruitOp.Reroll: r = Reroll(m, p, a, cat); break;
-                case RecruitOp.Hold: r = Hold(p, a); break;
+                case RecruitOp.Hold: r = Hold(m, p, a); break;
                 case RecruitOp.Upgrade: r = Upgrade(m, p, a, cat); break;
                 case RecruitOp.Play: r = Play(m, p, a, cat); break;
-                case RecruitOp.Reorder: r = Reorder(p, a); break;
+                case RecruitOp.Reorder: r = Reorder(m, p, a); break;
                 case RecruitOp.Latch: r = Latch(m, p, a, cat); break;
                 case RecruitOp.Edict: r = Edict(m, p, a, cat); break;
                 case RecruitOp.GlimpsePick: r = GlimpsePick(m, p, a, cat); break;
@@ -144,8 +144,10 @@ namespace Kindling.Sim.Validation
             return SimResult.Success();
         }
 
-        static SimResult Hold(PlayerState p, RecruitAction a)
+        static SimResult Hold(MatchState m, PlayerState p, RecruitAction a)
         {
+            SimResult phase = RequireRecruit(m);
+            if (!phase.Ok) return phase;
             p.Hold = a.Held;
             return SimResult.Success();
         }
@@ -188,8 +190,10 @@ namespace Kindling.Sim.Validation
             return SimResult.Success();
         }
 
-        static SimResult Reorder(PlayerState p, RecruitAction a)
+        static SimResult Reorder(MatchState m, PlayerState p, RecruitAction a)
         {
+            SimResult phase = RequireRecruit(m);
+            if (!phase.Ok) return phase;
             if (a.BoardPerm == null) return SimResult.Fail("BAD_PERM");
             if (a.BoardPerm.Length != p.Board.Count) return SimResult.Fail("BAD_PERM");
             var seen = new bool[p.Board.Count];

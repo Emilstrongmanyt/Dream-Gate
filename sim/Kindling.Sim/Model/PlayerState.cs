@@ -34,6 +34,7 @@ namespace Kindling.Sim.Model
         public List<UnitInstance> LastLockedBoard = new List<UnitInstance>();
         public int LastLockedBoardSum;
         public int DepthAtDeath;
+        public int DeathRound;
         public int PlayerSeq;
         public List<string> Logs = new List<string>();
         public int GhostRingDepth;

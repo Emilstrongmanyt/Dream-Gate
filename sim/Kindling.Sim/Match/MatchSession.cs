@@ -165,7 +165,8 @@ namespace Kindling.Sim.Match
         public void Finish()
         {
             if (!Loop.State.MatchOver) return;
-            Glicko2.ApplyPlaces(Loop.State.Seats);
+            if (Loop.State.Ranked)
+                Glicko2.ApplyPlaces(Loop.State.Seats);
             Telemetry.MatchFinished++;
             Telemetry.MatchActive = Telemetry.MatchActive > 0 ? Telemetry.MatchActive - 1 : 0;
         }

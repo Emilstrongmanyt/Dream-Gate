@@ -90,7 +90,7 @@ namespace Kindling.Client
             Keys.fontSize = 11;
             Keys.horizontalOverflow = HorizontalWrapMode.Wrap;
             Keys.verticalOverflow = VerticalWrapMode.Truncate;
-            Keys.text = spell ? "Play to cast" : HsUi.Keywords(u.Keywords, u.Awakened);
+            Keys.text = RulesText.Face(def, u);
             var kRt = Keys.GetComponent<RectTransform>();
             kRt.anchorMin = new Vector2(0.05f, 0.22f);
             kRt.anchorMax = new Vector2(0.95f, 0.34f);
@@ -155,7 +155,7 @@ namespace Kindling.Client
             Border.preserveAspect = true;
             Art.color = HsUi.ChorusColor(def.Chorus);
             Stats.text = def.Spell ? "Spell" : (def.Atk + " / " + def.Hp);
-            Keys.text = def.Spell ? "Play to cast" : HsUi.Keywords(def.Keywords, false);
+            Keys.text = RulesText.Face(def, null);
             DepthLabel.text = def.Chorus + " D" + def.Depth;
             Border.color = def.Spell ? HsUi.ChorusColor(Chorus.Spirit) : HsUi.Gold;
             PaintPattern(def, def.Spell);

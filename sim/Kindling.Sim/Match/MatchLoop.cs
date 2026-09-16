@@ -369,7 +369,7 @@ namespace Kindling.Sim.Match
             return ghost;
         }
 
-        PlayerState FindGhostSource()
+        public PlayerState FindGhostSource()
         {
             int bestRound = -1;
             int bestPlace = -1;
@@ -379,11 +379,7 @@ namespace Kindling.Sim.Match
             {
                 PlayerState p = State.Seats[i];
                 if (p.Alive || !p.Place.HasValue) continue;
-                int rnd = 0;
-                for (int e = 0; e < State.EliminationOrder.Count; e++)
-                {
-                    if (State.EliminationOrder[e] == i) { rnd = e; break; }
-                }
+                int rnd = p.DeathRound;
                 int place = p.Place.Value;
                 bool better = false;
                 if (best == null) better = true;
@@ -440,6 +436,7 @@ namespace Kindling.Sim.Match
                 if (!p.Place.HasValue && p.Wick <= 0)
                 {
                     p.DepthAtDeath = p.Depth;
+                    p.DeathRound = State.Round;
                     newly.Add(p);
                 }
             }

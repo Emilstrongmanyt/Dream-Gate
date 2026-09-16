@@ -9,6 +9,7 @@ using Kindling.Sim;
 using Kindling.Sim.Catalog;
 using Kindling.Sim.Match;
 using Kindling.Sim.Model;
+using Kindling.Sim.Recruit;
 
 namespace Kindling.Client
 {
@@ -53,6 +54,9 @@ namespace Kindling.Client
         Button _edictBtn;
         Button _upgradeBtn;
         Button _rerollBtn;
+        Button _holdBtn;
+        Text _wickNum;
+        Text _emberNum;
         GameObject _glimpsePanel;
         readonly List<CardView> _glimpseCards = new List<CardView>();
         float _timerEnd;
@@ -231,8 +235,8 @@ namespace Kindling.Client
             var act = HsUi.Panel(canvas.transform, "act", new Vector2(0.02f, 0.01f), new Vector2(0.72f, 0.15f), HsUi.Wood);
             _edictBtn = HsUi.MakeButton(act, "edict", "Edict", new Vector2(0.02f, 0.12f), new Vector2(0.22f, 0.88f), HsUi.ChorusColor(Chorus.Spirit), Edict);
             _rerollBtn = HsUi.MakeButton(act, "reroll", "Reroll  1", new Vector2(0.24f, 0.12f), new Vector2(0.44f, 0.88f), HsUi.Ember, Reroll);
-            HsUi.MakeButton(act, "hold", "Hold", new Vector2(0.46f, 0.12f), new Vector2(0.66f, 0.88f), HsUi.ChorusColor(Chorus.Humanoid), Hold);
-            _upgradeBtn = HsUi.MakeButton(act, "up", "Upgrade  D1", new Vector2(0.68f, 0.12f), new Vector2(0.98f, 0.88f), HsUi.Gold, Upgrade);
+            _holdBtn = HsUi.MakeButton(act, "hold", "Hold", new Vector2(0.46f, 0.12f), new Vector2(0.66f, 0.88f), HsUi.ChorusColor(Chorus.Humanoid), Hold);
+            _upgradeBtn = HsUi.MakeButton(act, "up", "Upgrade  5", new Vector2(0.68f, 0.12f), new Vector2(0.98f, 0.88f), HsUi.Gold, Upgrade);
 
             HsUi.MakeButton(canvas.transform, "ready", "READY", new Vector2(0.735f, 0.01f), new Vector2(0.99f, 0.13f), new Color(0.15f, 0.45f, 0.18f), Ready);
             _timerLabel = HsUi.Band(HsUi.Panel(canvas, "timer", new Vector2(0.735f, 0.14f), new Vector2(0.99f, 0.20f), Color.clear),
@@ -290,7 +294,7 @@ namespace Kindling.Client
                 new Vector2(0.10f, 0.08f), new Vector2(0.90f, 0.18f));
             _glimpsePanel.SetActive(false);
 
-            _helpPanel = HsUi.Panel(canvas, "help", new Vector2(0.18f, 0.38f), new Vector2(0.82f, 0.64f), new Color(0.08f, 0.05f, 0.02f, 0.94f)).gameObject;
+            _helpPanel = HsUi.Panel(canvas, "help", new Vector2(0.735f, 0.38f), new Vector2(0.99f, 0.61f), new Color(0.08f, 0.05f, 0.02f, 0.94f)).gameObject;
             _helpText = HsUi.Band(_helpPanel.transform, "ht", "", 18, TextAnchor.UpperLeft, HsUi.Cream,
                 new Vector2(0.06f, 0.30f), new Vector2(0.94f, 0.94f));
             HsUi.MakeButton(_helpPanel.transform, "next", "GOT IT", new Vector2(0.55f, 0.06f), new Vector2(0.96f, 0.26f), HsUi.GoldDark, AdvanceHelp);
@@ -799,6 +803,31 @@ namespace Kindling.Client
                 FireEdict(index);
                 return;
             }
+            if (_sel == kind && _selIndex == index)
+            {
+                _sel = SelKind.None;
+                Refresh();
+                return;
+            }
+            if (_sel == SelKind.Stall && (kind == SelKind.Hand || kind == SelKind.Board))
+            {
+                int dest = kind == SelKind.Hand ? index : (_loop.Human != null ? _loop.Human.Hand.Count : 0);
+                BuyStallToHand(_selIndex, dest);
+                Refresh();
+                return;
+            }
+            if (_sel == SelKind.Hand && kind == SelKind.Board)
+            {
+                PlayHandToBoard(_selIndex, index);
+                Refresh();
+                return;
+            }
+            if ((_sel == SelKind.Board || _sel == SelKind.Hand) && kind == SelKind.Stall)
+            {
+                SellFrom(_sel == SelKind.Board ? DestLoc.Board : DestLoc.Hand, _selIndex);
+                Refresh();
+                return;
+            }
             if (_sel == SelKind.Board && kind == SelKind.Board && _selIndex != index)
             {
                 TryReorder(_selIndex, index);
@@ -864,6 +893,10 @@ namespace Kindling.Client
             img.fillOrigin = 0;
             img.fillAmount = 1f;
             img.raycastTarget = false;
+            var num = HsUi.Band(bg, "n", "", 12, TextAnchor.MiddleCenter, HsUi.Cream, Vector2.zero, Vector2.one);
+            num.raycastTarget = false;
+            if (name == "wick") _wickNum = num;
+            else if (name == "ember") _emberNum = num;
             return img;
         }
 
@@ -1437,6 +1470,8 @@ namespace Kindling.Client
                      && !_showingCombat && !picking)
             {
                 _helpPanel.SetActive(true);
+                if (_log != null && _log.transform.parent != null)
+                    _helpPanel.transform.SetSiblingIndex(_log.transform.parent.GetSiblingIndex() + 1);
             }
 
             if (p == null) return;
@@ -1444,13 +1479,19 @@ namespace Kindling.Client
             if (_edictBtn != null)
             {
                 var capText = _edictBtn.GetComponentInChildren<Text>();
+                bool used = p.Edict != null && p.Edict.UsedThisRecruit && (p.Edict.Repeatable == false);
                 if (capText != null)
                 {
-                    if (cap != null && cap.HasEdict)
-                        capText.text = _edictTargeting ? "Edict…" : ("Edict  " + cap.EdictCost);
-                    else
+                    if (cap == null || !cap.HasEdict)
                         capText.text = "Edict";
+                    else if (_edictTargeting)
+                        capText.text = "Edict…";
+                    else if (used)
+                        capText.text = "Edict  used";
+                    else
+                        capText.text = "Edict  " + cap.EdictCost;
                 }
+                _edictBtn.interactable = cap != null && cap.HasEdict && !used;
             }
             if (_upgradeBtn != null)
             {
@@ -1458,8 +1499,21 @@ namespace Kindling.Client
                 if (upText != null)
                 {
                     if (p.Depth >= Rules.MaxDepth) upText.text = "MAX DEPTH";
-                    else upText.text = "Upgrade  D" + p.Depth;
+                    else upText.text = "Upgrade  " + p.UpgradeCost;
                 }
+                _upgradeBtn.interactable = p.Depth < Rules.MaxDepth && p.Embers >= p.UpgradeCost;
+            }
+            if (_rerollBtn != null)
+            {
+                var rrText = _rerollBtn.GetComponentInChildren<Text>();
+                int rr = Grant.RerollCostNow(p);
+                if (rrText != null) rrText.text = "Reroll  " + rr;
+                _rerollBtn.interactable = p.Embers >= rr;
+            }
+            if (_holdBtn != null)
+            {
+                var hText = _holdBtn.GetComponentInChildren<Text>();
+                if (hText != null) hText.text = p.Hold ? "HOLD ON" : "Hold";
             }
             string user = string.IsNullOrEmpty(p.DisplayName) ? _displayName : p.DisplayName;
             string capName = p.Captain.IsEmpty ? "" : NameOfCaptain(p.Captain.Value);
@@ -1470,10 +1524,13 @@ namespace Kindling.Client
                 + (_edictTargeting ? "   EDICT" : "");
             if (_depthChip != null)
                 _depthChip.text = p.Depth >= Rules.MaxDepth ? "MAX" : ("D" + p.Depth);
+            int wickMax = cap != null && cap.Wick > 0 ? cap.Wick : Rules.DefaultWick;
             if (_wickFill != null)
-                _wickFill.fillAmount = Mathf.Clamp01(p.Wick / 30f);
+                _wickFill.fillAmount = Mathf.Clamp01(p.Wick / (float)wickMax);
             if (_emberFill != null)
-                _emberFill.fillAmount = Mathf.Clamp01(p.Embers / 20f);
+                _emberFill.fillAmount = Mathf.Clamp01(p.Embers / (float)Rules.EmbersCeiling);
+            if (_wickNum != null) _wickNum.text = "Wick " + p.Wick;
+            if (_emberNum != null) _emberNum.text = "Embers " + p.Embers;
             if (_capRailName != null)
             {
                 string who = string.IsNullOrEmpty(user) ? "You" : user;
@@ -1563,16 +1620,16 @@ namespace Kindling.Client
             switch (_helpStep)
             {
                 case 0:
-                    _helpText.text = "1 / 4   Pick one of four Captains. Username is yours; the Captain is this match's power. Taken names cannot be shared.";
+                    _helpText.text = "1 / 4   Drag or tap a stall card, then HAND or WARBAND to buy (3 Embers). Buys always land in hand.";
                     break;
                 case 1:
-                    _helpText.text = "2 / 4   Drag a stall card onto HAND or WARBAND to buy (3 Embers). Buys always land in your hand. Drag a warband card onto the stall to sell.";
+                    _helpText.text = "2 / 4   Tap a hand card, then WARBAND to play. Spells cast from hand and never sit on the board.";
                     break;
                 case 2:
-                    _helpText.text = "3 / 4   Drag from hand onto WARBAND to play. Spells cast from hand and never sit on the board.";
+                    _helpText.text = "3 / 4   Tap a warband or hand card, then the stall to sell. Latch by dropping onto a host.";
                     break;
                 default:
-                    _helpText.text = "4 / 4   Combat starts when the timer hits 0 (15s round 1, 60s from round 5). READY fights early.";
+                    _helpText.text = "4 / 4   Upgrade shows Ember cost. Combat starts at 0 (15s R1, 60s from R5). READY fights early.";
                     break;
             }
         }
@@ -1613,7 +1670,7 @@ namespace Kindling.Client
                     return;
                 }
             }
-            _infoLabel.text = "Tap a Kindled. Drag stall to hand to buy. Drag hand to warband to play.";
+            _infoLabel.text = "Tap a Kindled to read it. Tap stall then hand to buy. Tap hand then warband to play.";
         }
 
         string NameOfCaptain(string id)

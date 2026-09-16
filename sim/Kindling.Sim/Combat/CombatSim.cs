@@ -631,8 +631,7 @@ namespace Kindling.Sim.Combat
                         if (act.Type == ActionType.SetEchoTimesBonus)
                         {
                             int amt = act.Amount > 0 ? act.Amount : 1;
-                            for (int k = 0; k < p.Board.Count; k++)
-                                p.Board[k].EchoTimesBonus += amt;
+                            u.EchoTimesBonus += amt;
                         }
                         else if (act.Type == ActionType.BuffStats)
                         {

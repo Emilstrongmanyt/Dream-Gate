@@ -75,6 +75,8 @@ Cut order if thin: IAP → Ranked → extra catalog → tutorial rewrite → cos
 
 ### Slice A — Make Practice honest (1–2 weeks)
 
+**Landed 2026-09-16** (sim goldens + HUD/text/tap/combat pace). Remaining: device-play confirmation.
+
 Highest playtest ROI. No new content.
 
 1. **Sim correctness**

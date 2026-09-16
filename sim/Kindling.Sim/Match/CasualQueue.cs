@@ -120,8 +120,9 @@ namespace Kindling.Sim.Match
 
         void WriteRatings(MatchSession s)
         {
-            if (s.RatingsWritten || Store == null) return;
+            if (s.RatingsWritten || Store == null || s.Loop == null) return;
             s.RatingsWritten = true;
+            bool ranked = s.Loop.State.Ranked;
             for (int i = 0; i < s.AccountIds.Length; i++)
             {
                 string acc = s.AccountIds[i];
@@ -131,8 +132,10 @@ namespace Kindling.Sim.Match
                 string name = Protocol.ReadString(prev, "displayName");
                 if (string.IsNullOrEmpty(name)) name = p.DisplayName ?? "";
                 int matches = Protocol.ReadInt(prev, "matches") + 1;
-                int mmr = (int)Math.Round(p.Rating);
-                int rd = (int)Math.Round(p.Rd);
+                int mmr = ranked ? (int)Math.Round(p.Rating) : Protocol.ReadInt(prev, "mmr");
+                if (!ranked && mmr <= 0) mmr = 1500;
+                int rd = ranked ? (int)Math.Round(p.Rd) : Protocol.ReadInt(prev, "rd");
+                if (!ranked && rd <= 0) rd = 350;
                 int place = p.Place ?? 0;
                 string json = AccountAuth.PatchRatings(prev, acc, name, mmr, rd, matches, place);
                 Store.PutAccount(acc, json);
