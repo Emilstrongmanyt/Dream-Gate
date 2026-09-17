@@ -170,16 +170,38 @@ namespace Kindling.Client
             return Font;
         }
 
-        public static bool ApplyBackdrop(Image img, string resource, bool keepRaycast)
+        public static bool ApplyBackdrop(Image host, string resource, bool keepRaycast)
         {
-            if (img == null || string.IsNullOrEmpty(resource)) return false;
+            if (host == null || string.IsNullOrEmpty(resource)) return false;
+            host.sprite = Pixel(Felt);
+            host.color = Felt;
+            host.type = Image.Type.Simple;
+            host.preserveAspect = false;
+            host.raycastTarget = keepRaycast;
+            if (host.GetComponent<RectMask2D>() == null)
+                host.gameObject.AddComponent<RectMask2D>();
+            Transform old = host.transform.Find("art");
+            if (old != null) Object.Destroy(old.gameObject);
             Sprite s = Resources.Load<Sprite>("Bg/" + resource);
             if (s == null) return false;
-            img.sprite = s;
-            img.color = Color.white;
-            img.type = Image.Type.Simple;
-            img.preserveAspect = false;
-            img.raycastTarget = keepRaycast;
+            if (s.texture != null) s.texture.wrapMode = TextureWrapMode.Clamp;
+            var art = Panel(host.transform, "art", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Color.white);
+            art.SetAsFirstSibling();
+            art.pivot = new Vector2(0.5f, 0.5f);
+            art.anchoredPosition = Vector2.zero;
+            art.sizeDelta = Vector2.zero;
+            var artImg = art.GetComponent<Image>();
+            artImg.sprite = s;
+            artImg.color = Color.white;
+            artImg.type = Image.Type.Simple;
+            artImg.preserveAspect = true;
+            artImg.raycastTarget = false;
+            float w = s.rect.width;
+            float h = s.rect.height;
+            if (h < 1f) h = 1f;
+            var fit = art.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectRatio = w / h;
             return true;
         }
 
@@ -229,7 +251,8 @@ namespace Kindling.Client
             float w = anchorMax.x - anchorMin.x;
             float h = anchorMax.y - anchorMin.y;
             bool top = parent != null && (parent.GetComponent<Canvas>() != null
-                || parent.name == "safe" || parent.name == "menu" || parent.name == "KindlingCanvas");
+                || parent.name == "safe" || parent.name == "menu" || parent.name == "menuSafe"
+                || parent.name == "KindlingCanvas");
             if (!full && color.a > 0.4f && w >= 0.32f && h >= 0.34f && top)
             {
                 if (StoneTheme.Skin(img, StoneTheme.PanelSprite()))

@@ -146,6 +146,7 @@ namespace Kindling.Client
             _canvas = canvasGo.GetComponent<Canvas>();
             var felt = HsUi.Panel(_canvas.transform, "felt", Vector2.zero, Vector2.one, HsUi.Felt);
             HsUi.ApplyBackdrop(felt.GetComponent<Image>(), "board", false);
+            felt.GetComponent<Image>().raycastTarget = false;
             _safe = HsUi.SafeRoot(_canvas.transform);
             var canvas = _safe;
 
@@ -357,20 +358,24 @@ namespace Kindling.Client
 
         void BuildMenu()
         {
-            Transform root = _safe != null ? _safe : _canvas.transform;
-            _menuRoot = HsUi.Panel(root, "menu", Vector2.zero, Vector2.one, new Color(0.08f, 0.04f, 0.02f, 0.98f)).gameObject;
-            HsUi.ApplyBackdrop(_menuRoot.GetComponent<Image>(), "menu", true);
+            Transform canvasRoot = _canvas != null ? _canvas.transform : (_safe != null ? _safe : transform);
+            _menuRoot = HsUi.Panel(canvasRoot, "menu", Vector2.zero, Vector2.one, HsUi.Felt).gameObject;
+            var menuImg = _menuRoot.GetComponent<Image>();
+            menuImg.raycastTarget = true;
+            HsUi.ApplyBackdrop(menuImg, "menu", true);
             var veil = HsUi.Panel(_menuRoot.transform, "veil", Vector2.zero, Vector2.one, new Color(0.04f, 0.02f, 0.01f, 0.42f));
-            var veilImg = veil.GetComponent<Image>();
-            veilImg.raycastTarget = false;
-            HsUi.Band(_menuRoot.transform, "mt", "KINDLING", 48, TextAnchor.MiddleCenter, HsUi.Gold,
+            veil.GetComponent<Image>().raycastTarget = false;
+            var root = HsUi.Panel(_menuRoot.transform, "menuSafe", Vector2.zero, Vector2.one, Color.clear);
+            root.gameObject.AddComponent<SafeAreaFitter>();
+            root.GetComponent<Image>().raycastTarget = false;
+            HsUi.Band(root, "mt", "KINDLING", 48, TextAnchor.MiddleCenter, HsUi.Gold,
                 new Vector2(0.18f, 0.86f), new Vector2(0.82f, 0.97f));
-            HsUi.Band(_menuRoot.transform, "ms", "The Ember Exchange", 22, TextAnchor.MiddleCenter, HsUi.Cream,
+            HsUi.Band(root, "ms", "The Ember Exchange", 22, TextAnchor.MiddleCenter, HsUi.Cream,
                 new Vector2(0.18f, 0.79f), new Vector2(0.82f, 0.86f));
-            HsUi.Band(_menuRoot.transform, "msub", "Sign in with a username, then Practice or Queue.", 16, TextAnchor.MiddleCenter, HsUi.Gold,
+            HsUi.Band(root, "msub", "Sign in with a username, then Practice or Queue.", 16, TextAnchor.MiddleCenter, HsUi.Gold,
                 new Vector2(0.18f, 0.73f), new Vector2(0.82f, 0.79f));
 
-            var card = HsUi.Panel(_menuRoot.transform, "card", new Vector2(0.33f, 0.12f), new Vector2(0.77f, 0.71f), HsUi.Wood);
+            var card = HsUi.Panel(root, "card", new Vector2(0.33f, 0.12f), new Vector2(0.77f, 0.71f), HsUi.Wood);
 
             _authPanel = HsUi.Panel(card, "auth", Vector2.zero, Vector2.one, Color.clear).gameObject;
             _nameInput = HsUi.MakeInput(_authPanel.transform, "name", new Vector2(0.10f, 0.70f), new Vector2(0.90f, 0.86f), "Username", false, 16);
@@ -388,7 +393,7 @@ namespace Kindling.Client
             HsUi.MakeButton(_hubPanel.transform, "set", "SETTINGS", new Vector2(0.10f, 0.14f), new Vector2(0.48f, 0.30f), HsUi.GoldDark, ToggleSettings);
             HsUi.MakeButton(_hubPanel.transform, "out", "LOG OUT", new Vector2(0.52f, 0.14f), new Vector2(0.90f, 0.30f), HsUi.WickRed, Logout);
 
-            _settingsPanel = HsUi.Panel(_menuRoot.transform, "settings", new Vector2(0.30f, 0.14f), new Vector2(0.70f, 0.78f), HsUi.Wood).gameObject;
+            _settingsPanel = HsUi.Panel(root, "settings", new Vector2(0.30f, 0.14f), new Vector2(0.70f, 0.78f), HsUi.Wood).gameObject;
             HsUi.Band(_settingsPanel.transform, "stt", "SETTINGS", 26, TextAnchor.MiddleCenter, HsUi.Gold,
                 new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.97f));
             _hostInput = HsUi.MakeInput(_settingsPanel.transform, "host", new Vector2(0.10f, 0.68f), new Vector2(0.90f, 0.82f), "Match host (optional)", false, 128);
@@ -397,7 +402,7 @@ namespace Kindling.Client
             HsUi.MakeButton(_settingsPanel.transform, "close", "CLOSE", new Vector2(0.10f, 0.10f), new Vector2(0.90f, 0.26f), HsUi.GoldDark, ToggleSettings);
             _settingsPanel.SetActive(false);
 
-            var hist = HsUi.Panel(_menuRoot.transform, "history", new Vector2(0.02f, 0.12f), new Vector2(0.30f, 0.71f), HsUi.Wood);
+            var hist = HsUi.Panel(root, "history", new Vector2(0.02f, 0.12f), new Vector2(0.30f, 0.71f), HsUi.Wood);
             hist.gameObject.AddComponent<RectMask2D>();
             HsUi.Band(hist, "ht", "RECENT MATCHES", 15, TextAnchor.MiddleCenter, HsUi.Gold,
                 new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.97f));
@@ -406,7 +411,7 @@ namespace Kindling.Client
             _historyLabel.resizeTextForBestFit = false;
             _historyLabel.verticalOverflow = VerticalWrapMode.Truncate;
 
-            _menuStatus = HsUi.Band(_menuRoot.transform, "st", "", 16, TextAnchor.MiddleCenter, HsUi.Selected,
+            _menuStatus = HsUi.Band(root, "st", "", 16, TextAnchor.MiddleCenter, HsUi.Selected,
                 new Vector2(0.10f, 0.02f), new Vector2(0.90f, 0.10f));
             _hubPanel.SetActive(false);
         }
