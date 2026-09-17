@@ -27,6 +27,8 @@
       }
     },
     "copyLimit": { "type": "integer" },
-    "tokenDamageDepth": { "type": "integer" }
+    "tokenDamageDepth": { "type": "integer" },
+    "text": { "type": "string" },
+    "disabled": { "type": "boolean" }
   }
 }

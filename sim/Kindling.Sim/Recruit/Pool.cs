@@ -7,6 +7,55 @@ namespace Kindling.Sim.Recruit
 {
     public static class Pool
     {
+        public static int StartingCopies(Catalog.Catalog cat)
+        {
+            int n = 0;
+            if (cat == null) return 0;
+            foreach (UnitDef def in cat.ShopUnits())
+                n += def.CopyLimit;
+            return n;
+        }
+
+        public static int AccountedCopies(MatchState m, Catalog.Catalog cat)
+        {
+            if (m == null) return 0;
+            int n = 0;
+            for (int i = 0; i < m.Pool.Count; i++)
+                n += m.Pool[i].Remaining;
+            if (m.Seats != null)
+            {
+                for (int s = 0; s < m.Seats.Length; s++)
+                {
+                    PlayerState p = m.Seats[s];
+                    if (p == null) continue;
+                    n += CountShop(p.Board, cat);
+                    n += CountShop(p.Hand, cat);
+                    n += CountShop(p.Stall, cat);
+                }
+            }
+            n += 2 * m.AwakenEvents;
+            n += m.ShopLatchDestroyed;
+            n += m.GlimpseOverflowGrants;
+            n += m.MirrorGrants;
+            n += m.AddToHandFromPoolOverflow;
+            return n;
+        }
+
+        static int CountShop(List<UnitInstance> list, Catalog.Catalog cat)
+        {
+            if (list == null) return 0;
+            int n = 0;
+            for (int i = 0; i < list.Count; i++)
+            {
+                UnitInstance u = list[i];
+                if (u == null) continue;
+                UnitDef def = cat != null ? cat.GetUnit(u.CatalogId) : null;
+                if (def == null || def.Token) continue;
+                n++;
+            }
+            return n;
+        }
+
         public static void Init(MatchState m, Catalog.Catalog cat)
         {
             m.Pool.Clear();

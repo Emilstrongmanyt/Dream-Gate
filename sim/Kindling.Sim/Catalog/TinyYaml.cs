@@ -86,6 +86,15 @@ namespace Kindling.Sim.Catalog
             Map.Add(new KeyValuePair<string, YamlNode>(key, value));
         }
 
+        public List<string> KeyNames()
+        {
+            var keys = new List<string>();
+            if (Type != Kind.Mapping || Map == null) return keys;
+            for (int i = 0; i < Map.Count; i++)
+                keys.Add(Map[i].Key);
+            return keys;
+        }
+
         public List<string> StringList(string key)
         {
             var result = new List<string>();

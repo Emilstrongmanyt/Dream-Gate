@@ -101,6 +101,8 @@ Exit: a designer can play a Practice match and know what a stall card does, what
 
 ### Slice B — Tests the catalog already needs (parallel with A)
 
+**Landed 2026-09-17** (DESIGN §6.5 goldens, pool identity, 100-seed combat fuzz, YAML key/id validate, 50-match soak).
+
 Phase 2 was “content complete + tests.” Content is done; tests are not.
 
 1. Missing §6.5 goldens: Throne + Spark Bit Kindle (aura gone before first attack); Night `SummonFill` on a 7-board; Buy+Reroll checkpoint → next stall **equals** control; mutual Echo; Investor StartOfRecruit.
